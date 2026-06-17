@@ -14,7 +14,6 @@
         <script src="core/jspsych/plugins/plugin-html-button-response.js"></script>
         <script src="core/jspsych/plugins/plugin-call-function.js"></script>
         <script src="core/jspsych/plugins/plugin-instructions.js"></script>
-        <script src="core/jspsych/plugins/plugin-fullscreen.js"></script>
         <link href="core/jspsych/css/jspsych.css" rel="stylesheet" type="text/css"></link>
         <script src="core/init_experiment.js"></script>
     </head>
@@ -55,12 +54,6 @@
             } : null,
         };
 
-        const fullscreen = {
-            type: jsPsychFullscreen,
-            message: '<p><u>Full Screen Mode:</u> This experiment works best in fullscreen mode. Press Continue when you are ready to proceed.</p>',
-            fullscreen_mode: true
-        };
-
         const instructions = {
             type: jsPsychInstructions,
             pages: [
@@ -90,7 +83,7 @@
             debug: debug,
         });
 
-        let timeline = [fullscreen, instructions];
+        let timeline = [instructions];
         timeline = timeline.concat(createDelayDiscountingTimeline(
             jsPsych,
             adaptive_controller,
