@@ -66,7 +66,7 @@ let { design } = selectOptimalDesign(
 const trials = [];
 let post_mean = null;
 for (let t = 0; t < default_dd_config.n_trials; t++) {
-  const sim = simulateDelayDiscountingChoice(design, default_dd_simulation_config, sim_rng);
+  const sim = simulateDelayDiscountingChoice(design, default_dd_simulation_config, sim_rng, hyp);
   trials.push({ ...design, choice: sim.response });
 
   const fit = model.sample({ data: hyp.buildData(trials), ...sample_config });

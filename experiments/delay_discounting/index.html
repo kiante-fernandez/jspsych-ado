@@ -86,9 +86,14 @@
 
         const using_jatos = typeof jatos !== 'undefined';
         const url_params = new URLSearchParams(window.location.search);
-        // "stan" = in-browser Stan inference + ADO (the live path); "mock" = fast
-        // deterministic dev controller with no WASM.
-        const ado_mode = url_params.get("ado") || "stan";
+        // Only "stan" (in-browser Stan inference + ADO, the live path) and "mock"
+        // (fast deterministic dev controller, no WASM) are supported. Normalize the
+        // recorded mode to what actually ran so data provenance is correct.
+        const requested_ado_mode = url_params.get("ado");
+        const ado_mode = requested_ado_mode === "mock" ? "mock" : "stan";
+        if (requested_ado_mode && requested_ado_mode !== "mock" && requested_ado_mode !== "stan") {
+            console.warn(`Unknown ado mode "${requested_ado_mode}"; running Stan.`);
+        }
         const debug = url_params.get("debug") === "1";
         const requested_simulation_mode = url_params.get("simulate");
         const simulation_mode = ["data-only", "visual"].includes(requested_simulation_mode) ? requested_simulation_mode : null;
@@ -143,7 +148,7 @@
              * @returns {Object} response/rt plus sim_* audit fields.
              */
             simulate_choice: function(design) {
-                return simulateDelayDiscountingChoice(design, default_dd_simulation_config, simulation_rng);
+                return simulateDelayDiscountingChoice(design, default_dd_simulation_config, simulation_rng, hyperbolicModel);
             },
             jatos: using_jatos ? {
                 studyResultId: jatos.studyResultId,

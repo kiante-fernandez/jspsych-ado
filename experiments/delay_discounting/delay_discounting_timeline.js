@@ -134,7 +134,7 @@ function logAdoTrial(run_context, trial_data, ado_result, config) {
       return;
     }
 
-    const next_design = ado_result.next_design || {};
+    const next_design = ado_result.next_design;
     const post_mean = ado_result.post_mean || {};
     const post_sd = ado_result.post_sd || {};
     const total_trials = config && config.n_trials ? config.n_trials : "?";
@@ -150,37 +150,31 @@ function logAdoTrial(run_context, trial_data, ado_result, config) {
       `  k:   mean ${formatDebugNumber(post_mean.k)}, sd ${formatDebugNumber(post_sd.k)}`,
       `  tau: mean ${formatDebugNumber(post_mean.tau)}, sd ${formatDebugNumber(post_sd.tau)}`,
       "",
-      "Next ADO design:",
-      `  ${formatDebugOffer("SS", next_design.r_ss, next_design.t_ss)}`,
-      `  ${formatDebugOffer("LL", next_design.r_ll, next_design.t_ll)}`,
+      // next_design is null on the final update (no further trial to show it on).
+      next_design
+        ? [
+            "Next ADO design:",
+            `  ${formatDebugOffer("SS", next_design.r_ss, next_design.t_ss)}`,
+            `  ${formatDebugOffer("LL", next_design.r_ll, next_design.t_ll)}`,
+          ].join("\n")
+        : "Next ADO design: (final trial; none)",
     ].join("\n");
 
     console.log(summary);
 
     if (console.groupCollapsed && console.table && console.groupEnd) {
       console.groupCollapsed(`${label} details`);
-      console.table([
-        {
-          option: "Presented SS",
-          reward: trial_data.r_ss,
-          delay: trial_data.t_ss,
-        },
-        {
-          option: "Presented LL",
-          reward: trial_data.r_ll,
-          delay: trial_data.t_ll,
-        },
-        {
-          option: "Next SS",
-          reward: next_design.r_ss,
-          delay: next_design.t_ss,
-        },
-        {
-          option: "Next LL",
-          reward: next_design.r_ll,
-          delay: next_design.t_ll,
-        },
-      ]);
+      const offer_rows = [
+        { option: "Presented SS", reward: trial_data.r_ss, delay: trial_data.t_ss },
+        { option: "Presented LL", reward: trial_data.r_ll, delay: trial_data.t_ll },
+      ];
+      if (next_design) {
+        offer_rows.push(
+          { option: "Next SS", reward: next_design.r_ss, delay: next_design.t_ss },
+          { option: "Next LL", reward: next_design.r_ll, delay: next_design.t_ll },
+        );
+      }
+      console.table(offer_rows);
       console.table([
         {
           parameter: "k",

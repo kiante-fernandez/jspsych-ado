@@ -29,7 +29,7 @@ In mock mode, the browser uses a deterministic stand-in controller with the same
 
 ## Why the boundary matters
 
-This separation keeps the experiment code focused on presentation and response collection. The timeline does not need to know how ADOpy computes likelihoods, updates posteriors, or chooses designs.
+This separation keeps the experiment code focused on presentation and response collection. The timeline does not need to know how the adaptive controller computes likelihoods, updates posteriors, or chooses designs.
 
 It also makes development easier. A new experiment can be wired against a mock controller first, then switched to the real Stan-backed controller once the trial flow and data fields are clear.
 

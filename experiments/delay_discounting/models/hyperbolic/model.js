@@ -56,6 +56,21 @@ function choiceProbLL(design, params) {
 }
 
 /**
+ * Optional model-specific diagnostics for the simulator: the hyperbolically
+ * discounted subjective values of each option.
+ *
+ * @param {Object} design - {t_ss, t_ll, r_ss, r_ll}.
+ * @param {Object} params - {k}.
+ * @returns {{v_ss: number, v_ll: number}} Subjective values.
+ */
+function subjectiveValues(design, params) {
+  return {
+    v_ss: getHyperbolicValue(design.r_ss, design.t_ss, params.k),
+    v_ll: getHyperbolicValue(design.r_ll, design.t_ll, params.k),
+  };
+}
+
+/**
  * Build the Stan `data` block from the accumulated observed choice trials.
  *
  * @param {Array<Object>} trials - [{t_ss, t_ll, r_ss, r_ll, choice}, ...]; choice 1 = LL.
@@ -84,7 +99,8 @@ const hyperbolicModel = {
   moduleUrl: new URL("./main.js", import.meta.url).href,
   buildData,
   choiceProbLL,
+  subjectiveValues,
 };
 
 export default hyperbolicModel;
-export { choiceProbLL, getHyperbolicValue, logistic, buildData };
+export { choiceProbLL, getHyperbolicValue, logistic, buildData, subjectiveValues };
