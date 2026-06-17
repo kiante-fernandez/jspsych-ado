@@ -60,24 +60,20 @@ function formatReward(reward) {
  * @returns {string} HTML stimulus for jsPsychHtmlButtonResponse.
  */
 function makeChoiceStimulus(design) {
-  return `
-    <div style="max-width: 900px; margin: 0 auto;">
-      <p style="font-size: 22px;">Choose the option you prefer.</p>
-      <div style="display: flex; gap: 30px; justify-content: center; align-items: stretch;">
-        <div style="border: 1px solid #ccc; padding: 24px; width: 320px;">
-          <p style="font-size: 22px;"><strong>Smaller-sooner</strong></p>
-          <p style="font-size: 36px;">${formatReward(design.r_ss)}</p>
-          <p style="font-size: 22px;">${formatDelay(design.t_ss)}</p>
-        </div>
-        <div style="border: 1px solid #ccc; padding: 24px; width: 320px;">
-          <p style="font-size: 22px;"><strong>Larger-later</strong></p>
-          <p style="font-size: 36px;">${formatReward(design.r_ll)}</p>
-          <p style="font-size: 22px;">${formatDelay(design.t_ll)}</p>
-        </div>
-      </div>
-      <p style="font-size: 16px;">Press the button for the option you prefer.</p>
-    </div>
-  `;
+  return `<p style="font-size: 1.3rem; margin: 0 0 1.75rem;">Which would you prefer?</p>`;
+}
+
+function makeOptionCardHtml(design, index) {
+  var is_ss = index === 0;
+  var amount = is_ss ? design.r_ss : design.r_ll;
+  var delay = is_ss ? design.t_ss : design.t_ll;
+  var key_hint = is_ss ? "S" : "L";
+  var delay_text = delay === 0 ? "available now" : "available in " + formatDelay(delay);
+  return "<button class=\"dd-option-card\">"
+    + "<span class=\"dd-key-hint\">" + key_hint + "</span>"
+    + "<span class=\"dd-amount\">" + formatReward(amount) + "</span>"
+    + "<span class=\"dd-when\">" + delay_text + "</span>"
+    + "</button>";
 }
 
 /**
@@ -242,6 +238,7 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
   let ado_state = null;
   let current_design = null;
   let last_choice_data = null;
+  let active_key_handler = null;
 
   const initialize_ado = {
     type: jsPsychCallFunction,
@@ -268,7 +265,16 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
       stimulus: function() {
         return makeChoiceStimulus(current_design);
       },
-      choices: ["Smaller-sooner", "Larger-later"],
+      choices: ["SS", "LL"],
+      button_html: function() {
+        return [
+          makeOptionCardHtml(current_design, 0),
+          makeOptionCardHtml(current_design, 1),
+        ];
+      },
+      margin_vertical: "0px",
+      margin_horizontal: "12px",
+      prompt: "<p style=\"margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;\">Press <strong>S</strong> for Smaller-sooner &nbsp;·&nbsp; Press <strong>L</strong> for Larger-later</p>",
       simulation_options: function() {
         return makeChoiceSimulationOptions(run_context, current_design);
       },
@@ -284,7 +290,24 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
           r_ll: current_design.r_ll,
         };
       },
+      on_load: function() {
+        active_key_handler = function(e) {
+          var key = e.key.toUpperCase();
+          if (key === "S") {
+            var btn = document.querySelector("#jspsych-html-button-response-button-0");
+            if (btn) { btn.click(); }
+          } else if (key === "L") {
+            var btn = document.querySelector("#jspsych-html-button-response-button-1");
+            if (btn) { btn.click(); }
+          }
+        };
+        document.addEventListener("keydown", active_key_handler);
+      },
       on_finish: function(data) {
+        if (active_key_handler) {
+          document.removeEventListener("keydown", active_key_handler);
+          active_key_handler = null;
+        }
         data.choice = data.response;
         data.choice_label = config.response_labels[data.choice];
         data.ado_design = {
