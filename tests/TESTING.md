@@ -19,7 +19,7 @@ uv run pytest -m slow          # run only the recovery tests
 | `tests/test_parity.py` | Replays a fixed response sequence through the wrapper and asserts the selected designs and posteriors match a committed ADOpy reference within `1e-6`. Skips if the fixture has not been generated. |
 | `tests/test_recovery.py` | Slow. Simulates participants with known `k`; asserts the posterior recovers the correct region (directional). |
 
-### The parity fixture
+### Testing the ADOpy wrapper against ADOpy
 
 `tests/test_parity.py` compares the wrapper against a committed ground-truth
 file produced from raw ADOpy. Generate (or regenerate) it whenever ADOpy or the
@@ -32,8 +32,7 @@ python tests/generate_fixtures.py
 This writes `tests/fixtures/adopy_reference_sequence.json`, which records the
 ADOpy version and grid configuration in its header. Commit the regenerated file.
 Until it exists, the parity tests skip with an explanatory message rather than
-fail. The same fixture is intended to seed the future jsADO TypeScript parity
-harness.
+fail.
 
 ## JavaScript (vitest + jsdom)
 
