@@ -39,6 +39,26 @@ The trace shows the design just presented, the response, posterior mean/sd,
 the next selected design, mode, and API latency when using the Python service.
 In DevTools, each summary also has a collapsed details group with tables.
 
+## Run simulated participants
+
+Add `simulate=data-only` to generate jsPsych data without clicks:
+
+```text
+experiments/delay_discounting/index.html?ado=mock&simulate=data-only
+experiments/delay_discounting/index.html?ado=api&api=http://127.0.0.1:8000&simulate=data-only
+```
+
+Add `simulate=visual` to watch jsPsych click through the same simulated run:
+
+```text
+experiments/delay_discounting/index.html?ado=mock&simulate=visual
+```
+
+The simulated participant parameters live in
+`experiments/delay_discounting/dd_config.js` as `default_dd_simulation_config`.
+The browser uses jsPsych's standard simulation API, so the generated data still
+comes from the experiment timeline rather than a separate data generator.
+
 ## Run tests
 
 ```bash

@@ -78,7 +78,8 @@
     </head>
     <body></body>
     <script type="module">
-        import { default_dd_config } from "./experiments/delay_discounting/dd_config.js";
+        import { default_dd_config, default_dd_simulation_config } from "./experiments/delay_discounting/dd_config.js";
+        import { createSeededRng, simulateDelayDiscountingChoice } from "./experiments/delay_discounting/dd_simulation.js";
         import { createDelayDiscountingTimeline } from "./experiments/delay_discounting/delay_discounting_timeline.js";
         import { createMockAdoController } from "./experiments/delay_discounting/controllers/mock_ado_controller.js";
         import { createApiAdoController } from "./experiments/delay_discounting/controllers/api_ado_controller.js";
@@ -89,6 +90,31 @@
         const ado_mode = url_params.get("ado") || "mock";
         const api_base = url_params.get("api") || "http://127.0.0.1:8000";
         const debug = url_params.get("debug") === "1";
+        const requested_simulation_mode = url_params.get("simulate");
+        const simulation_mode = ["data-only", "visual"].includes(requested_simulation_mode) ? requested_simulation_mode : null;
+        const simulation_rng = createSeededRng(default_dd_simulation_config.seed);
+
+        /**
+         * Build jsPsych instructions-plugin simulation data.
+         *
+         * @param {number} page_count - Number of instruction pages.
+         * @param {Object} simulation_config - Delay-discounting simulation settings.
+         * @returns {Object} Plugin data with total rt and per-page view_history.
+         */
+        function makeInstructionSimulationData(page_count, simulation_config) {
+            let view_history = [];
+            for (let i = 0; i < page_count; i++) {
+                view_history.push({
+                    page_index: i,
+                    viewing_time: simulation_config.rt.instructions,
+                });
+            }
+
+            return {
+                rt: page_count * simulation_config.rt.instructions,
+                view_history: view_history,
+            };
+        }
 
         let adaptive_controller;
         if (ado_mode === "api") {
@@ -103,8 +129,18 @@
             ado_mode: ado_mode,
             api_base: api_base,
             debug: debug,
+            simulation_mode: simulation_mode,
             using_jatos: using_jatos,
             session_id: using_jatos ? jatos.studyResultId : "local-" + Date.now(),
+            /**
+             * Return simulated jsPsych choice data for the current ADO design.
+             *
+             * @param {Object} design - Current SS/LL design from the controller.
+             * @returns {Object} response/rt plus sim_* audit fields.
+             */
+            simulate_choice: function(design) {
+                return simulateDelayDiscountingChoice(design, default_dd_simulation_config, simulation_rng);
+            },
             jatos: using_jatos ? {
                 studyResultId: jatos.studyResultId,
                 componentResultId: jatos.componentResultId,
@@ -124,7 +160,10 @@
             key_forward: 'm',
             key_backward: 'z',
             button_label_previous: 'Previous (<strong>Z</strong>)',
-            button_label_next: 'Next (<strong>M</strong>)'
+            button_label_next: 'Next (<strong>M</strong>)',
+            simulation_options: {
+                data: makeInstructionSimulationData(3, default_dd_simulation_config),
+            },
         };
 
         const end_screen = {
@@ -133,6 +172,12 @@
                 return '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
             },
             choices: ["SUBMIT"],
+            simulation_options: {
+                data: {
+                    response: 0,
+                    rt: default_dd_simulation_config.rt.end,
+                },
+            },
         };
 
         jsPsych = initializeExperiment();
@@ -140,6 +185,10 @@
             ado_mode: ado_mode,
             api_base: api_base,
             debug: debug,
+            simulate: simulation_mode,
+            simulation_seed: default_dd_simulation_config.seed,
+            sim_k: default_dd_simulation_config.params.k,
+            sim_tau: default_dd_simulation_config.params.tau,
         });
 
         let timeline = [instructions];
@@ -151,6 +200,10 @@
         ));
         timeline.push(end_screen);
 
-        jsPsych.run(timeline);
+        if (simulation_mode) {
+            jsPsych.simulate(timeline, simulation_mode);
+        } else {
+            jsPsych.run(timeline);
+        }
     </script>
 </html>

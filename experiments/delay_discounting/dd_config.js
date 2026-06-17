@@ -19,6 +19,14 @@ function logspace(start, stop, count, base = 10) {
   return linspace(start, stop, count).map(value => Math.pow(base, value));
 }
 
+/**
+ * Delay-discounting task and ADO grid configuration.
+ *
+ * grid_design defines the candidate SS/LL designs available to the adaptive
+ * controller. grid_param defines the k/tau parameter grid used by the backend
+ * ADO model. response_labels must match the jsPsych button indices used in the
+ * timeline: 0 = SS, 1 = LL.
+ */
 const default_dd_config = {
   n_trials: 42,
   grid_design: {
@@ -42,5 +50,28 @@ const default_dd_config = {
   }
 };
 
-export { default_dd_config, range, linspace, logspace };
+/**
+ * Editable simulated-participant settings used only when jsPsych.simulate()
+ * is active. params are the data-generating k/tau values; they are not posterior
+ * estimates from ADOpy. rt controls deterministic simulated response times.
+ */
+const default_dd_simulation_config = {
+  seed: 123,
+  params: {
+    k: 0.001,
+    tau: 2.5,
+  },
+  rt: {
+    instructions: 300,
+    choice: 500,
+    end: 300,
+  }
+};
 
+export {
+  default_dd_config,
+  default_dd_simulation_config,
+  range,
+  linspace,
+  logspace,
+};
