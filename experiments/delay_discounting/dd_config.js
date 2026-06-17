@@ -29,6 +29,12 @@ function logspace(start, stop, count, base = 10) {
  */
 const default_dd_config = {
   n_trials: 42,
+  use_adaptive_stopping: false,
+  min_trials: 10,
+  max_trials: 60,
+  // Convergence criterion: post_sd_k below this threshold signals adequate precision.
+  // ~0.1 matches the precision range reported in Ahn et al. (2020) for ADO delay discounting.
+  convergence_sd_k_threshold: 0.1,
   grid_design: {
     t_ss: [0],
     t_ll: [

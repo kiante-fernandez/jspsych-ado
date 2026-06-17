@@ -79,7 +79,7 @@
     <script type="module">
         import { default_dd_config, default_dd_simulation_config } from "./experiments/delay_discounting/dd_config.js";
         import { createSeededRng, simulateDelayDiscountingChoice } from "./experiments/delay_discounting/dd_simulation.js";
-        import { createDelayDiscountingTimeline } from "./experiments/delay_discounting/delay_discounting_timeline.js";
+        import { createDelayDiscountingTimeline, makeKConvergenceSvg } from "./experiments/delay_discounting/delay_discounting_timeline.js";
         import { createMockAdoController } from "./experiments/delay_discounting/controllers/mock_ado_controller.js";
         import { createApiAdoController } from "./experiments/delay_discounting/controllers/api_ado_controller.js";
 
@@ -172,62 +172,7 @@
             return v.toFixed(3);
         }
 
-        function make_k_convergence_svg(k_series) {
-            var W = 500, H = 200;
-            var ml = 58, mr = 16, mt = 14, mb = 38;
-            var pw = W - ml - mr;
-            var ph = H - mt - mb;
-            var n = k_series.length;
-
-            if (n === 0) {
-                return "<svg width=\"" + W + "\" height=\"" + H + "\"><text x=\"" + (W / 2) + "\" y=\"" + (H / 2) + "\" text-anchor=\"middle\" font-size=\"13\" fill=\"#6b7280\">No data</text></svg>";
-            }
-
-            var y_min = Infinity, y_max = -Infinity;
-            k_series.forEach(function(d) {
-                y_min = Math.min(y_min, d.mean - (d.sd || 0));
-                y_max = Math.max(y_max, d.mean + (d.sd || 0));
-            });
-            var y_pad = (y_max - y_min) * 0.10 || 0.001;
-            y_min -= y_pad;
-            y_max += y_pad;
-
-            function sx(i) { return ml + (n === 1 ? pw / 2 : (i / (n - 1)) * pw); }
-            function sy(v) { return mt + ph - ((v - y_min) / (y_max - y_min)) * ph; }
-
-            var band_top = [], band_bot = [];
-            k_series.forEach(function(d, i) {
-                band_top.push(sx(i) + "," + sy(d.mean + (d.sd || 0)));
-                band_bot.unshift(sx(i) + "," + sy(d.mean - (d.sd || 0)));
-            });
-            var band_pts = band_top.concat(band_bot).join(" ");
-            var line_pts = k_series.map(function(d, i) { return sx(i) + "," + sy(d.mean); }).join(" ");
-
-            var y_ticks = "";
-            for (var t = 0; t <= 3; t++) {
-                var v = y_min + (y_max - y_min) * (t / 3);
-                var yp = sy(v);
-                y_ticks += "<line x1=\"" + ml + "\" y1=\"" + yp + "\" x2=\"" + (ml + pw) + "\" y2=\"" + yp + "\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>"
-                    + "<text x=\"" + (ml - 5) + "\" y=\"" + (yp + 4) + "\" text-anchor=\"end\" font-size=\"10\" fill=\"#6b7280\">" + v.toExponential(1) + "</text>";
-            }
-
-            var x_ticks = "";
-            [0, Math.floor((n - 1) / 2), n - 1].forEach(function(i) {
-                x_ticks += "<text x=\"" + sx(i) + "\" y=\"" + (mt + ph + 18) + "\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6b7280\">" + k_series[i].trial + "</text>";
-            });
-
-            return "<svg width=\"" + W + "\" height=\"" + H + "\" style=\"display:block;margin:0 auto 2rem;\">"
-                + "<rect x=\"" + ml + "\" y=\"" + mt + "\" width=\"" + pw + "\" height=\"" + ph + "\" fill=\"#f9fafb\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>"
-                + y_ticks
-                + "<polygon points=\"" + band_pts + "\" fill=\"rgba(99,102,241,0.15)\"/>"
-                + "<polyline points=\"" + line_pts + "\" fill=\"none\" stroke=\"#4f46e5\" stroke-width=\"2\" stroke-linejoin=\"round\"/>"
-                + x_ticks
-                + "<text x=\"" + (ml + pw / 2) + "\" y=\"" + (H - 5) + "\" text-anchor=\"middle\" font-size=\"11\" fill=\"#374151\">Trial</text>"
-                + "<text x=\"12\" y=\"" + (mt + ph / 2) + "\" text-anchor=\"middle\" font-size=\"11\" fill=\"#374151\" transform=\"rotate(-90 12 " + (mt + ph / 2) + ")\">k</text>"
-                + "</svg>";
-        }
-
-        function make_debrief_stimulus() {
+        function make_debrief_stimulus(stopping_result) {
             var rows = jsPsych.data.get().filter({task: "delay_discounting"}).values();
             var with_post = rows.filter(function(d) { return d.post_mean_k != null; });
             var last = with_post.length > 0 ? with_post[with_post.length - 1] : null;
@@ -236,8 +181,17 @@
                 return {trial: d.trial_number, mean: d.post_mean_k, sd: d.post_sd_k};
             });
 
+            var stopping_note = "";
+            if (default_dd_config.use_adaptive_stopping && stopping_result) {
+                if (stopping_result.converged) {
+                    stopping_note = "<p style=\"font-size:0.9rem;color:#4f46e5;margin-bottom:1.25rem;\">Estimation converged after " + stopping_result.trial_count + " trials.</p>";
+                } else {
+                    stopping_note = "<p style=\"font-size:0.9rem;color:#6b7280;margin-bottom:1.25rem;\">Completed " + stopping_result.trial_count + " trials (maximum reached).</p>";
+                }
+            }
+
             return "<h2>Finished</h2>"
-                + "<p style=\"margin-bottom:1.25rem;\">The experiment is complete.</p>"
+                + stopping_note
                 + "<table style=\"border-collapse:collapse;margin:0 auto 1.5rem;font-size:0.95rem;\">"
                 + "<tr><td style=\"padding:4px 14px 4px 0;color:#6b7280;\">Discount rate k</td>"
                 + "<td style=\"font-family:ui-monospace,monospace;\">" + fmt_k(last && last.post_mean_k) + (last && last.post_sd_k != null ? " <span style=\"color:#9ca3af;\">± " + fmt_k(last.post_sd_k) + "</span>" : "") + "</td></tr>"
@@ -245,22 +199,8 @@
                 + "<td style=\"font-family:ui-monospace,monospace;\">" + fmt_tau(last && last.post_mean_tau) + (last && last.post_sd_tau != null ? " <span style=\"color:#9ca3af;\">± " + fmt_tau(last.post_sd_tau) + "</span>" : "") + "</td></tr>"
                 + "</table>"
                 + "<p style=\"font-size:0.82rem;color:#6b7280;margin-bottom:0.5rem;text-align:center;\">k convergence across trials</p>"
-                + make_k_convergence_svg(k_series);
+                + makeKConvergenceSvg(k_series);
         }
-
-        const end_screen = {
-            type: jsPsychHtmlButtonResponse,
-            stimulus: function() {
-                return make_debrief_stimulus();
-            },
-            choices: ["SUBMIT"],
-            simulation_options: {
-                data: {
-                    response: 0,
-                    rt: default_dd_simulation_config.rt.end,
-                },
-            },
-        };
 
         jsPsych = initializeExperiment();
         jsPsych.data.addProperties({
@@ -273,13 +213,33 @@
             sim_tau: default_dd_simulation_config.params.tau,
         });
 
-        let timeline = [instructions];
-        timeline = timeline.concat(createDelayDiscountingTimeline(
+        const dd = createDelayDiscountingTimeline(
             jsPsych,
             adaptive_controller,
             default_dd_config,
             run_context
-        ));
+        );
+
+        const end_screen = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: function() {
+                return make_debrief_stimulus(dd.stopping_result);
+            },
+            choices: ["SUBMIT"],
+            on_start: function() {
+                var chart = document.getElementById("dd-live-posterior-chart");
+                if (chart) { chart.remove(); }
+            },
+            simulation_options: {
+                data: {
+                    response: 0,
+                    rt: default_dd_simulation_config.rt.end,
+                },
+            },
+        };
+
+        let timeline = [instructions];
+        timeline = timeline.concat(dd.trials);
         timeline.push(end_screen);
 
         if (simulation_mode) {
