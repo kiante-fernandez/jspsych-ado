@@ -79,7 +79,7 @@
     <script type="module">
         import { default_dd_config, default_dd_simulation_config } from "./experiments/delay_discounting/dd_config.js";
         import { createSeededRng, simulateDelayDiscountingChoice } from "./experiments/delay_discounting/dd_simulation.js";
-        import { createDelayDiscountingTimeline } from "./experiments/delay_discounting/delay_discounting_timeline.js";
+        import { createDelayDiscountingTimeline, makeDebriefStimulus } from "./experiments/delay_discounting/delay_discounting_timeline.js";
         import { createMockAdoController } from "./experiments/delay_discounting/controllers/mock_ado_controller.js";
         import { createStanAdoController } from "./experiments/delay_discounting/controllers/stan_ado_controller.js";
         import hyperbolicModel from "./experiments/delay_discounting/models/hyperbolic/model.js";
@@ -175,10 +175,16 @@
             },
         };
 
+        let dd_result = null;
+
         const end_screen = {
             type: jsPsychHtmlButtonResponse,
-            stimulus: function() {
-                return '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
+            // Placeholder overwritten in on_start once all trials are done and
+            // param_history is fully populated. Using on_start (not stimulus:function)
+            // guarantees lazy evaluation right before the trial is presented.
+            stimulus: "<h2>Finished</h2>",
+            on_start: function(trial) {
+                trial.stimulus = makeDebriefStimulus(dd_result ? dd_result.param_history : {});
             },
             choices: ["SUBMIT"],
             simulation_options: {
@@ -202,13 +208,14 @@
             ),
         });
 
-        let timeline = [instructions];
-        timeline = timeline.concat(createDelayDiscountingTimeline(
+        dd_result = createDelayDiscountingTimeline(
             jsPsych,
             adaptive_controller,
             default_dd_config,
             run_context
-        ));
+        );
+        let timeline = [instructions];
+        timeline = timeline.concat(dd_result.trials);
         timeline.push(end_screen);
 
         if (simulation_mode) {
