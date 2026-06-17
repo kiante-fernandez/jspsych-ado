@@ -1,12 +1,135 @@
 body {
-      background: #f7f7f7;
-      font-family: Arial, sans-serif;
-      color: #222;
-    }
-    .jspsych-display-element {
-      font-size: 22px;
-    }
-    canvas {
-      background: #ffffff;
-      border: 1px solid #ddd;
-    }
+  margin: 0;
+  background: #f7f7f7;
+  font-family: Arial, sans-serif;
+  color: #222;
+}
+
+.jspsych-display-element {
+  font-size: 22px;
+}
+
+canvas {
+  background: #ffffff;
+  border: 1px solid #ddd;
+}
+
+.results-page {
+  width: min(980px, calc(100vw - 32px));
+  margin: 32px auto;
+}
+
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.results-header h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.results-header p {
+  margin: 0;
+  color: #4b5563;
+}
+
+.results-stat {
+  min-width: 128px;
+  padding: 14px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: center;
+}
+
+.results-stat span {
+  display: block;
+  margin-bottom: 4px;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.results-stat strong {
+  display: block;
+  color: #111827;
+  font-size: 28px;
+}
+
+.results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.results-actions button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #9ca3af;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+  cursor: pointer;
+}
+
+.results-actions button:hover {
+  background: #eef2f7;
+}
+
+.plot-wrap {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+.plot-wrap canvas {
+  display: block;
+  width: min(100%, 900px);
+  height: auto;
+}
+
+.summary-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+th {
+  background: #f3f4f6;
+  color: #374151;
+  font-weight: 700;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+@media (max-width: 700px) {
+  .results-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .results-stat {
+    text-align: left;
+  }
+}
