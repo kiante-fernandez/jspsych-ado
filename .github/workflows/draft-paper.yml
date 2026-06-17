@@ -5,14 +5,12 @@ name: Build paper (LaTeX -> PDF + Markdown)
 #   2. regenerates paper.md from body.tex + frontmatter.yaml (pandoc) and commits it
 #      back, so the JOSS Markdown always tracks the .tex source.
 #
-# paper.md is excluded from the trigger paths (and the bot commit uses [skip ci]) so the
-# regenerated-md commit does not retrigger this workflow.
+# The regenerated-paper.md commit uses [skip ci] so it does not retrigger this workflow.
 
 on:
   push:
     paths:
       - 'paper/**'
-      - '!paper/paper.md'
       - '.github/workflows/draft-paper.yml'
   workflow_dispatch:
 
