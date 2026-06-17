@@ -41,8 +41,17 @@ function createStanAdoController({
     seed: stan.seed ?? 123,
   };
 
-  // The candidate design grid is constant, so enumerate it once.
+  if (sample_config.num_chains < 1 || sample_config.num_warmup < 0 || sample_config.num_samples < 1) {
+    throw new Error("createStanAdoController: stan settings need num_chains>=1, num_warmup>=0, num_samples>=1");
+  }
+
+  // The candidate design grid is constant, so enumerate it once. An empty grid
+  // (a dimension with no values) would make every design selection return null.
   const designs = enumerateDesigns(grid_design);
+  if (designs.length === 0) {
+    throw new Error("createStanAdoController: grid_design produced no candidate designs (a dimension is empty)");
+  }
+
   const trials = [];
   const rng = createSeededRng(sample_config.seed);
 
@@ -73,16 +82,24 @@ function createStanAdoController({
     };
     // Worker-script-level failures (bad module path / 404 / parse error in the
     // worker or its imports) fire onerror and never post a message, so the pending
-    // request would otherwise hang forever. Reject it with a clear error.
+    // request would otherwise hang forever. Drop the dead worker so a later call
+    // rebuilds it, and reject the in-flight request with a clear error.
     worker.onerror = function(event) {
+      worker = null;
       settlePending(p => p.reject(new Error("Stan worker failed to load: " + (event.message || "worker error"))));
     };
     worker.onmessageerror = function() {
+      worker = null;
       settlePending(p => p.reject(new Error("Stan worker message could not be deserialized")));
     };
   }
 
   function send(message) {
+    // Requests are strictly sequential; a concurrent send would clobber the single
+    // pending slot and orphan the first promise, so fail loudly instead.
+    if (pending) {
+      return Promise.reject(new Error("Stan controller received a request while one was already in flight"));
+    }
     return new Promise((resolve, reject) => {
       pending = { resolve, reject };
       worker.postMessage(message);
@@ -106,6 +123,9 @@ function createStanAdoController({
     });
     const columns = result.draws;
     const n = columns[model.params[0]].length;
+    if (n === 0) {
+      throw new Error("Stan returned no posterior draws");
+    }
     const draws = new Array(n);
     for (let s = 0; s < n; s++) {
       const draw = {};

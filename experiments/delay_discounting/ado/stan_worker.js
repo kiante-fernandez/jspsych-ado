@@ -10,9 +10,10 @@ import StanModel from "../../../core/tinystan/index.mjs";
 
 let modelPromise = null;
 
+// The controller issues one request at a time and matches replies by type, so no
+// message ids are needed.
 self.onmessage = async function(event) {
   const message = event.data;
-  const id = message.id;
 
   try {
     if (message.type === "init") {
@@ -24,7 +25,7 @@ self.onmessage = async function(event) {
         StanModel.load(module.default, () => {})
       );
       await modelPromise;
-      self.postMessage({ type: "ready", id });
+      self.postMessage({ type: "ready" });
       return;
     }
 
@@ -45,12 +46,12 @@ self.onmessage = async function(event) {
         }
         draws[param] = fit.draws[index];
       }
-      self.postMessage({ type: "result", id, draws });
+      self.postMessage({ type: "result", draws });
       return;
     }
 
     throw new Error(`Unknown worker message type: ${message.type}`);
   } catch (error) {
-    self.postMessage({ type: "error", id, error: String((error && error.message) || error) });
+    self.postMessage({ type: "error", error: String((error && error.message) || error) });
   }
 };
