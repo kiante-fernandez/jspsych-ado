@@ -184,8 +184,6 @@
             // guarantees lazy evaluation right before the trial is presented.
             stimulus: "<h2>Finished</h2>",
             on_start: function(trial) {
-                var bar = document.getElementById("dd-live-posterior-chart");
-                if (bar) { bar.remove(); }
                 trial.stimulus = makeDebriefStimulus(dd_result ? dd_result.param_history : {});
             },
             choices: ["SUBMIT"],
