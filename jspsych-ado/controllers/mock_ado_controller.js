@@ -14,12 +14,17 @@ import { enumerateDesigns } from "../ado/mi_engine.js";
  *   arrays, or a curated array of designs) — same shape the Stan controller takes.
  * @param {string[]} [options.params] - Parameter names to emit mock posteriors for
  *   (e.g. ["k", "tau"]); defaults to none.
+ * @param {number} [options.n_trials] - Total number of choice trials.
+ * @param {number} [options.testlet_size=1] - Choice trials shown between updates.
  * @returns {Object} Controller with async start(context) and update(trial_data).
  */
-function createMockAdoController({ grid_design, params = [] } = {}) {
+function createMockAdoController({ grid_design, params = [], n_trials = null, testlet_size = 1 } = {}) {
   const designs = enumerateDesigns(grid_design);
   if (designs.length === 0) {
     throw new Error("createMockAdoController: grid_design produced no candidate designs.");
+  }
+  if (!Number.isInteger(testlet_size) || testlet_size < 1) {
+    throw new Error("createMockAdoController: testlet_size must be a positive integer");
   }
 
   let session_id = "mock-session";
@@ -28,6 +33,20 @@ function createMockAdoController({ grid_design, params = [] } = {}) {
   // Walk the candidate designs deterministically so successive trials differ.
   function mockDesign(index) {
     return designs[(index * 7) % designs.length];
+  }
+
+  function nextBlockSize(from_index) {
+    const remaining = n_trials == null ? testlet_size : Math.max(0, n_trials - from_index);
+    return Math.min(testlet_size, remaining);
+  }
+
+  function mockDesigns(from_index) {
+    const count = nextBlockSize(from_index);
+    const next_designs = [];
+    for (let i = 0; i < count; i++) {
+      next_designs.push(mockDesign(from_index + i));
+    }
+    return next_designs;
   }
 
   // Deterministic per-parameter summaries that drift with the trial index, so the
@@ -52,10 +71,12 @@ function createMockAdoController({ grid_design, params = [] } = {}) {
     start: async function(context) {
       session_id = (context && context.session_id) || "mock-session";
       trial_index = 0;
+      const next_designs = mockDesigns(trial_index);
       return {
         session_id,
         trial_index,
-        next_design: mockDesign(trial_index),
+        next_design: next_designs[0] ?? null,
+        next_designs,
         post_mean: null,
         post_sd: null,
         api_latency_ms: null,
@@ -63,18 +84,21 @@ function createMockAdoController({ grid_design, params = [] } = {}) {
     },
 
     /**
-     * Advance the mock controller after one completed jsPsych choice row.
+     * Advance the mock controller after one completed jsPsych choice row/testlet.
      *
-     * @param {Object} trial_data - Choice row with ado_trial_index.
+     * @param {Object|Array<Object>} trial_data - Choice row(s) with ado_trial_index.
      * @returns {Promise<Object>} Updated mock ADO state.
      */
     update: async function(trial_data) {
-      trial_index = trial_data.ado_trial_index + 1;
+      const rows = Array.isArray(trial_data) ? trial_data : [trial_data];
+      trial_index += rows.length;
       const { post_mean, post_sd } = mockPosterior(trial_index);
+      const next_designs = mockDesigns(trial_index);
       return {
         session_id,
         trial_index,
-        next_design: mockDesign(trial_index),
+        next_design: next_designs[0] ?? null,
+        next_designs,
         post_mean,
         post_sd,
         api_latency_ms: null,

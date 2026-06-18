@@ -31,10 +31,22 @@ function binaryEntropy(p) {
  * @param {Object} design - Candidate design (e.g. {t_ss, t_ll, r_ss, r_ll}).
  * @param {Array<Object>} draws - Posterior/prior draws, one object per draw.
  * @param {Function} choiceProbLL - Model likelihood: (design, draw) -> P(response=1).
+ * @param {?Array<number>|?Float64Array} [weights] - Optional per-draw weights.
  * @returns {number} Estimated mutual information for the design (nats).
  */
-function mutualInfo(design, draws, choiceProbLL) {
+function mutualInfo(design, draws, choiceProbLL, weights = null) {
   const n = draws.length;
+  if (weights) {
+    let meanP = 0;
+    let condEntropy = 0;
+    for (let s = 0; s < n; s++) {
+      const p = choiceProbLL(design, draws[s]);
+      meanP += weights[s] * p;
+      condEntropy += weights[s] * binaryEntropy(p);
+    }
+    return binaryEntropy(meanP) - condEntropy;
+  }
+
   let sumP = 0;
   let sumCondEntropy = 0;
   for (let s = 0; s < n; s++) {
@@ -42,9 +54,50 @@ function mutualInfo(design, draws, choiceProbLL) {
     sumP += p;
     sumCondEntropy += binaryEntropy(p);
   }
+
   const meanP = sumP / n;
   const condEntropy = sumCondEntropy / n;
   return binaryEntropy(meanP) - condEntropy;
+}
+
+/**
+ * Reweight posterior draws after a fantasized binary response to one design.
+ *
+ * This lets selectOptimalDesigns pick a small batch/testlet greedily without
+ * repeating the same information target for every item in the batch. The Stan
+ * posterior is still only recomputed after the real testlet responses arrive.
+ *
+ * @param {Object} design - Selected candidate design.
+ * @param {Array<Object>} draws - Posterior/prior draws.
+ * @param {Float64Array} weights - Per-draw weights, mutated in place.
+ * @param {Function} choiceProbLL - Model likelihood.
+ * @param {Function} rng - Seeded uniform RNG in [0, 1).
+ */
+function applyFantasyUpdate(design, draws, weights, choiceProbLL, rng) {
+  const n = draws.length;
+  const p = new Float64Array(n);
+  let meanP = 0;
+
+  for (let s = 0; s < n; s++) {
+    p[s] = choiceProbLL(design, draws[s]);
+    meanP += weights[s] * p[s];
+  }
+
+  const response = rng() < meanP ? 1 : 0;
+  let total = 0;
+  for (let s = 0; s < n; s++) {
+    weights[s] *= response === 1 ? p[s] : 1 - p[s];
+    total += weights[s];
+  }
+
+  if (total <= 0) {
+    weights.fill(1 / n);
+    return;
+  }
+
+  for (let s = 0; s < n; s++) {
+    weights[s] /= total;
+  }
 }
 
 /**
@@ -78,6 +131,63 @@ function enumerateDesigns(grid_design) {
 }
 
 /**
+ * Pick a batch of distinct designs by sequential greedy mutual information.
+ *
+ * count = 1 is the original one-design ADO step. For count > 1, each selected
+ * design is fantasy-updated against a frozen posterior before the next design is
+ * scored, giving a testlet of non-identical designs without running Stan inside
+ * the testlet.
+ *
+ * @param {Array<Object>} designs - Candidate designs to score.
+ * @param {Array<Object>} draws - Posterior/prior draws.
+ * @param {Function} choiceProbLL - Model likelihood.
+ * @param {number} [count=1] - Number of designs to return.
+ * @param {Object} [options]
+ * @param {Function} [options.rng] - Required when count > 1.
+ * @returns {Array<{design: Object, mutual_info: number}>} Ordered design picks.
+ */
+function selectOptimalDesigns(designs, draws, choiceProbLL, count = 1, options = {}) {
+  const n = draws.length;
+  const k = Math.min(count, designs.length);
+  if (k > 1 && typeof options.rng !== "function") {
+    throw new Error("selectOptimalDesigns: an rng is required when count > 1");
+  }
+
+  const weights = new Float64Array(n).fill(1 / n);
+  const used = new Set();
+  const picks = [];
+
+  for (let j = 0; j < k; j++) {
+    let best_index = -1;
+    let best_mi = -Infinity;
+
+    for (let i = 0; i < designs.length; i++) {
+      if (used.has(i)) {
+        continue;
+      }
+      const mi = mutualInfo(designs[i], draws, choiceProbLL, j === 0 ? null : weights);
+      if (mi > best_mi) {
+        best_mi = mi;
+        best_index = i;
+      }
+    }
+
+    if (best_index === -1) {
+      break;
+    }
+
+    used.add(best_index);
+    picks.push({ design: designs[best_index], mutual_info: best_mi });
+
+    if (j < k - 1) {
+      applyFantasyUpdate(designs[best_index], draws, weights, choiceProbLL, options.rng);
+    }
+  }
+
+  return picks;
+}
+
+/**
  * Pick the design that maximizes mutual information (the ADO step). Takes an
  * already-enumerated design list so callers can enumerate the constant grid once
  * (see enumerateDesigns).
@@ -88,16 +198,8 @@ function enumerateDesigns(grid_design) {
  * @returns {{design: Object, mutual_info: number}} Best design and its MI.
  */
 function selectOptimalDesign(designs, draws, choiceProbLL) {
-  let best_design = null;
-  let best_mi = -Infinity;
-  for (const design of designs) {
-    const mi = mutualInfo(design, draws, choiceProbLL);
-    if (mi > best_mi) {
-      best_mi = mi;
-      best_design = design;
-    }
-  }
-  return { design: best_design, mutual_info: best_mi };
+  const picks = selectOptimalDesigns(designs, draws, choiceProbLL, 1);
+  return picks[0] || { design: null, mutual_info: -Infinity };
 }
 
 /**
@@ -190,6 +292,7 @@ export {
   binaryEntropy,
   mutualInfo,
   enumerateDesigns,
+  selectOptimalDesigns,
   selectOptimalDesign,
   summarizeDraws,
   samplePriorDraws,

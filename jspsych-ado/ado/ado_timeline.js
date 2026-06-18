@@ -24,10 +24,10 @@
 //   - presentation.describeDesign(design) -> string[] (optional): human-readable
 //       lines for the debug log; defaults to generic key=value pairs.
 //
-// config: { n_trials, response_labels, presentation, choices, responseToOutcome?,
-//           task? }. responseToOutcome(design, choiceIndex) -> 0|1 defaults to
-// identity (raw button index IS the binary outcome), which is correct for tasks
-// like delay discounting where button 1 == outcome 1.
+// config: { n_trials, testlet_size?, response_labels, presentation, choices,
+//           responseToOutcome?, task? }. responseToOutcome(design, choiceIndex)
+// -> 0|1 defaults to identity (raw button index IS the binary outcome), which is
+// correct for tasks like delay discounting where button 1 == outcome 1.
 
 // ---------------------------------------------------------------------------
 // Data boundary helpers (model-agnostic)
@@ -597,22 +597,23 @@ function canvasResponse({ draw, getDesign, choices }, ctx) {
  * Create the generic adaptive jsPsych timeline fragment for any registered model.
  *
  * The timeline depends only on the ADO controller contract (start() provides the
- * first design; update(trial_data) returns posterior summaries plus the next
- * design) and on the model's presentation spec. It is independent of whether the
- * controller is mock-backed or the in-browser Stan controller, and of how the
+ * first design(s); update(trial_data) returns posterior summaries plus the next
+ * design(s)) and on the model's presentation spec. It is independent of whether
+ * the controller is mock-backed or the in-browser Stan controller, and of how the
  * stimulus is drawn.
  *
  * @param {Object} jsPsych - jsPsych instance returned by initJsPsych().
  * @param {Object} adaptive_controller - Controller with start/update methods.
  * @param {Object} config - { n_trials, response_labels, presentation, choices,
- *                            responseToOutcome?, task? }.
+ *                            testlet_size?, responseToOutcome?, task? }.
  * @param {Object} run_context - Run settings and optional simulation hook.
  * @returns {Array} jsPsych timeline fragment.
  */
 function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {}) {
   let ado_state = null;
   let current_design = null;
-  let last_choice_data = null;
+  let current_designs = [];
+  let testlet_rows = [];
 
   const presentation = config.presentation;
   if (!presentation || (typeof presentation.getChoiceTrials !== "function" && typeof presentation.makeStimulus !== "function")) {
@@ -623,6 +624,7 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
   // (e.g. "chose the more numerous side") override this.
   const responseToOutcome = config.responseToOutcome || ((_design, index) => index);
   const task = config.task || run_context.model_id || "ado";
+  const testlet_size = normalizeTestletSize(config.testlet_size);
 
   /**
    * Surface an adaptive-controller failure instead of letting the async trial hang
@@ -642,13 +644,37 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
     );
   }
 
+  function normalizeTestletSize(value) {
+    if (value == null) {
+      return 1;
+    }
+    if (!Number.isInteger(value) || value < 1) {
+      throw new Error(`createAdoTimeline: testlet_size must be a positive integer, got ${value}`);
+    }
+    return value;
+  }
+
+  function designsFromResult(result) {
+    if (result.next_designs && result.next_designs.length) {
+      return result.next_designs.slice();
+    }
+    return result.next_design != null ? [result.next_design] : [];
+  }
+
   const initialize_ado = {
     type: jsPsychCallFunction,
     async: true,
     func: function(done) {
       adaptive_controller.start(run_context).then(result => {
         ado_state = result;
-        current_design = result.next_design;
+        if (testlet_size > 1 && !result.next_designs) {
+          return failExperiment(
+            new Error("Adaptive controller did not return next_designs; testlet_size > 1 requires a batch-aware controller."),
+            done
+          );
+        }
+        current_designs = designsFromResult(result);
+        current_design = current_designs[0] ?? null;
         done({
           ado_event: "start",
           ado_session_id: result.session_id,
@@ -688,6 +714,20 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
       );
     }
 
+    const first_trial = choice_trials[0];
+    const inner_on_start = first_trial.on_start;
+    first_trial.on_start = function(trial) {
+      current_design = current_designs.shift();
+      if (current_design == null) {
+        console.error("ADO design queue underflow at choice trial.");
+        jsPsych.endExperiment("<p>The experiment encountered an error and cannot continue.</p>");
+        return;
+      }
+      if (inner_on_start) {
+        inner_on_start.call(this, trial);
+      }
+    };
+
     // Compose the ADO finalize step onto the response trial's own on_finish:
     // map the raw response to a binary outcome, record the full design + labels,
     // and copy the posterior summaries so downstream code reads them from data.
@@ -705,39 +745,50 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
       data.choice = choice;
       data.choice_label = config.response_labels[choice];
       data.ado_design = { ...design };
+      data.testlet_index = Math.floor(i / testlet_size);
+      data.testlet_position = i % testlet_size;
       copyPosteriorFields(data, ado_state);
-      last_choice_data = data;
+      testlet_rows.push(data);
     };
 
     trials.push(...choice_trials);
 
-    trials.push({
-      type: jsPsychCallFunction,
-      async: true,
-      func: function(done) {
-        adaptive_controller.update(last_choice_data).then(result => {
-          ado_state = result;
-          current_design = result.next_design;
-          logAdoTrial(run_context, last_choice_data, result, config);
-          appendPosteriorHistory(run_context, result);
-          done({
-            ado_event: "update",
-            ado_session_id: result.session_id,
-            ado_trial_index: result.trial_index,
-            ado_mode: run_context.ado_mode,
-            controller_mode: run_context.controller_mode,
-            design_strategy: run_context.design_strategy,
-            ado_next_design: result.next_design,
-            ado_post_mean: result.post_mean,
-            ado_post_sd: result.post_sd,
-            ado_api_latency_ms: result.api_latency_ms,
-          });
-        }).catch(error => failExperiment(error, done));
-      },
-      on_finish: function() {
-        updateLiveCharts(run_context.param_history || {}, ado_state, run_context);
-      }
-    });
+    const at_boundary = ((i + 1) % testlet_size === 0) || (i + 1 === config.n_trials);
+    if (at_boundary) {
+      trials.push({
+        type: jsPsychCallFunction,
+        async: true,
+        func: function(done) {
+          const batch = testlet_rows.slice();
+          testlet_rows.length = 0;
+          const payload = testlet_size === 1 ? batch[0] : batch;
+          adaptive_controller.update(payload).then(result => {
+            ado_state = result;
+            current_designs = designsFromResult(result);
+            current_design = current_designs[0] ?? null;
+            logAdoTrial(run_context, batch[batch.length - 1], result, config);
+            appendPosteriorHistory(run_context, result);
+            done({
+              ado_event: "update",
+              ado_session_id: result.session_id,
+              ado_trial_index: result.trial_index,
+              ado_testlet_size: batch.length,
+              ado_mode: run_context.ado_mode,
+              controller_mode: run_context.controller_mode,
+              design_strategy: run_context.design_strategy,
+              ado_next_design: result.next_design,
+              ado_next_designs: result.next_designs,
+              ado_post_mean: result.post_mean,
+              ado_post_sd: result.post_sd,
+              ado_api_latency_ms: result.api_latency_ms,
+            });
+          }).catch(error => failExperiment(error, done));
+        },
+        on_finish: function() {
+          updateLiveCharts(run_context.param_history || {}, ado_state, run_context);
+        }
+      });
+    }
   }
 
   return trials;

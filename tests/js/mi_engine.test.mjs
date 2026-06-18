@@ -6,6 +6,7 @@ import {
   mutualInfo,
   enumerateDesigns,
   selectOptimalDesign,
+  selectOptimalDesigns,
   summarizeDraws,
   samplePriorDraws,
 } from "../../jspsych-ado/ado/mi_engine.js";
@@ -65,6 +66,45 @@ test("selectOptimalDesign returns a valid grid member and prefers the discrimina
   assert.deepEqual(design, { d: 1 });
   assert.ok(mutual_info > 0);
   assert.ok(designs.includes(design));
+});
+
+test("selectOptimalDesigns with count 1 matches selectOptimalDesign", () => {
+  const designs = enumerateDesigns({ d: [0, 1] });
+  const draws = [{ s: 0 }, { s: 1 }, { s: 0 }, { s: 1 }];
+  const choiceProbLL = (design, draw) => (design.d === 0 ? 0.99 : draw.s === 1 ? 1 : 0);
+  const single = selectOptimalDesign(designs, draws, choiceProbLL);
+  const [batch_one] = selectOptimalDesigns(designs, draws, choiceProbLL, 1);
+  assert.deepEqual(batch_one.design, single.design);
+  assert.equal(batch_one.mutual_info, single.mutual_info);
+});
+
+test("selectOptimalDesigns returns distinct designs and avoids a redundant second pick", () => {
+  const draws = [
+    { a: 0, b: 0 },
+    { a: 0, b: 1 },
+    { a: 1, b: 0 },
+    { a: 1, b: 1 },
+  ];
+  const designs = enumerateDesigns({ d: [0, 1, 2, 3] });
+  const choiceProbLL = (design, draw) => {
+    if (design.d === 0 || design.d === 1) return draw.a;
+    if (design.d === 2) return draw.b;
+    return 0.99;
+  };
+  const picks = selectOptimalDesigns(designs, draws, choiceProbLL, 2, { rng: createSeededRng(3) });
+  assert.deepEqual(picks.map((p) => p.design.d), [0, 2]);
+});
+
+test("selectOptimalDesigns requires an rng when count > 1 and caps at the grid size", () => {
+  const designs = enumerateDesigns({ d: [0, 1] });
+  const draws = [{ s: 0 }, { s: 1 }];
+  const choiceProbLL = (_design, draw) => (draw.s === 1 ? 1 : 0);
+
+  assert.throws(() => selectOptimalDesigns(designs, draws, choiceProbLL, 2), /rng is required/);
+
+  const picks = selectOptimalDesigns(designs, draws, choiceProbLL, 5, { rng: createSeededRng(9) });
+  assert.equal(picks.length, 2);
+  assert.equal(new Set(picks.map((p) => p.design.d)).size, 2);
 });
 
 test("summarizeDraws computes correct mean and sample SD", () => {

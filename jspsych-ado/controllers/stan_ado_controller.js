@@ -1,6 +1,6 @@
 import {
   enumerateDesigns,
-  selectOptimalDesign,
+  selectOptimalDesigns,
   summarizeDraws,
   samplePriorDraws,
 } from "../ado/mi_engine.js";
@@ -29,6 +29,7 @@ const PRIOR_DRAWS = 2000;
  *   designs, "random" for a recovery/dev baseline sampled from the same grid.
  * @param {?number} [options.design_seed] - Optional seed for prior/random design
  *   selection. Defaults to stan.seed so existing runs stay reproducible.
+ * @param {number} [options.testlet_size=1] - Choice trials shown between Stan refits.
  * @returns {Object} Controller with async start(context) and update(trial_data).
  */
 function createStanAdoController({
@@ -39,6 +40,7 @@ function createStanAdoController({
   n_trials = null,
   design_strategy = "ado",
   design_seed = null,
+  testlet_size = 1,
 }) {
   const sample_config = {
     num_chains: stan.num_chains ?? 2,
@@ -53,12 +55,18 @@ function createStanAdoController({
   if (!["ado", "random"].includes(design_strategy)) {
     throw new Error(`createStanAdoController: unknown design_strategy "${design_strategy}"`);
   }
+  if (!Number.isInteger(testlet_size) || testlet_size < 1) {
+    throw new Error("createStanAdoController: testlet_size must be a positive integer");
+  }
 
   // The candidate design grid is constant, so enumerate it once. An empty grid
   // (a dimension with no values) would make every design selection return null.
   const designs = enumerateDesigns(grid_design);
   if (designs.length === 0) {
     throw new Error("createStanAdoController: grid_design produced no candidate designs (a dimension is empty)");
+  }
+  if (testlet_size > designs.length) {
+    throw new Error("createStanAdoController: testlet_size cannot exceed the number of candidate designs");
   }
 
   const trials = [];
@@ -157,17 +165,31 @@ function createStanAdoController({
     return designs[index];
   }
 
+  function sampleRandomDesigns(count) {
+    const next_designs = [];
+    for (let i = 0; i < count; i++) {
+      next_designs.push(sampleRandomDesign());
+    }
+    return next_designs;
+  }
+
   /**
    * Select the next design under the configured policy.
    *
    * The "random" policy intentionally ignores posterior draws for design
    * selection but still receives them so this helper has one call shape.
    */
-  function selectDesign(draws) {
+  function selectDesigns(draws, count) {
     if (design_strategy === "random") {
-      return sampleRandomDesign();
+      return sampleRandomDesigns(count);
     }
-    return selectOptimalDesign(designs, draws, model.choiceProbLL).design;
+    return selectOptimalDesigns(designs, draws, model.choiceProbLL, count, { rng: design_rng })
+      .map((pick) => pick.design);
+  }
+
+  function nextBlockSize(from_index) {
+    const remaining = n_trials == null ? testlet_size : Math.max(0, n_trials - from_index);
+    return Math.min(testlet_size, remaining);
   }
 
   return {
@@ -182,18 +204,20 @@ function createStanAdoController({
 
       trials.length = 0;
 
-      let design = null;
+      let next_designs = [];
+      const block_size = nextBlockSize(trials.length);
       if (design_strategy === "random") {
-        design = sampleRandomDesign();
+        next_designs = sampleRandomDesigns(block_size);
       } else {
         const prior = samplePriorDraws(model.prior, PRIOR_DRAWS, design_rng);
-        design = selectDesign(prior);
+        next_designs = selectDesigns(prior, block_size);
       }
 
       return {
         session_id,
         trial_index: trials.length,
-        next_design: design,
+        next_design: next_designs[0] ?? null,
+        next_designs,
         post_mean: null,
         post_sd: null,
         api_latency_ms: null,
@@ -201,31 +225,33 @@ function createStanAdoController({
     },
 
     /**
-     * Add the latest choice, re-infer the posterior with Stan, and pick the next
-     * MI-optimal design.
+     * Add the latest choice/testlet, re-infer the posterior with Stan, and pick
+     * the next MI-optimal design/testlet.
      *
-     * @param {Object} trial_data - jsPsych choice row with ado_design and choice.
+     * @param {Object|Array<Object>} trial_data - jsPsych choice row(s) with ado_design and choice.
      * @returns {Promise<Object>} Updated ADO state with posterior summaries.
      */
     update: async function(trial_data) {
       const started_at = now();
 
-      trials.push({ ...trial_data.ado_design, choice: trial_data.choice });
+      const rows = Array.isArray(trial_data) ? trial_data : [trial_data];
+      for (const row of rows) {
+        trials.push({ ...row.ado_design, choice: row.choice });
+      }
 
       const draws = await samplePosterior();
       const { post_mean, post_sd } = summarizeDraws(draws, model.params);
 
       // The design produced after the final choice is never shown, so skip the
       // ~1M-evaluation MI scan on the last update.
-      let next_design = null;
-      if (!n_trials || trials.length < n_trials) {
-        next_design = selectDesign(draws);
-      }
+      const block_size = nextBlockSize(trials.length);
+      const next_designs = block_size > 0 ? selectDesigns(draws, block_size) : [];
 
       return {
         session_id,
         trial_index: trials.length,
-        next_design,
+        next_design: next_designs[0] ?? null,
+        next_designs,
         post_mean,
         post_sd,
         // Reuse the latency field to report local sampling+MI time (ms).

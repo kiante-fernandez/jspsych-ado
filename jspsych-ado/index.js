@@ -67,6 +67,7 @@ const _compileCache = new Map();   // stanCode -> moduleUrl (per page session)
  * @param {string}   [spec.task]          - Task label saved into each data row.
  * @param {Object}   [spec.stan]          - Default sampler settings for this model.
  * @param {number}   [spec.n_trials]      - Default trial count for this model.
+ * @param {number}   [spec.testlet_size]  - Default choice trials between Stan refits.
  */
 function registerModel(name, spec) {
   if (!name || typeof name !== "string") {
@@ -177,6 +178,7 @@ async function prepareModels({ compileServer, authToken = DEFAULT_TOKEN } = {}) 
  * @param {string} [config.task]       - Task label saved into each data row.
  * @param {Object} [config.stan]       - Sampler overrides {num_chains,num_warmup,num_samples,seed}.
  * @param {number} [config.n_trials]   - Trial count override.
+ * @param {number} [config.testlet_size] - Choice trials shown between Stan refits.
  * @param {string} [config.session_id] - Session id saved into the data.
  * @param {string} [config.design_strategy="ado"] - "ado" for MI-selected
  *   designs, "random" for a recovery/dev baseline sampled from the same grid.
@@ -197,18 +199,12 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
       `or register it with a precompiled \`moduleUrl\`.`
     );
   }
-  if (config.testlet_size != null && config.testlet_size !== 1) {
-    console.warn(
-      `createTimeline: testlet_size is not supported by the current engine, which refits Stan ` +
-      `after every choice. Ignoring testlet_size=${config.testlet_size}.`
-    );
-  }
-
   const adapter = buildAdapter(entry);
   const spec = entry.spec;
   const grid_design = spec.design_grid;
   const stan = { ...DEFAULT_STAN, ...spec.stan, ...config.stan };
   const n_trials = config.n_trials ?? spec.n_trials ?? DEFAULT_N_TRIALS;
+  const testlet_size = normalizeTestletSize(config.testlet_size ?? spec.testlet_size);
   const response_labels = labelsToConfig(spec.response_labels);
 
   const controller = createStanAdoController({
@@ -216,6 +212,7 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
     grid_design,
     stan,
     n_trials,
+    testlet_size,
     session_id: config.session_id,
     design_strategy: config.design_strategy ?? "ado",
     design_seed: config.design_seed ?? null,
@@ -225,6 +222,7 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
   // responseToOutcome; everything stimulus-specific lives in the model package.
   const timeline_config = {
     n_trials,
+    testlet_size,
     response_labels,
     presentation: spec.presentation,
     choices: spec.choices,
@@ -245,6 +243,16 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+function normalizeTestletSize(value) {
+  if (value == null) {
+    return 1;
+  }
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`createTimeline: testlet_size must be a positive integer, got ${value}`);
+  }
+  return value;
+}
 
 // Turn a registry entry into the engine's model adapter shape, bridging the
 // argument-order / trial-shape mismatches between the friendly spec and the engine.
@@ -466,6 +474,7 @@ function validateModel(model, opts = {}) {
  * @param {string} [overrides.name]      - Registry name; defaults to model.id.
  * @param {Object} [overrides.stan]      - Sampler settings; falls back to model.stan.
  * @param {number} [overrides.n_trials]  - Trial count; falls back to model.n_trials.
+ * @param {number} [overrides.testlet_size] - Testlet size; falls back to model.testlet_size.
  * @param {string} [overrides.task]      - Task label; falls back to model.task.
  * @returns {string} The registered model name.
  */
@@ -506,6 +515,7 @@ function registerModelPackage(model, overrides = {}) {
     posterior_display: model.posterior_display,
     stan: overrides.stan ?? model.stan,
     n_trials: overrides.n_trials ?? model.n_trials,
+    testlet_size: overrides.testlet_size ?? model.testlet_size,
     task: overrides.task ?? model.task,
   });
   return name;

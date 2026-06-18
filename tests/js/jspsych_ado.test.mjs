@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { samplePriorDraws } from "../../jspsych-ado/ado/mi_engine.js";
+import { createAdoTimeline } from "../../jspsych-ado/ado/ado_timeline.js";
 import { createSeededRng } from "../../jspsych-ado/ado/ado_simulation.js";
 import { compileStanModel } from "../../jspsych-ado/models/compile_stan_model.js";
 import {
@@ -46,6 +47,13 @@ model {
 const DESIGN_GRID = {
   t_ss: [0],
   t_ll: [1],
+  r_ss: [100],
+  r_ll: [200],
+};
+
+const TESTLET_DESIGN_GRID = {
+  t_ss: [0],
+  t_ll: [1, 2, 3],
   r_ss: [100],
   r_ll: [200],
 };
@@ -288,6 +296,158 @@ test("createTimeline forwards design strategy into the Stan controller", async (
   }
 });
 
+test("createTimeline schedules updates at testlet boundaries", async () => {
+  const restoreFetch = installFakeFetch();
+  const restoreWorker = installFakeWorker();
+  globalThis.jsPsychCallFunction = "call-function";
+  globalThis.jsPsychHtmlButtonResponse = "html-button-response";
+
+  try {
+    registerTestModel("testlet-structure-model", {
+      design_grid: TESTLET_DESIGN_GRID,
+    });
+    await prepareModels({ compileServer: "http://compile.test" });
+
+    const timeline = createTimeline({}, {
+      model: "testlet-structure-model",
+      n_trials: 5,
+      testlet_size: 2,
+      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 5 },
+    });
+
+    const choices = timeline.filter((t) => t.type === "html-button-response");
+    const calls = timeline.filter((t) => t.type === "call-function");
+    assert.equal(choices.length, 5);
+    assert.equal(calls.length - 1, 3);
+  } finally {
+    restoreFetch();
+    restoreWorker();
+    delete globalThis.jsPsychCallFunction;
+    delete globalThis.jsPsychHtmlButtonResponse;
+  }
+});
+
+test("createTimeline rejects a non-positive-integer testlet_size", async () => {
+  const restoreFetch = installFakeFetch();
+  const restoreWorker = installFakeWorker();
+  globalThis.jsPsychCallFunction = "call-function";
+  globalThis.jsPsychHtmlButtonResponse = "html-button-response";
+
+  try {
+    registerTestModel("testlet-validation-model", {
+      design_grid: TESTLET_DESIGN_GRID,
+    });
+    await prepareModels({ compileServer: "http://compile.test" });
+
+    assert.throws(
+      () => createTimeline({}, { model: "testlet-validation-model", testlet_size: 0 }),
+      /positive integer/
+    );
+    assert.throws(
+      () => createTimeline({}, { model: "testlet-validation-model", testlet_size: 1.5 }),
+      /positive integer/
+    );
+  } finally {
+    restoreFetch();
+    restoreWorker();
+    delete globalThis.jsPsychCallFunction;
+    delete globalThis.jsPsychHtmlButtonResponse;
+  }
+});
+
+test("createAdoTimeline passes completed testlets as batches and refills designs", async () => {
+  globalThis.jsPsychCallFunction = "call-function";
+  globalThis.jsPsychHtmlButtonResponse = "html-button-response";
+
+  const designs = [
+    { t_ss: 0, t_ll: 1, r_ss: 100, r_ll: 200 },
+    { t_ss: 0, t_ll: 2, r_ss: 100, r_ll: 200 },
+    { t_ss: 0, t_ll: 3, r_ss: 100, r_ll: 200 },
+  ];
+  const seen_batches = [];
+  const jsPsych = {
+    endExperiment: (message) => {
+      throw new Error(message);
+    },
+  };
+  const controller = {
+    start: async () => ({
+      session_id: "testlet-session",
+      trial_index: 0,
+      next_design: designs[0],
+      next_designs: designs.slice(0, 2),
+      post_mean: null,
+      post_sd: null,
+      api_latency_ms: null,
+    }),
+    update: async (payload) => {
+      const rows = Array.isArray(payload) ? payload : [payload];
+      seen_batches.push(rows);
+      const done = seen_batches.reduce((sum, batch) => sum + batch.length, 0);
+      return {
+        session_id: "testlet-session",
+        trial_index: done,
+        next_design: done < designs.length ? designs[done] : null,
+        next_designs: done < designs.length ? [designs[done]] : [],
+        post_mean: { k: done },
+        post_sd: { k: 0.1 },
+        api_latency_ms: 1,
+      };
+    },
+  };
+
+  try {
+    const timeline = createAdoTimeline(jsPsych, controller, {
+      n_trials: 3,
+      testlet_size: 2,
+      response_labels: { 0: "SS", 1: "LL" },
+      presentation: TEST_PRESENTATION,
+      choices: ["SS", "LL"],
+      task: "demo",
+    }, {});
+
+    await new Promise((resolve, reject) => {
+      timeline[0].func(resolve);
+      setTimeout(() => reject(new Error("timed out waiting for start")), 100);
+    });
+
+    timeline[1].on_start({});
+    const first = { ...timeline[1].data(), response: 1 };
+    timeline[1].on_finish(first);
+
+    timeline[2].on_start({});
+    const second = { ...timeline[2].data(), response: 0 };
+    timeline[2].on_finish(second);
+
+    const first_update = await new Promise((resolve, reject) => {
+      timeline[3].func(resolve);
+      setTimeout(() => reject(new Error("timed out waiting for update")), 100);
+    });
+
+    timeline[4].on_start({});
+    const third = { ...timeline[4].data(), response: 1 };
+    timeline[4].on_finish(third);
+
+    const second_update = await new Promise((resolve, reject) => {
+      timeline[5].func(resolve);
+      setTimeout(() => reject(new Error("timed out waiting for final update")), 100);
+    });
+
+    assert.equal(seen_batches.length, 2);
+    assert.equal(seen_batches[0].length, 2);
+    assert.equal(seen_batches[1].length, 1);
+    assert.deepEqual(seen_batches[0].map((row) => row.trial_number), [1, 2]);
+    assert.deepEqual(seen_batches[0].map((row) => row.testlet_position), [0, 1]);
+    assert.equal(seen_batches[1][0].trial_number, 3);
+    assert.equal(seen_batches[1][0].post_mean_k, 2);
+    assert.equal(first_update.ado_testlet_size, 2);
+    assert.equal(second_update.ado_testlet_size, 1);
+  } finally {
+    delete globalThis.jsPsychCallFunction;
+    delete globalThis.jsPsychHtmlButtonResponse;
+  }
+});
+
 test("buildAdapter reshapes flat {...design, choice} rows to {design, response} generically", () => {
   const seen = [];
   const adapter = buildAdapter({
@@ -468,6 +628,31 @@ test("registerModelPackage rejects an invalid package and requires a design_grid
     () => registerModelPackage(makePackage({ id: "needs-grid" }), {}),
     /design_grid is required/
   );
+});
+
+test("registerModelPackage forwards testlet_size as a timeline default", async () => {
+  const restoreWorker = installFakeWorker();
+  globalThis.jsPsychCallFunction = "call-function";
+  globalThis.jsPsychHtmlButtonResponse = "html-button-response";
+
+  try {
+    const name = registerModelPackage(makePackage({ id: "pkg-testlet-default" }), {
+      design_grid: TESTLET_DESIGN_GRID,
+      n_trials: 5,
+      testlet_size: 2,
+      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 3 },
+    });
+
+    const timeline = createTimeline({}, { model: name });
+    const choices = timeline.filter((t) => t.type === "html-button-response");
+    const calls = timeline.filter((t) => t.type === "call-function");
+    assert.equal(choices.length, 5);
+    assert.equal(calls.length - 1, 3);
+  } finally {
+    restoreWorker();
+    delete globalThis.jsPsychCallFunction;
+    delete globalThis.jsPsychHtmlButtonResponse;
+  }
 });
 
 test("registerModelPackage registers a package and wires choiceProbLL(design, draw) in the right order", async () => {
