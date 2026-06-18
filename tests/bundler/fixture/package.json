@@ -1,0 +1,15 @@
+{
+  "name": "jspsych-ado-bundler-fixture",
+  "private": true,
+  "type": "module",
+  "description": "Throwaway consumer used by tests/bundler/run.mjs to prove the packed tarball builds + loads its hashed WASM under Vite. jspsych-ado is installed from a fresh `npm pack` by the runner, not listed here.",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "jspsych": "^8",
+    "@jspsych/plugin-html-button-response": "^2",
+    "@jspsych/plugin-call-function": "^2",
+    "vite": "^5"
+  }
+}

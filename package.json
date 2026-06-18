@@ -27,8 +27,13 @@
     "./ado/*": "./jspsych-ado/ado/*",
     "./controllers/*": "./jspsych-ado/controllers/*",
     "./models/*": "./jspsych-ado/models/*",
-    "./tasks/*": "./jspsych-ado/tasks/*"
+    "./tasks/*": "./jspsych-ado/tasks/*",
+    "./core/tinystan/*": "./core/tinystan/*"
   },
+  "sideEffects": [
+    "**/model.js",
+    "**/main.js"
+  ],
   "files": [
     "jspsych-ado",
     "core/tinystan",
@@ -38,10 +43,22 @@
   "scripts": {
     "test": "node --test tests/js/*.test.mjs",
     "test:smoke": "node tests/js/stan_recovery.smoke.mjs",
-    "test:browser": "node tests/browser/dd_smoke.mjs && node tests/browser/line_length_discrimination_smoke.mjs"
+    "test:browser": "node tests/browser/dd_smoke.mjs && node tests/browser/line_length_discrimination_smoke.mjs",
+    "patch:wasm": "node scripts/patch-wasm-glue.mjs",
+    "test:bundler": "node tests/bundler/run.mjs",
+    "prepublishOnly": "npm test"
   },
+  "author": "The jspsych-ado contributors",
   "peerDependencies": {
-    "jspsych": ">=7"
+    "jspsych": ">=7",
+    "@jspsych/plugin-html-button-response": ">=1",
+    "@jspsych/plugin-call-function": ">=1",
+    "@jspsych/plugin-canvas-keyboard-response": ">=1"
+  },
+  "peerDependenciesMeta": {
+    "@jspsych/plugin-html-button-response": { "optional": true },
+    "@jspsych/plugin-call-function": { "optional": true },
+    "@jspsych/plugin-canvas-keyboard-response": { "optional": true }
   },
   "devDependencies": {
     "puppeteer": "^24.15.0"

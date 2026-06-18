@@ -1,0 +1,4 @@
+# Build artifacts produced by run.mjs; the fixture sources are committed.
+fixture/node_modules/
+fixture/dist/
+fixture/package-lock.json

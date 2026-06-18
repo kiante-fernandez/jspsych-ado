@@ -201,9 +201,11 @@ const design_grid = makeDotComparisonDesigns();
 const presentation = {
   getChoiceTrials(ctx) {
     const getDesign = ctx.getDesign;
+    // Pass ctx.plugins so injected jsPsych plugin classes reach the canvas factories
+    // under a bundler (falls back to globals for static-served pages). (#57)
     return [
-      withCanvasSize(canvasFrame({ draw: drawFixation, getDesign, duration: FIXATION_MS })),
-      withCanvasSize(canvasFrame({ draw: drawDots, getDesign, duration: STIM_MS })),
+      withCanvasSize(canvasFrame({ draw: drawFixation, getDesign, duration: FIXATION_MS }, ctx.plugins)),
+      withCanvasSize(canvasFrame({ draw: drawDots, getDesign, duration: STIM_MS }, ctx.plugins)),
       withCanvasSize(canvasResponse({ draw: drawResponsePrompt, getDesign, choices: RESPONSE_KEYS }, ctx)),
     ];
   },

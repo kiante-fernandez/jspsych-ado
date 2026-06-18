@@ -21,8 +21,19 @@ self.onmessage = async function(event) {
       // its default export (createModule) to tinystan. Load is memoized. The no-op
       // print callback swallows Stan's per-iteration stdout so the console stays
       // clean across the per-trial sampling calls.
-      modelPromise = import(/* @vite-ignore */ message.moduleUrl).then(module =>
-        StanModel.load(module.default, () => {})
+      //
+      // The import is marked ignore for BOTH bundlers so Vite/webpack leave it as a
+      // runtime import of the URL the controller passed (not a build-time rewrite).
+      // When the model adapter supplies a wasmUrl (the bundler-emitted .wasm asset
+      // URL), inject it via emscripten's locateFile so the wasm resolves after
+      // bundling — a bundled main.js would otherwise fetch a same-name sibling the
+      // bundler has renamed/hashed. With no wasmUrl (static-served, no bundler),
+      // main.js resolves its sibling main.wasm as before.
+      const overrides = message.wasmUrl
+        ? { locateFile: (path) => (path.endsWith(".wasm") ? message.wasmUrl : path) }
+        : {};
+      modelPromise = import(/* @vite-ignore */ /* webpackIgnore: true */ message.moduleUrl).then(module =>
+        StanModel.load((options) => module.default({ ...options, ...overrides }), () => {})
       );
       await modelPromise;
       self.postMessage({ type: "ready" });

@@ -117,6 +117,11 @@ const hyperbolicModel = {
   // Absolute URL of the compiled emscripten module, resolved next to this file so
   // a Web Worker can dynamic-import() it regardless of the page's <base href>.
   moduleUrl: new URL("./main.js", import.meta.url).href,
+  // Statically referenced so bundlers (Vite/webpack) emit the .wasm as an asset
+  // and resolve its final URL; the worker passes this to emscripten's locateFile
+  // (see ado/stan_worker.js) so the wasm loads after bundling, not just from a
+  // static server. Without it, a bundled main.js would 404 on its sibling wasm.
+  wasmUrl: new URL("./main.wasm", import.meta.url).href,
   buildData,
   responseProb,
   responseProbs,

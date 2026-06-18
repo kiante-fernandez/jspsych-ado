@@ -653,22 +653,55 @@ function removeAdoDebugPanels() {
 // response index on data.__ado_response; the timeline then composes the ADO
 // finalize step (outcome mapping, design recording, posterior copy) on top.
 
+// jsPsych plugin classes the timeline builds trials from. Bundler/ESM consumers
+// can't rely on the plugins' UMD <script> globals, so they pass the classes via
+// createTimeline(..., { plugins: { htmlButtonResponse, callFunction,
+// canvasKeyboardResponse } }); static pages that load the UMD builds get them from
+// globalThis as a fallback. (#57 bundler story.)
+const PLUGIN_GLOBALS = {
+  htmlButtonResponse: "jsPsychHtmlButtonResponse",
+  callFunction: "jsPsychCallFunction",
+  canvasKeyboardResponse: "jsPsychCanvasKeyboardResponse",
+};
+
+function resolvePlugin(plugins, key) {
+  const injected = plugins && plugins[key];
+  if (injected) {
+    return injected;
+  }
+  return typeof globalThis !== "undefined" ? globalThis[PLUGIN_GLOBALS[key]] : undefined;
+}
+
+function requirePlugin(plugins, key) {
+  const plugin = resolvePlugin(plugins, key);
+  if (!plugin) {
+    throw new Error(
+      `createAdoTimeline: jsPsych plugin "${PLUGIN_GLOBALS[key]}" is not available. ` +
+      `Load its UMD <script> build (which sets globalThis.${PLUGIN_GLOBALS[key]}), or ` +
+      `pass it when bundling via createTimeline(..., { plugins: { ${key}: <PluginClass> } }).`
+    );
+  }
+  return plugin;
+}
+
 /**
  * Single html-button-response choice trial. Covers the common case (e.g. delay
  * discounting's two option cards). Design-dependent rendering is lazy: stimulus,
  * button_html, data, and simulation_options all read ctx.getDesign() at run time,
  * so the live ADO-selected design is shown.
  *
- * @param {Object} ctx - { getDesign, getState, choices, run_context, trial_number, task }
+ * @param {Object} ctx - { getDesign, getState, choices, run_context, trial_number, task, plugins? }
  * @param {Object} presentation - { makeStimulus, button_html?, keymap?, prompt?,
  *                                   margin_vertical?, margin_horizontal? }
+ * @param {Object} [plugins] - Injected jsPsych plugin classes; defaults to ctx.plugins
+ *   (then globalThis). See PLUGIN_GLOBALS.
  * @returns {Object} jsPsych html-button-response trial (response-collecting).
  */
-function htmlButtonChoice(ctx, presentation) {
+function htmlButtonChoice(ctx, presentation, plugins = ctx && ctx.plugins) {
   let key_handler = null;
 
   const trial = {
-    type: jsPsychHtmlButtonResponse,
+    type: requirePlugin(plugins, "htmlButtonResponse"),
     stimulus: function() {
       return presentation.makeStimulus(ctx.getDesign());
     },
@@ -739,11 +772,13 @@ function htmlButtonChoice(ctx, presentation) {
  * @param {Function} opts.getDesign - () => current design.
  * @param {?number} [opts.duration] - Frame duration in ms (with choices "NO_KEYS"
  *   a null duration would never end, so pass a duration for timed frames).
+ * @param {Object} [plugins] - Injected jsPsych plugin classes (pass ctx.plugins);
+ *   falls back to globalThis. See PLUGIN_GLOBALS.
  * @returns {Object} jsPsych canvas-keyboard-response trial (no response).
  */
-function canvasFrame({ draw, getDesign, duration = null }) {
+function canvasFrame({ draw, getDesign, duration = null }, plugins) {
   return {
-    type: jsPsychCanvasKeyboardResponse,
+    type: requirePlugin(plugins, "canvasKeyboardResponse"),
     stimulus: function(canvas) {
       draw(canvas, getDesign());
     },
@@ -763,13 +798,15 @@ function canvasFrame({ draw, getDesign, duration = null }) {
  * @param {Function} opts.draw - (canvas, design) => void.
  * @param {Function} opts.getDesign - () => current design.
  * @param {string[]} opts.choices - Response keys in index order, e.g. ["b","y"].
- * @param {Object} ctx - { getState, run_context, trial_number, task }.
+ * @param {Object} ctx - { getState, run_context, trial_number, task, plugins? }.
+ * @param {Object} [plugins] - Injected jsPsych plugin classes; defaults to ctx.plugins
+ *   (then globalThis). See PLUGIN_GLOBALS.
  * @returns {Object} jsPsych canvas-keyboard-response trial (response-collecting).
  */
-function canvasResponse({ draw, getDesign, choices }, ctx) {
+function canvasResponse({ draw, getDesign, choices }, ctx, plugins = ctx && ctx.plugins) {
   const lower_choices = choices.map(key => String(key).toLowerCase());
   return {
-    type: jsPsychCanvasKeyboardResponse,
+    type: requirePlugin(plugins, "canvasKeyboardResponse"),
     stimulus: function(canvas) {
       draw(canvas, getDesign());
     },
@@ -838,6 +875,13 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
   const task = config.task || run_context.model_id || "ado";
   const testlet_size = normalizeTestletSize(config.testlet_size);
 
+  // Resolve plugin classes once (injected config.plugins, else UMD globals). Fail
+  // fast on the always-needed call-function plugin so bundler consumers get a clear
+  // message instead of a "type is undefined" deep in jsPsych. The choice-trial
+  // plugins are resolved lazily in the factories (only the task's path needs them).
+  const injected_plugins = config.plugins;
+  const callFunctionPlugin = requirePlugin(injected_plugins, "callFunction");
+
   /**
    * Surface an adaptive-controller failure instead of letting the async trial hang
    * forever. Completes the current call-function trial and ends the experiment with
@@ -874,7 +918,7 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
   }
 
   const initialize_ado = {
-    type: jsPsychCallFunction,
+    type: callFunctionPlugin,
     async: true,
     func: function(done) {
       adaptive_controller.start(run_context).then(result => {
@@ -919,11 +963,14 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
       run_context,
       trial_number: i + 1,
       task,
+      // Tasks that build canvas trials in getChoiceTrials pass these to
+      // canvasFrame/canvasResponse so injected plugins reach those factories too.
+      plugins: injected_plugins,
     };
 
     const choice_trials = typeof presentation.getChoiceTrials === "function"
       ? presentation.getChoiceTrials(ctx)
-      : [htmlButtonChoice(ctx, presentation)];
+      : [htmlButtonChoice(ctx, presentation, injected_plugins)];
 
     const response_trials = choice_trials.filter(t => t && t.__ado_is_response);
     if (response_trials.length !== 1) {
@@ -978,7 +1025,7 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
     const at_boundary = ((i + 1) % testlet_size === 0) || (i + 1 === config.n_trials);
     if (at_boundary) {
       trials.push({
-        type: jsPsychCallFunction,
+        type: callFunctionPlugin,
         async: true,
         func: function(done) {
           const batch = testlet_rows.slice();

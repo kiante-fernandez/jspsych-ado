@@ -104,6 +104,9 @@ const lineLengthDiscriminationModel = {
     bias_c: { label: "C bias", y_min: -1.5, y_max: 1.5 },
   },
   moduleUrl: new URL("./main.js", import.meta.url).href,
+  // Statically referenced so bundlers emit the .wasm asset; the worker feeds this
+  // to emscripten's locateFile so the wasm loads after bundling (see ado/stan_worker.js).
+  wasmUrl: new URL("./main.wasm", import.meta.url).href,
   buildData,
   responseProbs,
   simulationData,

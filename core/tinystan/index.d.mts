@@ -61,4 +61,3 @@ declare class StanModel {
 }
 //#endregion
 export { type PathfinderParams, type PrintCallback, type SamplerParams, type StanDraws, type StanVariableInputs, StanModel as default };
-//# sourceMappingURL=index.d.mts.map

@@ -19,5 +19,3 @@ const printCallbackSponge = () => {
 };
 //#endregion
 export { prepareStanJSON, printCallbackSponge };
-
-//# sourceMappingURL=util.mjs.map

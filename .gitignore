@@ -5,6 +5,8 @@ Thumbs.db
 # Node (dev tooling only — the experiment itself has no build step)
 node_modules/
 npm-debug.log*
+# transient tarball from `npm pack` (used by tests/bundler/run.mjs)
+*.tgz
 
 # IDE
 .vscode/

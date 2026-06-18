@@ -23,6 +23,8 @@ jobs:
         run: node tests/js/stan_recovery.smoke.mjs
       - name: Stan recovery smoke - weber dots (real WASM via fetch shim)
         run: node tests/js/weber_recovery.smoke.mjs
+      - name: locateFile runtime smoke (emscripten honors the #57 glue patch)
+        run: node tests/js/locate_file.smoke.mjs
 
   browser:
     name: Headless Worker/WASM smoke
@@ -36,3 +38,20 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Headless browser smokes (delay discounting + line length)
         run: npm run test:browser
+
+  bundler:
+    name: Bundler smoke (npm pack -> Vite build -> headless WASM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dev deps (puppeteer + Chromium)
+        run: npm install --no-audit --no-fund
+      # Packs the library, installs the tarball into tests/bundler/fixture, runs a
+      # real Vite production build, and headlessly confirms the hashed WASM loads
+      # through the public API — the only check that exercises the #57 fix under a
+      # real bundler (node tests bypass the Worker; browser smokes serve raw source).
+      - name: Bundler consumer smoke (Vite + hashed WASM)
+        run: npm run test:bundler

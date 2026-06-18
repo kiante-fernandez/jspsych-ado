@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="jspsych-ado.png" alt="jspsych-ado — the adaptive loop: model → design → stimulus → response → update" width="180">
+  <img src="https://raw.githubusercontent.com/githubpsyche/jspsych-ado/main/jspsych-ado.png" alt="jspsych-ado — the adaptive loop: model → design → stimulus → response → update" width="180">
 </p>
 
 <h1 align="center">jspsych-ado</h1>
@@ -27,14 +27,15 @@ have written, which are ready to be used out of the box.
 
 ## Status
 
-🚧 **In active development.** The in-browser engine, the binary delay-discounting
-example, the 3IFC categorical line-length example, and the Halberda-style dot
-comparison example work and are covered by CI (unit tests + real headless
-Worker/WASM smokes). Two things are still settling:
-the experiment API around future task/model/controller extensions and an
-npm/bundler-friendly package build (see
-[#57](https://github.com/githubpsyche/jspsych-ado/issues/57)). For now, use it by
-serving the repo (below) — it is not yet published to npm.
+🚧 **In active development, preparing the first npm release.** The in-browser
+engine, the binary delay-discounting example, the 3IFC categorical line-length
+example, and the Halberda-style dot comparison example work and are covered by CI
+(unit tests + real headless Worker/WASM smokes). The committed WASM is now
+bundler-safe and the package builds under Vite and webpack 5 (see
+[Using with a bundler](#using-with-a-bundler) and
+[#57](https://github.com/githubpsyche/jspsych-ado/issues/57)). Still settling: the
+experiment API around future task/model/controller extensions. Not yet published to
+npm — for now, either serve the repo (above) or install from a packed tarball / git.
 
 ## Quick start
 
@@ -60,29 +61,63 @@ experiments/experiment_halberda_dot_comparison/index.html?controller=mock&debug=
 
 ## Usage
 
-To use `jspsych-ado`: register a task package and a model package, then
-ask the façade for the timeline.
+An experiment is a thin consumer: register a task package and a model package, then
+ask the façade for the timeline. The example below is for a **bundler** project
+(`npm install jspsych-ado`); see [Using with a bundler](#using-with-a-bundler) for
+the required setup, and [Quick start](#quick-start) above for running the in-repo
+examples by serving the repo statically.
 
 ```js
-import { jsPsychADO } from "./jspsych-ado/index.js";
-import hyperbolic from "./jspsych-ado/models/hyperbolic/model.js";
-import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
-import { default_dd_config } from "./experiments/delay_discounting/dd_config.js";
+import { initJsPsych } from "jspsych";
+import htmlButtonResponse from "@jspsych/plugin-html-button-response";
+import callFunction from "@jspsych/plugin-call-function";
+
+import { jsPsychADO } from "jspsych-ado";
+import hyperbolic from "jspsych-ado/models/hyperbolic/model.js";
+import delayDiscountingTask from "jspsych-ado/tasks/delay_discounting/task.js";
+import "jspsych-ado/tasks/delay_discounting/task.css"; // task styles (see Tasks)
 
 const jsPsych = initJsPsych();
 
 jsPsychADO.registerTask(delayDiscountingTask.id, delayDiscountingTask);
 jsPsychADO.registerModelPackage(hyperbolic, {
-  stan:        default_dd_config.stan,
-  n_trials:    default_dd_config.n_trials,
+  stan:     { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 },
+  n_trials: 42,
 });
 
 const ado = jsPsychADO.createTimeline(jsPsych, {
-  task: delayDiscountingTask.id,
+  task:  delayDiscountingTask.id,
   model: hyperbolic.id,
+  // Inject the jsPsych plugin classes the timeline builds trials from. A static
+  // page that loads the plugins' UMD <script> builds can omit this — the timeline
+  // falls back to the globals those scripts define.
+  plugins: { htmlButtonResponse, callFunction },
 });
 jsPsych.run([ /* instructions, */ ...ado /*, end screen */ ]);
 ```
+
+### Using with a bundler
+
+The package is ESM and runs **client-side only** (it spawns a Web Worker that loads
+the Stan WASM). It is tested against Vite and webpack 5.
+
+- **jsPsych plugins.** Install the plugins your task uses and pass them via
+  `createTimeline(..., { plugins })`: `@jspsych/plugin-html-button-response` and
+  `@jspsych/plugin-call-function` for button tasks (delay discounting, line length),
+  plus `@jspsych/plugin-canvas-keyboard-response` for canvas tasks (dots). They are
+  declared as optional `peerDependencies`. (On a static page that loads their UMD
+  `<script>` builds instead, the timeline reads them from `globalThis` and you can
+  omit `plugins`.)
+- **Task styles.** Import the task's stylesheet, e.g.
+  `import "jspsych-ado/tasks/delay_discounting/task.css"`.
+- **Vite.** The worker and WASM are emitted from `new URL(..., import.meta.url)`
+  inside the installed dependency. If Vite's dep pre-bundling interferes with that
+  emission, exclude the package: `optimizeDeps: { exclude: ["jspsych-ado"] }`.
+- **webpack 5.** Works out of the box (first-class `new Worker(new URL(...))` and
+  WASM asset support); no extra config needed.
+- **SSR / Next.js.** Build the timeline only in the browser (e.g. behind
+  `useEffect` / a `"use client"` component) — the Worker and WASM are not available
+  during server rendering.
 
 ### API
 
@@ -149,10 +184,16 @@ Continuous responses are not supported yet.
 ```bash
 node --test tests/js/*.test.mjs        # unit tests: MI engine, model adapter, façade
 node tests/js/stan_recovery.smoke.mjs  # real-WASM smoke: ADO recovers parameters
+node tests/js/locate_file.smoke.mjs    # real-WASM smoke: emscripten honors the wasm locateFile patch
 npm install && npm run test:browser    # headless Worker/WASM browser smoke (puppeteer)
+npm run test:bundler                   # npm pack -> Vite build -> headless: hashed WASM loads
+npm run patch:wasm                     # re-apply the bundler-safety glue patch after recompiling a model
 ```
 
-CI runs the unit tests, the recovery smoke, and the headless browser smoke on every PR.
+CI runs the unit tests, the recovery + locateFile smokes, the headless browser
+smoke, and the bundler smoke on every PR. After recompiling any model's `main.js`,
+run `npm run patch:wasm` (CI's unit job fails if a committed `main.js` is left
+unpatched).
 
 ## Deploying
 

@@ -176,4 +176,3 @@ interface PathfinderUniqueParams {
 type PathfinderParams = LBFGSConfig & PathfinderUniqueParams;
 //#endregion
 export { StanVariableInputs as a, StanDraws as i, PrintCallback as n, SamplerParams as r, PathfinderParams as t };
-//# sourceMappingURL=types-BxjbB-KD.d.mts.map

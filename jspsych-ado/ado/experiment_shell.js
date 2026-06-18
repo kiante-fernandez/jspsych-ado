@@ -205,6 +205,9 @@ function makeTimelineConfig(task, config) {
     choices: task.choices,
     responseToOutcome: task.responseToOutcome,
     task: task.id,
+    // Injected jsPsych plugin classes for bundler consumers (#57); undefined on
+    // static-served pages, where ado_timeline falls back to the UMD globals.
+    plugins: config.plugins,
   };
 }
 
@@ -249,6 +252,7 @@ function createExperimentAdoTimeline(jsPsych, {
     design_strategy: run_context.design_strategy,
     design_seed,
     testlet_size: config.testlet_size,
+    plugins: config.plugins,
   }, run_context);
 }
 

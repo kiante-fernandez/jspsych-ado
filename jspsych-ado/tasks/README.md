@@ -22,7 +22,23 @@ A task package exports:
 For simple button tasks, `presentation` can provide `makeStimulus(design)` plus
 optional `button_html(design)`, `keymap`, `prompt`, and `describeDesign(design)`.
 For multi-frame tasks, provide `getChoiceTrials(ctx)` and use the timeline helper
-factories to mark the response-collecting trial.
+factories (`htmlButtonChoice`, `canvasFrame`, `canvasResponse`) to mark the
+response-collecting trial. Those factories need the jsPsych plugin classes; on a
+static page they come from the plugins' UMD `<script>` globals, and a bundler
+consumer injects them via `createTimeline(jsPsych, { ..., plugins })` (see the
+top-level README "Using with a bundler").
+
+## Styles
+
+A task that emits HTML class names ships its stylesheet beside `task.js`. Load it
+so the stimulus renders as designed:
+
+- Bundler: `import "jspsych-ado/tasks/delay_discounting/task.css";`
+- Static page: `<link rel="stylesheet" href=".../tasks/delay_discounting/task.css">`
+
+Shipped task styles: `delay_discounting/task.css` (`.dd-*`) and
+`line_length_discrimination/task.css` (`.ll-*`). Canvas tasks (e.g.
+`halberda_dot_comparison`) draw to a canvas and need no stylesheet.
 
 `createTimeline({ task, model })` checks that the model's `designKeys` are present
 in the task grid and that the task/model response spaces are compatible before

@@ -282,7 +282,7 @@ function createStanAdoController({
      */
     start: async function() {
       ensureWorker();
-      await send({ type: "init", moduleUrl: model.moduleUrl });
+      await send({ type: "init", moduleUrl: model.moduleUrl, wasmUrl: model.wasmUrl });
 
       trials.length = 0;
 

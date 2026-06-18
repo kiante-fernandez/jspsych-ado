@@ -265,5 +265,3 @@ var src_default = class StanModel {
 };
 //#endregion
 export { src_default as default };
-
-//# sourceMappingURL=index.mjs.map

@@ -97,6 +97,9 @@ const weberDotsModel = {
     w: { label: "w", y_min: 0, y_max: 1, lower_bound: 0 },
   },
   moduleUrl: new URL("./main.js", import.meta.url).href,
+  // Statically referenced so bundlers emit the .wasm asset; the worker feeds this
+  // to emscripten's locateFile so the wasm loads after bundling (see ado/stan_worker.js).
+  wasmUrl: new URL("./main.wasm", import.meta.url).href,
   buildData,
   responseProb,
   responseProbs,
