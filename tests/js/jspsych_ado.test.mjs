@@ -1,16 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { samplePriorDraws } from "../../experiments/delay_discounting/ado/mi_engine.js";
-import { createSeededRng } from "../../experiments/delay_discounting/dd_simulation.js";
-import { compileStanModel } from "../../experiments/delay_discounting/models/compile_stan_model.js";
+import { samplePriorDraws } from "../../jspsych-ado/ado/mi_engine.js";
+import { createSeededRng } from "../../jspsych-ado/ado/ado_simulation.js";
+import { compileStanModel } from "../../jspsych-ado/models/compile_stan_model.js";
 import {
+  buildAdapter,
   createTimeline,
   labelsToConfig,
   parseStanPriors,
   prepareModels,
   registerModel,
-} from "../../experiments/delay_discounting/jspsych_ado.js";
+} from "../../jspsych-ado/index.js";
 
 const STAN_CODE = `
 data {
@@ -51,6 +52,9 @@ const TO_STAN_DATA = (trials) => ({
   N: trials.length,
   y: trials.map((trial) => trial.response),
 });
+
+// A minimal presentation that satisfies the timeline's single-button path.
+const TEST_PRESENTATION = { makeStimulus: () => "<p>choose</p>" };
 
 function linkProb(theta, design) {
   const gap = design.r_ll - design.r_ss - theta.k * design.t_ll;
@@ -106,6 +110,7 @@ function registerTestModel(name, overrides = {}) {
     linkProb,
     toStanData: TO_STAN_DATA,
     response_labels: ["SS", "LL"],
+    presentation: TEST_PRESENTATION,
     ...overrides,
   });
 }
@@ -141,6 +146,7 @@ test("stanUrl registration derives priors after prepareModels fetches the source
       linkProb,
       toStanData: TO_STAN_DATA,
       response_labels: ["SS", "LL"],
+      presentation: TEST_PRESENTATION,
     });
 
     await prepareModels({ compileServer: "http://compile.test" });
@@ -158,13 +164,131 @@ test("stanUrl registration derives priors after prepareModels fetches the source
 
     assert.equal(start_data.ado_event, "start");
     assert.equal(start_data.ado_mode, "stan");
-    assert.equal(typeof timeline[1].data().t_ss, "number");
+    // The generic timeline spreads the live ADO design into the choice row, so the
+    // design keys are present without the timeline knowing they are DD-shaped.
+    const row = timeline[1].data();
+    assert.equal(typeof row.t_ss, "number");
+    assert.equal(row.r_ll, 200);
+    assert.equal(row.trial_number, 1);
   } finally {
     restoreFetch();
     restoreWorker();
     delete globalThis.jsPsychCallFunction;
     delete globalThis.jsPsychHtmlButtonResponse;
   }
+});
+
+test("createTimeline composes on_finish: raw response -> outcome, full design, labels", async () => {
+  const restoreFetch = installFakeFetch();
+  const restoreWorker = installFakeWorker();
+  globalThis.jsPsychCallFunction = "call-function";
+  globalThis.jsPsychHtmlButtonResponse = "html-button-response";
+
+  try {
+    registerModel("data-flow-model", {
+      stanCode: STAN_CODE,
+      params: ["k", "tau", "beta"],
+      design_grid: DESIGN_GRID,
+      linkProb,
+      toStanData: TO_STAN_DATA,
+      response_labels: ["SS", "LL"],
+      presentation: TEST_PRESENTATION,
+      // Flip the raw button index so we can see responseToOutcome actually applied
+      // (this is the generic seam that the dots task will use).
+      responseToOutcome: (_design, index) => 1 - index,
+    });
+
+    await prepareModels({ compileServer: "http://compile.test" });
+
+    const timeline = createTimeline({}, {
+      model: "data-flow-model",
+      n_trials: 1,
+      task: "demo",
+      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 5 },
+    });
+
+    // Drive start so current_design is the (single) grid design.
+    await new Promise((resolve, reject) => {
+      timeline[0].func((data) => resolve(data));
+      setTimeout(() => reject(new Error("timed out waiting for fake worker")), 100);
+    });
+
+    const response_trial = timeline[1];
+    assert.equal(response_trial.data().task, "demo");
+
+    const data = { response: 1 };
+    response_trial.on_finish(data);
+
+    assert.equal(data.__ado_response, 1);
+    assert.equal(data.choice_raw, 1);
+    assert.equal(data.choice, 0, "responseToOutcome should map raw 1 -> outcome 0");
+    assert.equal(data.choice_label, "SS", "label should come from the mapped outcome");
+    assert.deepEqual(data.ado_design, { t_ss: 0, t_ll: 1, r_ss: 100, r_ll: 200 });
+  } finally {
+    restoreFetch();
+    restoreWorker();
+    delete globalThis.jsPsychCallFunction;
+    delete globalThis.jsPsychHtmlButtonResponse;
+  }
+});
+
+test("buildAdapter reshapes flat {...design, choice} rows to {design, response} generically", () => {
+  const seen = [];
+  const adapter = buildAdapter({
+    name: "reshape-model",
+    spec: {
+      linkProb,
+      toStanData: (trials) => {
+        seen.push(...trials);
+        return { N: trials.length };
+      },
+    },
+    paramNames: ["k"],
+    prior: { k: { dist: "lognormal", meanlog: 0, sdlog: 1 } },
+    moduleUrl: "/x/main.js",
+  });
+
+  // Arbitrary design keys (not DD-shaped) survive the reshape.
+  adapter.buildData([
+    { a: 1, b: 2, choice: 1 },
+    { a: 3, b: 4, choice: 0 },
+  ]);
+  assert.deepEqual(seen, [
+    { design: { a: 1, b: 2 }, response: 1 },
+    { design: { a: 3, b: 4 }, response: 0 },
+  ]);
+
+  // choiceProbLL bridges the argument order: choiceProbLL(design, draw) === linkProb(draw, design).
+  const design = { r_ss: 100, r_ll: 200, t_ll: 1 };
+  const draw = { k: 0.01, tau: 1 };
+  assert.equal(adapter.choiceProbLL(design, draw), linkProb(draw, design));
+});
+
+test("registerModel requires a presentation with getChoiceTrials or makeStimulus", () => {
+  assert.throws(
+    () => registerModel("no-presentation", {
+      stanCode: STAN_CODE,
+      params: ["k"],
+      design_grid: DESIGN_GRID,
+      linkProb,
+      toStanData: TO_STAN_DATA,
+      response_labels: ["SS", "LL"],
+    }),
+    /missing required field "presentation"/
+  );
+
+  assert.throws(
+    () => registerModel("bad-presentation", {
+      stanCode: STAN_CODE,
+      params: ["k"],
+      design_grid: DESIGN_GRID,
+      linkProb,
+      toStanData: TO_STAN_DATA,
+      response_labels: ["SS", "LL"],
+      presentation: {},
+    }),
+    /getChoiceTrials\(ctx\) or makeStimulus\(design\)/
+  );
 });
 
 test("moduleUrl registration requires an explicit prior", () => {
@@ -176,6 +300,7 @@ test("moduleUrl registration requires an explicit prior", () => {
       linkProb,
       toStanData: TO_STAN_DATA,
       response_labels: ["SS", "LL"],
+      presentation: TEST_PRESENTATION,
     }),
     /Pass an explicit `prior` when registering with `moduleUrl`/
   );

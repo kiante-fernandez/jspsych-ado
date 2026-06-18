@@ -1,31 +1,32 @@
-// experiments/delay_discounting/jspsych_ado.js
+// jspsych-ado/index.js — the jsPsychADO façade (package entry point).
 //
 // A thin façade that lets researchers register a model from a Stan SOURCE STRING
 // and a few JS callbacks, then build the timeline with a one-line call:
 //
 //   jsPsychADO.registerModel("my-hyperbolic", { stanCode, params, design_grid,
-//                                                linkProb, toStanData, response_labels });
+//                                                linkProb, toStanData, response_labels,
+//                                                presentation });
 //   await jsPsychADO.prepareModels({ compileServer: "https://compile.yourlab.org" });
 //   const dd = jsPsychADO.createTimeline(jsPsych, { model: "my-hyperbolic" });
 //   jsPsych.run([ ...dd ]);
 //
 // It does NOT modify the engine (ado/mi_engine.js), the worker (ado/stan_worker.js),
-// or the controller (controllers/stan_ado_controller.js). It only TRANSLATES the
-// researcher-friendly spec into:
+// the controller (controllers/stan_ado_controller.js), or the generic timeline
+// (ado/ado_timeline.js). It only TRANSLATES the researcher-friendly spec into:
 //   - a model adapter   { id, params, prior, moduleUrl, buildData, choiceProbLL }
 //   - a controller via  createStanAdoController(...)
-//   - a timeline via    createDelayDiscountingTimeline(...)
+//   - a timeline via    createAdoTimeline(...)
 //
 // Three things the façade reconciles, because the friendly spec and the engine
 // disagree on shape:
 //   1. linkProb(theta, design)  ->  choiceProbLL(design, draw)   (argument order)
-//   2. toStanData([{design,response}])  <-  engine passes flat {t_ss,..,choice} rows
+//   2. toStanData([{design,response}])  <-  engine passes flat {...design,choice} rows
 //   3. The engine needs a JS-side `prior` to pick the first design before any data.
 //      The snippet doesn't supply one, so we derive it from the Stan source (or you
 //      can pass an explicit `prior`, which always wins).
 
 import { createStanAdoController } from "./controllers/stan_ado_controller.js";
-import { createDelayDiscountingTimeline } from "./delay_discounting_timeline.js";
+import { createAdoTimeline } from "./ado/ado_timeline.js";
 
 const DEFAULT_STAN = { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 };
 const DEFAULT_N_TRIALS = 42;
@@ -52,8 +53,14 @@ const _compileCache = new Map();   // stanCode -> moduleUrl (per page session)
  * @param {Object}   spec.design_grid     - Candidate grid {t_ss,t_ll,r_ss,r_ll} arrays.
  * @param {Function} spec.linkProb        - (theta, design) => P(LL).
  * @param {Function} spec.toStanData      - (trials:[{design,response}]) => Stan data block.
- * @param {Function} [spec.makeStimulus]  - (design) => HTML. (Not wired into the current timeline.)
+ * @param {Object}   spec.presentation    - Stimulus spec for the generic timeline:
+ *                                          getChoiceTrials(ctx) OR makeStimulus(design)
+ *                                          (+ optional button_html/keymap/prompt/describeDesign).
+ * @param {string[]} [spec.choices]       - Button/key labels in index order (e.g. ["SS","LL"]).
+ * @param {Function} [spec.responseToOutcome] - (design, choiceIndex) => 0|1. Default identity.
+ * @param {Object}   [spec.posterior_display] - Per-parameter chart labels/ranges for debug.
  * @param {string[]|Object} spec.response_labels - ["SS","LL"] or {0:"SS",1:"LL"}.
+ * @param {string}   [spec.task]          - Task label saved into each data row.
  * @param {Object}   [spec.stan]          - Default sampler settings for this model.
  * @param {number}   [spec.n_trials]      - Default trial count for this model.
  */
@@ -67,8 +74,13 @@ function registerModel(name, spec) {
       `registerModel("${name}"): provide exactly one of stanCode | stanUrl | moduleUrl (got ${sources.length}).`
     );
   }
-  for (const k of ["params", "design_grid", "linkProb", "toStanData", "response_labels"]) {
+  for (const k of ["params", "design_grid", "linkProb", "toStanData", "response_labels", "presentation"]) {
     if (spec[k] == null) throw new Error(`registerModel("${name}"): missing required field "${k}".`);
+  }
+  if (typeof spec.presentation.getChoiceTrials !== "function" && typeof spec.presentation.makeStimulus !== "function") {
+    throw new Error(
+      `registerModel("${name}"): presentation must provide getChoiceTrials(ctx) or makeStimulus(design).`
+    );
   }
   if (REGISTRY.has(name)) {
     console.warn(`registerModel: overwriting already-registered model "${name}".`);
@@ -178,18 +190,13 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
       `after every choice. Ignoring testlet_size=${config.testlet_size}.`
     );
   }
-  if (entry.spec.makeStimulus) {
-    console.warn(
-      `createTimeline: makeStimulus is not consumed by the current delay_discounting_timeline ` +
-      `(it renders the SS/LL cards itself). Using the built-in renderer.`
-    );
-  }
 
   const adapter = buildAdapter(entry);
-  const grid_design = entry.spec.design_grid;
-  const stan = { ...DEFAULT_STAN, ...entry.spec.stan, ...config.stan };
-  const n_trials = config.n_trials ?? entry.spec.n_trials ?? DEFAULT_N_TRIALS;
-  const response_labels = labelsToConfig(entry.spec.response_labels);
+  const spec = entry.spec;
+  const grid_design = spec.design_grid;
+  const stan = { ...DEFAULT_STAN, ...spec.stan, ...config.stan };
+  const n_trials = config.n_trials ?? spec.n_trials ?? DEFAULT_N_TRIALS;
+  const response_labels = labelsToConfig(spec.response_labels);
 
   const controller = createStanAdoController({
     model: adapter,
@@ -199,11 +206,21 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
     session_id: config.session_id,
   });
 
-  const dd_config = { n_trials, grid_design, stan, response_labels };
+  // The generic timeline reads the model's presentation, choices, and (optional)
+  // responseToOutcome; everything stimulus-specific lives in the model package.
+  const timeline_config = {
+    n_trials,
+    response_labels,
+    presentation: spec.presentation,
+    choices: spec.choices,
+    responseToOutcome: spec.responseToOutcome,
+    task: config.task ?? spec.task ?? adapter.id,
+  };
 
-  return createDelayDiscountingTimeline(jsPsych, controller, dd_config, {
+  return createAdoTimeline(jsPsych, controller, timeline_config, {
     ado_mode: "stan",
     model_id: adapter.id,
+    posterior_display: spec.posterior_display,
     ...run_context,
   });
 }
@@ -223,14 +240,12 @@ function buildAdapter(entry) {
     params: paramNames,
     prior,
     moduleUrl,
-    // Engine pushes flat rows {t_ss,t_ll,r_ss,r_ll,choice}; reshape to {design,response}
-    // so the researcher's toStanData reads exactly as written.
+    // Engine pushes flat rows {...design, choice} (any design keys); split off
+    // `choice` and pass the remaining keys through as `design` so the researcher's
+    // toStanData reads exactly as written, for any model's design shape.
     buildData: (trials) =>
       toStanData(
-        trials.map((row) => ({
-          design: { t_ss: row.t_ss, t_ll: row.t_ll, r_ss: row.r_ss, r_ll: row.r_ll },
-          response: row.choice,
-        }))
+        trials.map(({ choice, ...design }) => ({ design, response: choice }))
       ),
     // Engine calls choiceProbLL(design, draw); the researcher wrote linkProb(theta, design).
     choiceProbLL: (design, draw) => linkProb(draw, design),
@@ -339,5 +354,5 @@ function parseStanPriors(stanCode, paramSpecs) {
 
 const jsPsychADO = { registerModel, prepareModels, createTimeline };
 
-export { jsPsychADO, registerModel, prepareModels, createTimeline, parseStanPriors, labelsToConfig };
+export { jsPsychADO, registerModel, prepareModels, createTimeline, parseStanPriors, labelsToConfig, buildAdapter };
 export default jsPsychADO;

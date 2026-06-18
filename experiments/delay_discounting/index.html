@@ -77,12 +77,16 @@
     </head>
     <body></body>
     <script type="module">
+        // The delay-discounting experiment is now a THIN CONSUMER of the general
+        // jspsych-ado package: it registers the hyperbolic model and asks the
+        // façade to build the adaptive timeline. Nothing here is ADO-engine- or
+        // timeline-specific; all of that lives in ../../jspsych-ado/.
+        import { jsPsychADO } from "./jspsych-ado/index.js";
+        import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
+        import { createAdoTimeline, makeDebriefStimulus } from "./jspsych-ado/ado/ado_timeline.js";
+        import { createMockAdoController } from "./jspsych-ado/controllers/mock_ado_controller.js";
+        import { createSeededRng, simulateDelayDiscountingChoice } from "./jspsych-ado/ado/ado_simulation.js";
         import { default_dd_config, default_dd_simulation_config } from "./experiments/delay_discounting/dd_config.js";
-        import { createSeededRng, simulateDelayDiscountingChoice } from "./experiments/delay_discounting/dd_simulation.js";
-        import { createDelayDiscountingTimeline, makeDebriefStimulus } from "./experiments/delay_discounting/delay_discounting_timeline.js";
-        import { createMockAdoController } from "./experiments/delay_discounting/controllers/mock_ado_controller.js";
-        import { createStanAdoController } from "./experiments/delay_discounting/controllers/stan_ado_controller.js";
-        import hyperbolicModel from "./experiments/delay_discounting/models/hyperbolic/model.js";
 
         const using_jatos = typeof jatos !== 'undefined';
         const url_params = new URLSearchParams(window.location.search);
@@ -122,18 +126,7 @@
         }
 
         const param_history = {};
-        let adaptive_controller;
-        if (ado_mode === "mock") {
-            adaptive_controller = createMockAdoController(default_dd_config);
-        } else {
-            adaptive_controller = createStanAdoController({
-                model: hyperbolicModel,
-                grid_design: default_dd_config.grid_design,
-                stan: default_dd_config.stan,
-                n_trials: default_dd_config.n_trials,
-                session_id: using_jatos ? jatos.studyResultId : "local-" + Date.now(),
-            });
-        }
+        const session_id = using_jatos ? jatos.studyResultId : "local-" + Date.now();
 
         const run_context = {
             ado_mode: ado_mode,
@@ -143,7 +136,7 @@
             posterior_display: hyperbolicModel.posterior_display,
             simulation_mode: simulation_mode,
             using_jatos: using_jatos,
-            session_id: using_jatos ? jatos.studyResultId : "local-" + Date.now(),
+            session_id: session_id,
             /**
              * Return simulated jsPsych choice data for the current ADO design.
              *
@@ -160,6 +153,26 @@
                 batchId: jatos.batchId,
             } : null,
         };
+
+        // Register the hyperbolic model with the façade. linkProb/toStanData bridge
+        // the friendly spec to the engine's argument order and data shape; the rest
+        // (presentation, choices, priors, posterior display) comes straight from the
+        // model package, so adding another model is just another registerModel call.
+        jsPsychADO.registerModel(hyperbolicModel.id, {
+            moduleUrl: hyperbolicModel.moduleUrl,
+            prior: hyperbolicModel.prior,
+            params: hyperbolicModel.params,
+            design_grid: default_dd_config.grid_design,
+            linkProb: (theta, design) => hyperbolicModel.choiceProbLL(design, theta),
+            toStanData: (trials) =>
+                hyperbolicModel.buildData(trials.map(({ design, response }) => ({ ...design, choice: response }))),
+            response_labels: hyperbolicModel.response_labels,
+            presentation: hyperbolicModel.presentation,
+            choices: hyperbolicModel.choices,
+            posterior_display: hyperbolicModel.posterior_display,
+            stan: default_dd_config.stan,
+            n_trials: default_dd_config.n_trials,
+        });
 
         const plain_finish_stimulus = '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
 
@@ -184,7 +197,7 @@
             type: jsPsychHtmlButtonResponse,
             stimulus: plain_finish_stimulus,
             on_start: function(trial) {
-                var bar = document.getElementById("dd-live-posterior-chart");
+                var bar = document.getElementById("ado-live-posterior-chart");
                 if (bar) { bar.remove(); }
                 trial.stimulus = run_context.debug
                     ? makeDebriefStimulus(run_context.param_history || {}, run_context.posterior_display)
@@ -213,12 +226,25 @@
         });
 
         let timeline = [instructions];
-        timeline = timeline.concat(createDelayDiscountingTimeline(
-            jsPsych,
-            adaptive_controller,
-            default_dd_config,
-            run_context
-        ));
+        if (ado_mode === "mock") {
+            // Dev path: drive the SAME generic timeline directly with the
+            // deterministic mock controller (no WASM, no façade compile step).
+            const mock_controller = createMockAdoController(default_dd_config);
+            timeline = timeline.concat(createAdoTimeline(jsPsych, mock_controller, {
+                n_trials: default_dd_config.n_trials,
+                response_labels: default_dd_config.response_labels,
+                presentation: hyperbolicModel.presentation,
+                choices: hyperbolicModel.choices,
+                task: "delay_discounting",
+            }, run_context));
+        } else {
+            // Live path: the façade builds the in-browser Stan controller + timeline.
+            timeline = timeline.concat(jsPsychADO.createTimeline(jsPsych, {
+                model: hyperbolicModel.id,
+                session_id: session_id,
+                task: "delay_discounting",
+            }, run_context));
+        }
         timeline.push(end_screen);
 
         if (simulation_mode) {

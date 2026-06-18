@@ -1,13 +1,24 @@
 # jspsych-ado
 
-A jsPsych/JATOS delay discounting experiment that runs **adaptive design optimization
-(ADO) entirely in the browser**. A Stan model, compiled to WebAssembly, infers the
-posterior over the discounting parameters after each trial; the next SS/LL offer is
-chosen by maximizing mutual information over a design grid. There is no Python and no
-server — inference runs client-side via [tinystan](https://github.com/WardBrian/tinystan)
-+ WASM.
+Run **adaptive design optimization (ADO) entirely in the browser** for jsPsych
+experiments. A Stan model, compiled to WebAssembly, infers the posterior over the
+model parameters after each trial; the next design is chosen by maximizing mutual
+information over a design grid. There is no Python and no server — inference runs
+client-side via [tinystan](https://github.com/WardBrian/tinystan) + WASM.
 
-Everything lives in `experiments/delay_discounting/`.
+## Layout
+
+- **`jspsych-ado/`** — the general, model- and stimulus-agnostic library: the MI
+  engine, the in-browser Stan controller + Web Worker, the generic adaptive
+  timeline, and the `jsPsychADO` façade (`registerModel` / `prepareModels` /
+  `createTimeline`). It knows nothing about any specific task.
+- **`jspsych-ado/models/<name>/`** — a pluggable model package: a `model.js`
+  adapter (`params`, `prior`, `choiceProbLL`, `buildData`, `presentation`, …) plus
+  its compiled `.stan` artifacts. Adding a model is dropping a folder here and
+  calling `registerModel` — no edits to the engine, controller, or timeline.
+- **`experiments/<name>/`** — thin consumers. Each page registers a model and asks
+  the façade to build the timeline. `experiments/delay_discounting/` is the first
+  example (the hyperbolic model).
 
 ## Run it
 
@@ -52,9 +63,9 @@ node tests/js/stan_recovery.smoke.mjs  # real-WASM smoke: ADO recovers k across 
 
 ## The Stan model
 
-The model is `experiments/delay_discounting/models/hyperbolic/hyperbolic.stan`, compiled
-to the committed `main.js` + `main.wasm` via the public stan-playground compile server.
-See [experiments/delay_discounting/models/README.md](experiments/delay_discounting/models/README.md)
+The model is `jspsych-ado/models/hyperbolic/hyperbolic.stan`, compiled to the committed
+`main.js` + `main.wasm` via the public stan-playground compile server.
+See [jspsych-ado/models/README.md](jspsych-ado/models/README.md)
 for how to recompile or add another model — no local toolchain required.
 
 ## JATOS

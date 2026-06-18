@@ -1,10 +1,14 @@
 ## Usage
 
-`jspsych-ado` runs adaptive design optimization (ADO) for delay discounting
-**entirely in the browser**. A Stan model compiled to WebAssembly infers the
-posterior over the discounting parameters after every trial, and the next
-smaller-sooner / larger-later (SS/LL) offer is chosen by maximizing mutual
-information over a design grid. No Python, no server.
+`jspsych-ado` runs adaptive design optimization (ADO) **entirely in the browser**.
+A Stan model compiled to WebAssembly infers the posterior over the model parameters
+after every trial, and the next design is chosen by maximizing mutual information
+over a design grid. No Python, no server.
+
+The general library lives in [`jspsych-ado/`](../../jspsych-ado) and is model- and
+stimulus-agnostic. An experiment is a thin page that **registers a model** and asks
+the `jsPsychADO` façade to build the timeline. Delay discounting (this folder, the
+hyperbolic model) is the first example.
 
 ### Quick start (no code)
 
@@ -19,84 +23,105 @@ URL parameters:
 - `ado=stan` (default) — live in-browser Stan inference + ADO in a Web Worker.
 - `ado=mock` — deterministic, no-WASM controller for fast timeline/UI work.
 - `debug=1` — per-trial console summary (design shown, response, posterior
-  mean/sd for each parameter, next design, local sampling time).
+  mean/sd for each parameter, next design, local sampling time) plus live
+  posterior trajectory charts.
 - `simulate=data-only` / `simulate=visual` — run a simulated participant
   (generate data with no clicks / watch jsPsych click through the run).
 
-### Wiring it yourself
+### Wiring it yourself (the façade)
 
-Three pieces: a **model adapter**, a **controller**, and the **timeline**.
-Import a model, build a controller, and hand the controller to the timeline.
+Register a model, then build the timeline. The friendly spec bridges to the engine
+in two places (`linkProb` argument order; `toStanData` trial shape); everything
+else — priors, the stimulus `presentation`, response labels — comes from the model
+package, so a second model is just a second `registerModel` call.
 
 ```js
+import { jsPsychADO } from "./jspsych-ado/index.js";
+import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
 import { default_dd_config } from "./experiments/delay_discounting/dd_config.js";
-import { createStanAdoController } from "./experiments/delay_discounting/controllers/stan_ado_controller.js";
-import { createDelayDiscountingTimeline } from "./experiments/delay_discounting/delay_discounting_timeline.js";
-import hyperbolicModel from "./experiments/delay_discounting/models/hyperbolic/model.js";
 
 const jsPsych = initJsPsych();
 
-const controller = createStanAdoController({
-  model: hyperbolicModel,
-  grid_design: default_dd_config.grid_design,
-  stan: default_dd_config.stan,        // { num_chains, num_warmup, num_samples, seed }
+jsPsychADO.registerModel("hyperbolic", {
+  moduleUrl:     hyperbolicModel.moduleUrl,     // precompiled main.js (no compile step)
+  prior:         hyperbolicModel.prior,
+  params:        hyperbolicModel.params,
+  design_grid:   default_dd_config.grid_design,
+  linkProb:      (theta, design) => hyperbolicModel.choiceProbLL(design, theta),
+  toStanData:    (trials) =>                     // trials: [{ design, response }]
+    hyperbolicModel.buildData(trials.map(({ design, response }) => ({ ...design, choice: response }))),
+  response_labels:  hyperbolicModel.response_labels,
+  presentation:     hyperbolicModel.presentation,
+  choices:          hyperbolicModel.choices,
+  posterior_display: hyperbolicModel.posterior_display,
+  stan:     default_dd_config.stan,             // { num_chains, num_warmup, num_samples, seed }
   n_trials: default_dd_config.n_trials,
 });
 
-const timeline = createDelayDiscountingTimeline(
-  jsPsych,
-  controller,
-  default_dd_config,
-  { debug: true }                      // run_context
-);
+const timeline = jsPsychADO.createTimeline(jsPsych, {
+  model: "hyperbolic",
+  task: "delay_discounting",
+}, { debug: true });                            // run_context
 
 jsPsych.run(timeline);
 ```
 
-For fast UI iteration with no WASM, swap in the mock controller — everything else
-is identical:
+If a model is registered from a Stan **source string** (`stanCode`) or a `.stan`
+URL (`stanUrl`) instead of a precompiled `moduleUrl`, compile it once at study
+setup before building any timelines:
 
 ```js
-import { createMockAdoController } from "./experiments/delay_discounting/controllers/mock_ado_controller.js";
+await jsPsychADO.prepareModels({ compileServer: "https://stan-wasm.flatironinstitute.org" });
+```
+
+### Dev path (mock controller, no WASM)
+
+The generic timeline accepts any controller, so for fast UI iteration drive it
+directly with the deterministic mock controller — no façade, no WASM:
+
+```js
+import { createAdoTimeline } from "./jspsych-ado/ado/ado_timeline.js";
+import { createMockAdoController } from "./jspsych-ado/controllers/mock_ado_controller.js";
+import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
+import { default_dd_config } from "./experiments/delay_discounting/dd_config.js";
 
 const controller = createMockAdoController(default_dd_config);
+const timeline = createAdoTimeline(jsPsych, controller, {
+  n_trials:        default_dd_config.n_trials,
+  response_labels: default_dd_config.response_labels,
+  presentation:    hyperbolicModel.presentation,
+  choices:         hyperbolicModel.choices,
+  task:            "delay_discounting",
+}, { debug: true });
 ```
 
 ### Adjusting the experiment
 
-The knobs live in `default_dd_config` (or your own copy). Override inline when you
-build the controller:
-
-```js
-const controller = createStanAdoController({
-  model: hyperbolicModel,
-  grid_design: default_dd_config.grid_design,
-  stan: { num_chains: 4, num_warmup: 500, num_samples: 1000, seed: 42 },
-  n_trials: 40,
-});
-```
+The knobs live in `default_dd_config` (or your own copy):
 
 - `n_trials` — number of adaptive choice trials.
-- `grid_design` — candidate SS/LL designs the MI engine scores, as arrays:
-  `{ t_ss, t_ll, r_ss, r_ll }`.
+- `grid_design` — candidate designs the MI engine scores, as arrays of values
+  (`{ t_ss, t_ll, r_ss, r_ll }`), or a curated array of design objects.
 - `stan` — NUTS sampler settings: `num_chains`, `num_warmup`, `num_samples`,
   `seed`. More samples means better design selection but slower per-trial
-  inference (Stan refits after every choice).
-- `response_labels` — button labels by index: `{ 0: "SS", 1: "LL" }`.
+  inference (Stan refits after every choice). Override per timeline via
+  `createTimeline(jsPsych, { model, stan: { ... } })`.
+- `response_labels` — labels by index: `{ 0: "SS", 1: "LL" }`.
 
-### Adding a discounting model
+### Adding a model
 
-A model is a folder under `models/`. Three steps, no local compiler toolchain
-required.
+A model is a folder under `jspsych-ado/models/`. Three steps, no local compiler
+toolchain required.
 
-**1. Write the Stan model** at `models/<name>/<name>.stan` (likelihood + priors).
+**1. Write the Stan model** at `jspsych-ado/models/<name>/<name>.stan` (likelihood
++ priors).
 
 **2. Compile it once** with the public Flatiron server and drop the two artifacts
 in the folder (keep the `main.js` / `main.wasm` names — `main.js` hardcodes loading
 its sibling `main.wasm`):
 
 ```bash
-cd experiments/delay_discounting/models/<name>
+cd jspsych-ado/models/<name>
 ID=$(curl -s -X POST https://stan-wasm.flatironinstitute.org/compile \
   -H "Content-Type: text/plain" -H "Authorization: Bearer 1234" \
   --data-binary @<name>.stan | sed -E 's/.*"model_id":"([^"]+)".*/\1/')
@@ -109,8 +134,11 @@ curl -s "https://stan-wasm.flatironinstitute.org/download/$ID/main.wasm" -o main
 `docker run -p 8083:8080 ghcr.io/flatironinstitute/stan-wasm-server:latest` and point
 the URLs at `http://localhost:8083`.)
 
-**3. Write the adapter** at `models/<name>/model.js`. The default export is the
-object `createStanAdoController` consumes:
+**3. Write the adapter** at `jspsych-ado/models/<name>/model.js`. It owns the
+likelihood (mirroring the `.stan` block), the priors, and the **presentation** —
+how a design is shown and answered. The generic timeline consumes `presentation`
+through either the single-button convenience path (`makeStimulus` + optional
+`button_html`/`keymap`/`prompt`) or `getChoiceTrials(ctx)` for multi-frame tasks.
 
 ```js
 export default {
@@ -119,6 +147,10 @@ export default {
   prior: {                                        // MUST match <name>.stan priors
     r:   { dist: "lognormal", meanlog: -2, sdlog: 1 },
     tau: { dist: "halfnormal", sd: 3 },
+  },
+  posterior_display: {                            // optional chart labels/ranges (debug)
+    r:   { label: "r", y_min: 0, y_max: 1, lower_bound: 0 },
+    tau: { label: "τ", y_min: 0, y_max: 7, lower_bound: 0 },
   },
   moduleUrl: new URL("./main.js", import.meta.url).href,
   buildData: (trials) => ({                       // trials: {t_ss,t_ll,r_ss,r_ll,choice}
@@ -132,46 +164,42 @@ export default {
     const vll = design.r_ll * Math.exp(-p.r * design.t_ll);
     return 1 / (1 + Math.exp(-p.tau * (vll - vss)));
   },
+  // Stimulus + response contract consumed by the generic timeline.
+  presentation: {
+    makeStimulus: (design) => `<p>Which would you prefer?</p>`,
+    button_html:  (design) => [card(design, 0), card(design, 1)],
+    keymap:       { s: 0, l: 1 },                 // physical key -> button index
+    prompt:       "<p>Press S for sooner · L for later</p>",
+  },
+  choices: ["SS", "LL"],
+  response_labels: { 0: "SS", 1: "LL" },
 };
 ```
 
-Then import it where you build the controller
-(`import expModel from "./models/exponential/model.js"`) and pass it as `model`.
-`choiceProbLL` is the JS mirror of the `.stan` likelihood and must agree with it;
-the adapter unit test (`tests/js/<name>.test.mjs`) guards the formula.
+Then register it exactly like the hyperbolic model above and pass `model: "exponential"`
+to `createTimeline`. `choiceProbLL` is the JS mirror of the `.stan` likelihood and
+must agree with it; the adapter unit test (`tests/js/<name>.test.mjs`) guards the
+formula.
+
+For a task whose binary outcome depends on the design (e.g. "chose the more
+numerous side"), add `responseToOutcome: (design, choiceIndex) => 0 | 1` to the
+spec; it defaults to identity (the raw button index is the outcome), which is
+correct for delay discounting.
 
 ### (Optional) Compile from a `.stan` string at setup
 
 To keep the Stan source inline and skip the curl/commit step while prototyping,
 `compileStanModel` compiles a source string at experiment setup and returns the
-same adapter shape. It POSTs to the same Flatiron server and points the adapter's
-`moduleUrl` at the compiled module — the engine, worker, and controller are
-untouched.
+same adapter shape (minus `presentation`, which you still supply). It POSTs to the
+same Flatiron server and points the adapter's `moduleUrl` at the compiled module —
+the engine, worker, controller, and timeline are untouched.
 
 ```js
-import { compileStanModel } from "./experiments/delay_discounting/models/compile_stan_model.js";
-
-const expStan = `
-data {
-  int<lower=0> N;
-  array[N] real t_ss; array[N] real t_ll;
-  array[N] real r_ss; array[N] real r_ll;
-  array[N] int<lower=0,upper=1> y;
-}
-parameters { real<lower=0> r; real<lower=0> tau; }
-model {
-  r   ~ lognormal(-2, 1);
-  tau ~ normal(0, 3);
-  for (n in 1:N) {
-    real vss = r_ss[n] * exp(-r * t_ss[n]);
-    real vll = r_ll[n] * exp(-r * t_ll[n]);
-    y[n] ~ bernoulli_logit(tau * (vll - vss));
-  }
-}`;
+import { compileStanModel } from "./jspsych-ado/models/compile_stan_model.js";
 
 const expModel = await compileStanModel({
   id: "exponential",
-  stan: expStan,
+  stan: expStan,                                  // .stan source string
   params: ["r", "tau"],
   prior: { r: { dist: "lognormal", meanlog: -2, sdlog: 1 }, tau: { dist: "halfnormal", sd: 3 } },
   buildData: (trials) => ({
@@ -186,27 +214,19 @@ const expModel = await compileStanModel({
     return 1 / (1 + Math.exp(-p.tau * (vll - vss)));
   },
 });
-
-const controller = createStanAdoController({
-  model: expModel,
-  grid_design: default_dd_config.grid_design,
-  stan: default_dd_config.stan,
-  n_trials: default_dd_config.n_trials,
-});
 ```
 
 `compileStanModel` is for prototyping: the compiled module is fetched from the
-compile server at run time, so every participant load depends on that server (and
-on cross-origin access to it). For a deployed study, download `main.js` +
-`main.wasm` once with the curl above, commit them, and write a normal `model.js`
-so the live experiment is pure static assets with no third-party runtime
-dependency.
+compile server at run time, so every participant load depends on that server. For a
+deployed study, download `main.js` + `main.wasm` once with the curl above, commit
+them, and write a normal `model.js` so the live experiment is pure static assets
+with no third-party runtime dependency.
 
 ### What gets logged
 
-Each choice trial records the design shown (`t_ss`, `t_ll`, `r_ss`, `r_ll`), the
-response (`choice`, `choice_label`), the per-trial posterior summaries named from
-the model's parameters (`post_mean_<param>`, `post_sd_<param>`, e.g.
-`post_mean_k`), and timing. Run-level properties include `ado_mode` and
-`model_id`; under `simulate`, the data-generating `sim_<param>` values are saved
-too.
+Each choice trial records the design shown (its design keys, e.g. `t_ss`, `t_ll`,
+`r_ss`, `r_ll`), the response (`choice`, `choice_raw`, `choice_label`, and the full
+`ado_design` object), the per-trial posterior summaries named from the model's
+parameters (`post_mean_<param>`, `post_sd_<param>`, e.g. `post_mean_k`), and timing.
+Run-level properties include `ado_mode` and `model_id`; under `simulate`, the
+data-generating `sim_<param>` values are saved too.

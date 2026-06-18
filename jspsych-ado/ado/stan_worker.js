@@ -6,7 +6,7 @@
 // parameter columns to keep transfers small. Pattern follows stan-playground's
 // StanModelWorker.ts.
 
-import StanModel from "../../../core/tinystan/index.mjs";
+import StanModel from "../../core/tinystan/index.mjs";
 
 let modelPromise = null;
 

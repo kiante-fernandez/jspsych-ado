@@ -34,12 +34,12 @@ globalThis.fetch = async (url, opts) => {
 };
 
 const StanModel = (await import("../../core/tinystan/index.mjs")).default;
-const hyp = (await import("../../experiments/delay_discounting/models/hyperbolic/model.js")).default;
+const hyp = (await import("../../jspsych-ado/models/hyperbolic/model.js")).default;
 const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws } = await import(
-  "../../experiments/delay_discounting/ado/mi_engine.js"
+  "../../jspsych-ado/ado/mi_engine.js"
 );
 const { createSeededRng, simulateDelayDiscountingChoice } = await import(
-  "../../experiments/delay_discounting/dd_simulation.js"
+  "../../jspsych-ado/ado/ado_simulation.js"
 );
 const { default_dd_config } = await import("../../experiments/delay_discounting/dd_config.js");
 

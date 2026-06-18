@@ -6,7 +6,7 @@ import model, {
   getHyperbolicValue,
   logistic,
   buildData,
-} from "../../experiments/delay_discounting/models/hyperbolic/model.js";
+} from "../../jspsych-ado/models/hyperbolic/model.js";
 
 test("logistic basics", () => {
   assert.ok(Math.abs(logistic(0) - 0.5) < 1e-12);
@@ -85,4 +85,21 @@ test("model adapter exposes the expected metadata", () => {
   assert.ok(model.moduleUrl.endsWith("main.js"));
   assert.equal(typeof model.buildData, "function");
   assert.equal(typeof model.choiceProbLL, "function");
+});
+
+test("model adapter exposes the presentation/choice contract", () => {
+  assert.equal(typeof model.presentation.makeStimulus, "function");
+  assert.equal(typeof model.presentation.button_html, "function");
+  assert.deepEqual(model.presentation.keymap, { s: 0, l: 1 });
+  assert.deepEqual(model.choices, ["SS", "LL"]);
+  assert.deepEqual(model.response_labels, { 0: "SS", 1: "LL" });
+
+  const design = { t_ss: 0, t_ll: 52, r_ss: 400, r_ll: 800 };
+  const cards = model.presentation.button_html(design);
+  assert.equal(cards.length, 2);
+  assert.ok(cards[0].includes("$400") && cards[1].includes("$800"));
+  // describeDesign feeds the debug log with task-specific offer lines.
+  const lines = model.presentation.describeDesign(design);
+  assert.equal(lines.length, 2);
+  assert.ok(lines[0].startsWith("SS:") && lines[1].startsWith("LL:"));
 });

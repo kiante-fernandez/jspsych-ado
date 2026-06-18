@@ -48,12 +48,20 @@ function mutualInfo(design, draws, choiceProbLL) {
 }
 
 /**
- * Expand a design grid (object of value arrays) into every design combination.
+ * Expand a design grid into the candidate design list scored by mutual information.
  *
- * @param {Object} grid_design - e.g. {t_ss: [...], t_ll: [...], r_ss: [...], r_ll: [...]}.
- * @returns {Array<Object>} Cartesian product of the grid as design objects.
+ * Accepts either an object of value arrays (Cartesian product, the common case)
+ * or an already-curated array of design objects, which is returned as-is. The
+ * array form lets a model supply hand-picked designs that are not a clean grid
+ * (e.g. numerosity pairs for a dots task) without changing the engine.
+ *
+ * @param {Object|Array<Object>} grid_design - {t_ss:[...], ...} OR [{...}, {...}].
+ * @returns {Array<Object>} Candidate designs.
  */
 function enumerateDesigns(grid_design) {
+  if (Array.isArray(grid_design)) {
+    return grid_design;
+  }
   const keys = Object.keys(grid_design);
   let combos = [{}];
   for (const key of keys) {

@@ -1,82 +1,37 @@
-/**
- * @typedef {Object} DelayDiscountingDesign
- * @property {number} r_ss - Smaller-sooner reward.
- * @property {number} t_ss - Smaller-sooner delay.
- * @property {number} r_ll - Larger-later reward.
- * @property {number} t_ll - Larger-later delay.
- */
+// Generic adaptive-design-optimization (ADO) jsPsych timeline.
+//
+// This module is MODEL- AND STIMULUS-AGNOSTIC. It knows nothing about delay
+// discounting, dots, or any particular task. It wires together:
+//   - an ADO controller (start/update; mock or in-browser Stan), and
+//   - a model "presentation" spec that supplies the per-trial stimulus,
+// into the standard ADO loop: pick a design -> show it -> record the choice ->
+// re-infer + pick the next design. Everything task-specific (how a design is
+// rendered, which raw response maps to which binary outcome) is provided by the
+// registered model, so adding a model never requires editing this file.
+//
+// The presentation contract (supplied by the model, threaded through config):
+//   - presentation.getChoiceTrials(ctx) -> Array<jsPsychTrial>
+//       Return the jsPsych trials shown for one choice. EXACTLY ONE of them must
+//       be the response-collecting trial built by one of the factories below
+//       (htmlButtonChoice / canvasResponse), which marks itself and stores the
+//       raw response index on data.__ado_response. ctx exposes:
+//         { getDesign(), getState(), choices, response_labels, run_context,
+//           trial_number, task }
+//   - CONVENIENCE PATH for the common single-button case: instead of
+//       getChoiceTrials, supply presentation.makeStimulus(design) -> HTML (plus
+//       optional button_html(design) -> string[], keymap {key:index}, prompt);
+//       the timeline builds the trial via htmlButtonChoice(...) for you.
+//   - presentation.describeDesign(design) -> string[] (optional): human-readable
+//       lines for the debug log; defaults to generic key=value pairs.
+//
+// config: { n_trials, response_labels, presentation, choices, responseToOutcome?,
+//           task? }. responseToOutcome(design, choiceIndex) -> 0|1 defaults to
+// identity (raw button index IS the binary outcome), which is correct for tasks
+// like delay discounting where button 1 == outcome 1.
 
-/**
- * @typedef {Object} DelayDiscountingPosteriorSummary
- * @property {number} k - Posterior summary for discount rate.
- * @property {number} tau - Posterior summary for choice sensitivity.
- */
-
-/**
- * @typedef {Object} DelayDiscountingAdoState
- * @property {string} session_id - Backend/controller session identifier.
- * @property {number} trial_index - Zero-based ADO trial index for next_design.
- * @property {DelayDiscountingDesign} next_design - Design to show on the next choice trial.
- * @property {?DelayDiscountingPosteriorSummary} post_mean - Posterior means after the latest update.
- * @property {?DelayDiscountingPosteriorSummary} post_sd - Posterior SDs after the latest update.
- * @property {?number} api_latency_ms - API round-trip time when available.
- */
-
-/**
- * @typedef {Object} DelayDiscountingAdoController
- * @property {Function} start - Async function(context) returning initial DelayDiscountingAdoState.
- * @property {Function} update - Async function(trial_data) returning updated DelayDiscountingAdoState.
- */
-
-/**
- * @typedef {Object} DelayDiscountingRunContext
- * @property {string} ado_mode - Controller mode label saved into data/debug logs.
- * @property {boolean} debug - Whether to print ADO trial summaries.
- * @property {?string} simulation_mode - jsPsych simulation mode, usually data-only or visual.
- * @property {?Function} simulate_choice - Function(design) returning simulated jsPsych trial data.
- * @property {?Object} param_history - Mutable posterior history for debug charts.
- * @property {?Object} posterior_display - Optional parameter labels and preferred chart ranges.
- */
-
-function formatDelay(delay) {
-  if (delay === 0) {
-    return "now";
-  }
-  if (delay === 1) {
-    return "1 week";
-  }
-  if (delay < 1) {
-    return `${delay} weeks`;
-  }
-  return `${delay} weeks`;
-}
-
-function formatReward(reward) {
-  return `$${Number(reward).toFixed(2).replace(".00", "")}`;
-}
-
-/**
- * Build the HTML shown for one delay-discounting choice trial.
- *
- * @param {DelayDiscountingDesign} design - Current SS/LL offer.
- * @returns {string} HTML stimulus for jsPsychHtmlButtonResponse.
- */
-function makeChoiceStimulus(design) {
-  return `<p style="font-size: 1.3rem; margin: 0 0 1.75rem;">Which would you prefer?</p>`;
-}
-
-function makeOptionCardHtml(design, index) {
-  var is_ss = index === 0;
-  var amount = is_ss ? design.r_ss : design.r_ll;
-  var delay = is_ss ? design.t_ss : design.t_ll;
-  var key_hint = is_ss ? "S" : "L";
-  var delay_text = delay === 0 ? "available now" : "available in " + formatDelay(delay);
-  return "<button class=\"dd-option-card\">"
-    + "<span class=\"dd-key-hint\">" + key_hint + "</span>"
-    + "<span class=\"dd-amount\">" + formatReward(amount) + "</span>"
-    + "<span class=\"dd-when\">" + delay_text + "</span>"
-    + "</button>";
-}
+// ---------------------------------------------------------------------------
+// Data boundary helpers (model-agnostic)
+// ---------------------------------------------------------------------------
 
 /**
  * Copy posterior summaries from the current ADO state onto a jsPsych choice row.
@@ -85,7 +40,7 @@ function makeOptionCardHtml(design, index) {
  * code can read from the saved jsPsych JSON.
  *
  * @param {Object} data - jsPsych choice-trial data row, mutated in place.
- * @param {DelayDiscountingAdoState} ado_state - Current controller state.
+ * @param {Object} ado_state - Current controller state with post_mean/post_sd.
  */
 function copyPosteriorFields(data, ado_state) {
   if (ado_state.post_mean) {
@@ -114,19 +69,33 @@ function formatDebugLatency(value) {
   return `${value} ms`;
 }
 
-function formatDebugOffer(label, reward, delay) {
-  const delay_label = formatDelay(delay);
-  const delay_text = delay_label === "now" ? delay_label : `in ${delay_label}`;
-  return `${label}: ${formatReward(reward)} ${delay_text}`;
+/**
+ * Describe a design for the debug log. Models may supply a task-specific
+ * presentation.describeDesign(design) -> string[]; otherwise fall back to
+ * generic key=value lines so any model is debuggable out of the box.
+ *
+ * @param {Object} design - The design object.
+ * @param {Object} config - Timeline config (may carry presentation.describeDesign).
+ * @returns {string[]} Lines describing the design.
+ */
+function describeDesign(design, config) {
+  if (!design) {
+    return ["(none)"];
+  }
+  const describe = config.presentation && config.presentation.describeDesign;
+  if (typeof describe === "function") {
+    return describe(design);
+  }
+  return Object.entries(design).map(([key, value]) => `${key}: ${value}`);
 }
 
 /**
- * Print a readable summary of the just-finished ADO update.
+ * Print a readable summary of the just-finished ADO update (debug only).
  *
- * @param {DelayDiscountingRunContext} run_context - Current run settings.
+ * @param {Object} run_context - Current run settings (debug, ado_mode).
  * @param {Object} trial_data - Completed jsPsych choice row.
- * @param {DelayDiscountingAdoState} ado_result - Updated controller state.
- * @param {Object} config - Delay-discounting experiment config.
+ * @param {Object} ado_result - Updated controller state.
+ * @param {Object} config - Timeline config.
  */
 function logAdoTrial(run_context, trial_data, ado_result, config) {
   if (!run_context.debug) {
@@ -147,8 +116,7 @@ function logAdoTrial(run_context, trial_data, ado_result, config) {
       `${label} | latency: ${formatDebugLatency(ado_result.api_latency_ms)}`,
       "",
       "Presented:",
-      `  ${formatDebugOffer("SS", trial_data.r_ss, trial_data.t_ss)}`,
-      `  ${formatDebugOffer("LL", trial_data.r_ll, trial_data.t_ll)}`,
+      ...describeDesign(trial_data.ado_design, config).map(line => "  " + line),
       "",
       "Posterior after response:",
       ...Object.keys(post_mean).map(param =>
@@ -157,11 +125,7 @@ function logAdoTrial(run_context, trial_data, ado_result, config) {
       "",
       // next_design is null on the final update (no further trial to show it on).
       next_design
-        ? [
-            "Next ADO design:",
-            `  ${formatDebugOffer("SS", next_design.r_ss, next_design.t_ss)}`,
-            `  ${formatDebugOffer("LL", next_design.r_ll, next_design.t_ll)}`,
-          ].join("\n")
+        ? ["Next ADO design:", ...describeDesign(next_design, config).map(line => "  " + line)].join("\n")
         : "Next ADO design: (final trial; none)",
     ].join("\n");
 
@@ -169,17 +133,11 @@ function logAdoTrial(run_context, trial_data, ado_result, config) {
 
     if (console.groupCollapsed && console.table && console.groupEnd) {
       console.groupCollapsed(`${label} details`);
-      const offer_rows = [
-        { option: "Presented SS", reward: trial_data.r_ss, delay: trial_data.t_ss },
-        { option: "Presented LL", reward: trial_data.r_ll, delay: trial_data.t_ll },
-      ];
+      const design_rows = [{ when: "presented", ...trial_data.ado_design }];
       if (next_design) {
-        offer_rows.push(
-          { option: "Next SS", reward: next_design.r_ss, delay: next_design.t_ss },
-          { option: "Next LL", reward: next_design.r_ll, delay: next_design.t_ll },
-        );
+        design_rows.push({ when: "next", ...next_design });
       }
-      console.table(offer_rows);
+      console.table(design_rows);
       console.table(Object.keys(post_mean).map(param => ({
         parameter: param,
         mean: post_mean[param],
@@ -198,8 +156,8 @@ function logAdoTrial(run_context, trial_data, ado_result, config) {
  * jsPsych expects simulation_options.data to contain plugin data such as
  * response and rt. Extra sim_* fields are kept in the final jsPsych data row.
  *
- * @param {DelayDiscountingRunContext} run_context - Current run settings.
- * @param {DelayDiscountingDesign} design - Current SS/LL offer.
+ * @param {Object} run_context - Current run settings (simulation_mode, simulate_choice).
+ * @param {Object} design - Current design.
  * @returns {Object} jsPsych simulation_options object for the choice trial.
  */
 function makeChoiceSimulationOptions(run_context, design) {
@@ -211,6 +169,10 @@ function makeChoiceSimulationOptions(run_context, design) {
     data: run_context.simulate_choice(design),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Live posterior charts (debug only; model-agnostic)
+// ---------------------------------------------------------------------------
 
 function formatAxisTick(v) {
   if (v === 0) return "0";
@@ -356,8 +318,8 @@ function makeParamConvergenceSvg(series, param_name, opts) {
  * One chart is rendered per parameter, side by side.
  *
  * @param {Object<string, Array<{trial, mean, sd}>>} param_history
- * @param {DelayDiscountingAdoState} ado_state
- * @param {DelayDiscountingRunContext} run_context
+ * @param {Object} ado_state
+ * @param {Object} run_context
  */
 function updateLiveCharts(param_history, ado_state, run_context) {
   if (!run_context.debug) {
@@ -369,10 +331,10 @@ function updateLiveCharts(param_history, ado_state, run_context) {
     return;
   }
 
-  var container = document.getElementById("dd-live-posterior-chart");
+  var container = document.getElementById("ado-live-posterior-chart");
   if (!container) {
     container = document.createElement("div");
-    container.id = "dd-live-posterior-chart";
+    container.id = "ado-live-posterior-chart";
     container.style.cssText = "position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,0.95);border-top:1px solid #e5e7eb;z-index:1000;pointer-events:none;padding:0.3rem 0;";
     document.body.appendChild(container);
   }
@@ -468,25 +430,196 @@ function appendPosteriorHistory(run_context, ado_result) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Response-trial factories (the stimulus seam)
+// ---------------------------------------------------------------------------
+//
+// A model's presentation builds its choice trials from these. Each factory that
+// COLLECTS a response marks its trial with __ado_is_response and stores the raw
+// response index on data.__ado_response; the timeline then composes the ADO
+// finalize step (outcome mapping, design recording, posterior copy) on top.
+
 /**
- * Create the adaptive delay-discounting jsPsych timeline fragment.
+ * Single html-button-response choice trial. Covers the common case (e.g. delay
+ * discounting's two option cards). Design-dependent rendering is lazy: stimulus,
+ * button_html, data, and simulation_options all read ctx.getDesign() at run time,
+ * so the live ADO-selected design is shown.
  *
- * The timeline depends only on the ADO controller contract: start() provides the
- * first design, and update(trial_data) returns posterior summaries plus the next
- * design. This keeps the jsPsych task independent of whether the controller is
- * mock-backed or the live in-browser Stan controller.
+ * @param {Object} ctx - { getDesign, getState, choices, run_context, trial_number, task }
+ * @param {Object} presentation - { makeStimulus, button_html?, keymap?, prompt?,
+ *                                   margin_vertical?, margin_horizontal? }
+ * @returns {Object} jsPsych html-button-response trial (response-collecting).
+ */
+function htmlButtonChoice(ctx, presentation) {
+  let key_handler = null;
+
+  const trial = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: function() {
+      return presentation.makeStimulus(ctx.getDesign());
+    },
+    choices: ctx.choices,
+    margin_vertical: presentation.margin_vertical ?? "0px",
+    margin_horizontal: presentation.margin_horizontal ?? "12px",
+    simulation_options: function() {
+      return makeChoiceSimulationOptions(ctx.run_context, ctx.getDesign());
+    },
+    data: function() {
+      const state = ctx.getState();
+      return {
+        task: ctx.task,
+        ado_session_id: state.session_id,
+        ado_trial_index: state.trial_index,
+        trial_number: ctx.trial_number,
+        ...ctx.getDesign(),
+      };
+    },
+    on_finish: function(data) {
+      if (key_handler) {
+        document.removeEventListener("keydown", key_handler);
+        key_handler = null;
+      }
+      data.__ado_response = data.response;
+    },
+    __ado_is_response: true,
+  };
+
+  if (presentation.button_html) {
+    trial.button_html = function() {
+      return presentation.button_html(ctx.getDesign());
+    };
+  }
+  if (presentation.prompt != null) {
+    trial.prompt = presentation.prompt;
+  }
+  if (presentation.keymap) {
+    // Map physical keys to button indices, then click the matching button so the
+    // plugin records the response exactly as a mouse click would.
+    const keymap = {};
+    for (const [key, index] of Object.entries(presentation.keymap)) {
+      keymap[key.toUpperCase()] = index;
+    }
+    trial.on_load = function() {
+      key_handler = function(e) {
+        const index = keymap[e.key.toUpperCase()];
+        if (index === undefined) {
+          return;
+        }
+        const btn = document.querySelector("#jspsych-html-button-response-button-" + index);
+        if (btn) { btn.click(); }
+      };
+      document.addEventListener("keydown", key_handler);
+    };
+  }
+
+  return trial;
+}
+
+/**
+ * A canvas frame that shows a stimulus for a fixed duration and collects NO
+ * response (e.g. a fixation cross or a brief stimulus flash). Forward-declared
+ * for canvas tasks such as numerosity dots; not exercised by html-button models.
+ *
+ * @param {Object} opts
+ * @param {Function} opts.draw - (canvas, design) => void; draws onto the canvas.
+ * @param {Function} opts.getDesign - () => current design.
+ * @param {?number} [opts.duration] - Frame duration in ms (with choices "NO_KEYS"
+ *   a null duration would never end, so pass a duration for timed frames).
+ * @returns {Object} jsPsych canvas-keyboard-response trial (no response).
+ */
+function canvasFrame({ draw, getDesign, duration = null }) {
+  return {
+    type: jsPsychCanvasKeyboardResponse,
+    stimulus: function(canvas) {
+      draw(canvas, getDesign());
+    },
+    choices: "NO_KEYS",
+    trial_duration: duration,
+    response_ends_trial: false,
+  };
+}
+
+/**
+ * A response-collecting canvas frame (keyboard). Forward-declared for canvas
+ * tasks such as numerosity dots. The pressed key is mapped to a response index
+ * via choices order, stored on data.__ado_response, and the trial is marked so
+ * the timeline composes the ADO finalize step.
+ *
+ * @param {Object} opts
+ * @param {Function} opts.draw - (canvas, design) => void.
+ * @param {Function} opts.getDesign - () => current design.
+ * @param {string[]} opts.choices - Response keys in index order, e.g. ["b","y"].
+ * @param {Object} ctx - { getState, run_context, trial_number, task }.
+ * @returns {Object} jsPsych canvas-keyboard-response trial (response-collecting).
+ */
+function canvasResponse({ draw, getDesign, choices }, ctx) {
+  const lower_choices = choices.map(key => String(key).toLowerCase());
+  return {
+    type: jsPsychCanvasKeyboardResponse,
+    stimulus: function(canvas) {
+      draw(canvas, getDesign());
+    },
+    choices,
+    simulation_options: function() {
+      return makeChoiceSimulationOptions(ctx.run_context, getDesign());
+    },
+    data: function() {
+      const state = ctx.getState();
+      return {
+        task: ctx.task,
+        ado_session_id: state.session_id,
+        ado_trial_index: state.trial_index,
+        trial_number: ctx.trial_number,
+        ...getDesign(),
+      };
+    },
+    on_finish: function(data) {
+      // Map the recorded key to its index. In jsPsych simulation, response may
+      // already be an index; tolerate both.
+      if (typeof data.response === "number") {
+        data.__ado_response = data.response;
+      } else {
+        data.__ado_response = lower_choices.indexOf(String(data.response).toLowerCase());
+      }
+    },
+    __ado_is_response: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The generic ADO timeline
+// ---------------------------------------------------------------------------
+
+/**
+ * Create the generic adaptive jsPsych timeline fragment for any registered model.
+ *
+ * The timeline depends only on the ADO controller contract (start() provides the
+ * first design; update(trial_data) returns posterior summaries plus the next
+ * design) and on the model's presentation spec. It is independent of whether the
+ * controller is mock-backed or the in-browser Stan controller, and of how the
+ * stimulus is drawn.
  *
  * @param {Object} jsPsych - jsPsych instance returned by initJsPsych().
- * @param {DelayDiscountingAdoController} adaptive_controller - Controller with start/update methods.
- * @param {Object} config - Delay-discounting config with n_trials and response_labels.
- * @param {DelayDiscountingRunContext} run_context - Run settings and optional simulation hook.
+ * @param {Object} adaptive_controller - Controller with start/update methods.
+ * @param {Object} config - { n_trials, response_labels, presentation, choices,
+ *                            responseToOutcome?, task? }.
+ * @param {Object} run_context - Run settings and optional simulation hook.
  * @returns {Array} jsPsych timeline fragment.
  */
-function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, run_context = {}) {
+function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {}) {
   let ado_state = null;
   let current_design = null;
   let last_choice_data = null;
-  let active_key_handler = null;
+
+  const presentation = config.presentation;
+  if (!presentation || (typeof presentation.getChoiceTrials !== "function" && typeof presentation.makeStimulus !== "function")) {
+    throw new Error("createAdoTimeline: config.presentation must provide getChoiceTrials or makeStimulus.");
+  }
+  // Default: the raw button/key index IS the binary outcome (correct for tasks
+  // like delay discounting). Tasks where the outcome depends on the design
+  // (e.g. "chose the more numerous side") override this.
+  const responseToOutcome = config.responseToOutcome || ((_design, index) => index);
+  const task = config.task || run_context.model_id || "ado";
 
   /**
    * Surface an adaptive-controller failure instead of letting the async trial hang
@@ -526,66 +659,52 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
   const trials = [initialize_ado];
 
   for (let i = 0; i < config.n_trials; i++) {
-    trials.push({
-      type: jsPsychHtmlButtonResponse,
-      stimulus: function() {
-        return makeChoiceStimulus(current_design);
-      },
-      choices: ["SS", "LL"],
-      button_html: function() {
-        return [
-          makeOptionCardHtml(current_design, 0),
-          makeOptionCardHtml(current_design, 1),
-        ];
-      },
-      margin_vertical: "0px",
-      margin_horizontal: "12px",
-      prompt: "<p style=\"margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;\">Press <strong>S</strong> for Smaller-sooner &nbsp;·&nbsp; Press <strong>L</strong> for Larger-later</p>",
-      simulation_options: function() {
-        return makeChoiceSimulationOptions(run_context, current_design);
-      },
-      data: function() {
-        return {
-          task: "delay_discounting",
-          ado_session_id: ado_state.session_id,
-          ado_trial_index: ado_state.trial_index,
-          trial_number: i + 1,
-          t_ss: current_design.t_ss,
-          t_ll: current_design.t_ll,
-          r_ss: current_design.r_ss,
-          r_ll: current_design.r_ll,
-        };
-      },
-      on_load: function() {
-        active_key_handler = function(e) {
-          var key = e.key.toUpperCase();
-          if (key === "S") {
-            var btn = document.querySelector("#jspsych-html-button-response-button-0");
-            if (btn) { btn.click(); }
-          } else if (key === "L") {
-            var btn = document.querySelector("#jspsych-html-button-response-button-1");
-            if (btn) { btn.click(); }
-          }
-        };
-        document.addEventListener("keydown", active_key_handler);
-      },
-      on_finish: function(data) {
-        if (active_key_handler) {
-          document.removeEventListener("keydown", active_key_handler);
-          active_key_handler = null;
-        }
-        data.choice = data.response;
-        data.choice_label = config.response_labels[data.choice];
-        data.ado_design = {
-          t_ss: data.t_ss,
-          t_ll: data.t_ll,
-          r_ss: data.r_ss,
-          r_ll: data.r_ll,
-        };
-        copyPosteriorFields(data, ado_state);
-        last_choice_data = data;
+    // ctx is read lazily by the trial property functions, so the live design and
+    // controller state are picked up when the trial actually runs.
+    const ctx = {
+      getDesign: () => current_design,
+      getState: () => ado_state,
+      choices: config.choices,
+      response_labels: config.response_labels,
+      run_context,
+      trial_number: i + 1,
+      task,
+    };
+
+    const choice_trials = typeof presentation.getChoiceTrials === "function"
+      ? presentation.getChoiceTrials(ctx)
+      : [htmlButtonChoice(ctx, presentation)];
+
+    const response_trials = choice_trials.filter(t => t && t.__ado_is_response);
+    if (response_trials.length !== 1) {
+      throw new Error(
+        `createAdoTimeline: a choice must contain exactly one response-collecting trial ` +
+        `(built via htmlButtonChoice/canvasResponse); got ${response_trials.length}.`
+      );
+    }
+
+    // Compose the ADO finalize step onto the response trial's own on_finish:
+    // map the raw response to a binary outcome, record the full design + labels,
+    // and copy the posterior summaries so downstream code reads them from data.
+    const response_trial = response_trials[0];
+    delete response_trial.__ado_is_response;
+    const inner_on_finish = response_trial.on_finish;
+    response_trial.on_finish = function(data) {
+      if (inner_on_finish) {
+        inner_on_finish.call(this, data);
       }
-    });
+      const design = current_design;
+      const choice_raw = data.__ado_response;
+      const choice = responseToOutcome(design, choice_raw);
+      data.choice_raw = choice_raw;
+      data.choice = choice;
+      data.choice_label = config.response_labels[choice];
+      data.ado_design = { ...design };
+      copyPosteriorFields(data, ado_state);
+      last_choice_data = data;
+    };
+
+    trials.push(...choice_trials);
 
     trials.push({
       type: jsPsychCallFunction,
@@ -616,4 +735,11 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
   return trials;
 }
 
-export { createDelayDiscountingTimeline, makeChoiceStimulus, makeParamConvergenceSvg, makeDebriefStimulus };
+export {
+  createAdoTimeline,
+  htmlButtonChoice,
+  canvasFrame,
+  canvasResponse,
+  makeParamConvergenceSvg,
+  makeDebriefStimulus,
+};

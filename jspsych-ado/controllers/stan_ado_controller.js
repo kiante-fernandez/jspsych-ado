@@ -4,7 +4,7 @@ import {
   summarizeDraws,
   samplePriorDraws,
 } from "../ado/mi_engine.js";
-import { createSeededRng } from "../dd_simulation.js";
+import { createSeededRng } from "../ado/ado_simulation.js";
 
 // Number of prior draws used to pick the first design (before any data exist).
 const PRIOR_DRAWS = 2000;

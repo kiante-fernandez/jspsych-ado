@@ -8,8 +8,8 @@ import {
   selectOptimalDesign,
   summarizeDraws,
   samplePriorDraws,
-} from "../../experiments/delay_discounting/ado/mi_engine.js";
-import { createSeededRng } from "../../experiments/delay_discounting/dd_simulation.js";
+} from "../../jspsych-ado/ado/mi_engine.js";
+import { createSeededRng } from "../../jspsych-ado/ado/ado_simulation.js";
 
 const LN2 = Math.log(2);
 
@@ -45,6 +45,15 @@ test("enumerateDesigns produces the full cartesian product", () => {
   for (const d of designs) {
     assert.ok(grid.a.includes(d.a) && grid.b.includes(d.b));
   }
+});
+
+test("enumerateDesigns passes a curated array of designs through unchanged", () => {
+  // The array escape hatch lets a model supply hand-picked designs (e.g. dots
+  // numerosity pairs) that are not a clean grid; the engine returns them as-is.
+  const curated = [{ n1: 10, n2: 12 }, { n1: 10, n2: 20 }];
+  const designs = enumerateDesigns(curated);
+  assert.equal(designs, curated);
+  assert.deepEqual(designs, [{ n1: 10, n2: 12 }, { n1: 10, n2: 20 }]);
 });
 
 test("selectOptimalDesign returns a valid grid member and prefers the discriminating design", () => {

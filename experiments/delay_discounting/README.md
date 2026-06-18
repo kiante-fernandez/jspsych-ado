@@ -3,24 +3,31 @@
 An ADOpy-style delay discounting experiment whose adaptive inference runs entirely
 in the browser with a Stan model compiled to WebAssembly.
 
-The timeline is separated from the adaptive backend by a small controller contract
-(`start(context)` / `update(trial_data)`):
+This experiment is a **thin consumer** of the general [`jspsych-ado/`](../../jspsych-ado)
+package. `index.html` registers the hyperbolic model and asks the `jsPsychADO` façade
+to build the adaptive timeline:
 
-- `delay_discounting_timeline.js` displays trials and records data.
-- `controllers/stan_ado_controller.js` — the live path: Stan (WASM, in a Web Worker)
-  infers the posterior over `k`/`tau`; the generic engine picks the next design by
-  mutual information.
-- `controllers/mock_ado_controller.js` — deterministic stand-in so the timeline can
-  run without loading WASM.
+```js
+import { jsPsychADO } from "./jspsych-ado/index.js";
+import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
 
-Layout:
+jsPsychADO.registerModel("hyperbolic", { /* prior, params, design_grid, linkProb,
+  toStanData, presentation, choices, ... — all from the model package */ });
+const timeline = jsPsychADO.createTimeline(jsPsych, { model: "hyperbolic" }, run_context);
+```
 
-- `ado/mi_engine.js` — model-agnostic mutual-information design optimization + prior draws.
-- `ado/stan_worker.js` — generic Web Worker that runs NUTS off the main thread.
-- `models/<name>/` — self-contained model packages (`.stan` + compiled `main.js`/`main.wasm`
-  + `model.js` adapter). See [models/README.md](models/README.md).
-- `dd_config.js` — `grid_design`, the `stan` sampler settings, and simulation config.
-- `dd_simulation.js` — simulated participant (shares the model adapter's likelihood).
+What lives where:
+
+- **All adaptive machinery is in `jspsych-ado/`** — the MI engine, the in-browser
+  Stan controller + Web Worker, the generic timeline, and the façade. None of it is
+  delay-discounting-specific.
+- **The hyperbolic model package** (`jspsych-ado/models/hyperbolic/`) owns the
+  likelihood (`choiceProbLL`/`.stan`), the priors, and the **presentation** (the
+  SS/LL option cards, the S/L keymap, the prompt).
+- **This folder** holds only experiment-level config and the page:
+  - `dd_config.js` — `grid_design`, the `stan` sampler settings, and simulation config.
+  - `index.html` — registers the model and runs the timeline (`?ado=stan` live path,
+    `?ado=mock` deterministic dev path, `?simulate=…` simulated participants).
 
 Response coding:
 
