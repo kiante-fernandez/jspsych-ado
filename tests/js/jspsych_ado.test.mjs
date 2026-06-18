@@ -164,6 +164,8 @@ test("stanUrl registration derives priors after prepareModels fetches the source
 
     assert.equal(start_data.ado_event, "start");
     assert.equal(start_data.ado_mode, "stan");
+    assert.equal(start_data.controller_mode, "stan");
+    assert.equal(start_data.design_strategy, "ado");
     // The generic timeline spreads the live ADO design into the choice row, so the
     // design keys are present without the timeline knowing they are DD-shaped.
     const row = timeline[1].data();
@@ -265,8 +267,6 @@ test("createTimeline forwards design strategy into the Stan controller", async (
       design_strategy: "random",
       design_seed: 23,
       stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 7 },
-    }, {
-      ado_mode: "random",
     });
 
     const start_data = await new Promise((resolve, reject) => {
@@ -275,7 +275,9 @@ test("createTimeline forwards design strategy into the Stan controller", async (
     });
 
     assert.equal(start_data.ado_event, "start");
-    assert.equal(start_data.ado_mode, "random");
+    assert.equal(start_data.ado_mode, "stan");
+    assert.equal(start_data.controller_mode, "stan");
+    assert.equal(start_data.design_strategy, "random");
   } finally {
     restoreFetch();
     restoreWorker();

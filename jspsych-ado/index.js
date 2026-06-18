@@ -234,6 +234,8 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
 
   return createAdoTimeline(jsPsych, controller, timeline_config, {
     ado_mode: "stan",
+    controller_mode: "stan",
+    design_strategy: config.design_strategy ?? "ado",
     model_id: adapter.id,
     posterior_display: spec.posterior_display,
     ...run_context,

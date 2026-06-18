@@ -193,6 +193,8 @@ def normalize_run(
                 "sim_p_ll": choice_row.get("sim_p_ll"),
                 "sim_draw": choice_row.get("sim_draw"),
                 "ado_mode": choice_row.get("ado_mode"),
+                "controller_mode": choice_row.get("controller_mode"),
+                "design_strategy": choice_row.get("design_strategy"),
                 "ado_trial_index": choice_row.get("ado_trial_index"),
                 "choice_task_field": choice_task_field,
                 "choice_task": choice_task,
@@ -234,7 +236,11 @@ def run_browser_grid(
                         page.add_init_script(
                             "window.__JSPSYCH_ADO_RUN_CONFIG__ = " + json.dumps(run_config) + ";"
                         )
-                        query = urlencode({"ado": strategy, "simulate": "data-only"})
+                        query = urlencode({
+                            "controller": "stan",
+                            "strategy": strategy,
+                            "simulate": "data-only",
+                        })
                         page.goto(f"{base_url}/{experiment_path}?{query}", wait_until="domcontentloaded")
                         raw_rows = get_displayed_json(page)
                         page.close()
