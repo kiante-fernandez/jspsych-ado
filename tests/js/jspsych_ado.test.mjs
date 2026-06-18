@@ -232,6 +232,58 @@ test("createTimeline composes on_finish: raw response -> outcome, full design, l
   }
 });
 
+test("createTimeline forwards design strategy into the Stan controller", async () => {
+  const restoreFetch = installFakeFetch();
+  const restoreWorker = installFakeWorker();
+  globalThis.jsPsychCallFunction = "call-function";
+  globalThis.jsPsychHtmlButtonResponse = "html-button-response";
+
+  try {
+    registerModel("strategy-forwarding-model", {
+      stanCode: STAN_CODE,
+      params: ["k", "tau", "beta"],
+      design_grid: DESIGN_GRID,
+      linkProb,
+      toStanData: TO_STAN_DATA,
+      response_labels: ["SS", "LL"],
+      presentation: TEST_PRESENTATION,
+    });
+
+    await prepareModels({ compileServer: "http://compile.test" });
+
+    assert.throws(
+      () => createTimeline({}, {
+        model: "strategy-forwarding-model",
+        design_strategy: "unsupported",
+      }),
+      /unknown design_strategy/
+    );
+
+    const timeline = createTimeline({}, {
+      model: "strategy-forwarding-model",
+      n_trials: 1,
+      design_strategy: "random",
+      design_seed: 23,
+      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 7 },
+    }, {
+      ado_mode: "random",
+    });
+
+    const start_data = await new Promise((resolve, reject) => {
+      timeline[0].func((data) => resolve(data));
+      setTimeout(() => reject(new Error("timed out waiting for fake worker")), 100);
+    });
+
+    assert.equal(start_data.ado_event, "start");
+    assert.equal(start_data.ado_mode, "random");
+  } finally {
+    restoreFetch();
+    restoreWorker();
+    delete globalThis.jsPsychCallFunction;
+    delete globalThis.jsPsychHtmlButtonResponse;
+  }
+});
+
 test("buildAdapter reshapes flat {...design, choice} rows to {design, response} generically", () => {
   const seen = [];
   const adapter = buildAdapter({

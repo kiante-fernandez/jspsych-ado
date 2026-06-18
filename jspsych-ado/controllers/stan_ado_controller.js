@@ -25,6 +25,10 @@ const PRIOR_DRAWS = 2000;
  * @param {string} [options.session_id] - Session identifier saved into the data.
  * @param {number} [options.n_trials] - Total choice trials; lets the final update skip
  *   the unused next-design search. Omit to always compute a next design.
+ * @param {string} [options.design_strategy="ado"] - "ado" for MI-selected
+ *   designs, "random" for a recovery/dev baseline sampled from the same grid.
+ * @param {?number} [options.design_seed] - Optional seed for prior/random design
+ *   selection. Defaults to stan.seed so existing runs stay reproducible.
  * @returns {Object} Controller with async start(context) and update(trial_data).
  */
 function createStanAdoController({
@@ -33,6 +37,8 @@ function createStanAdoController({
   stan = {},
   session_id = "stan-session",
   n_trials = null,
+  design_strategy = "ado",
+  design_seed = null,
 }) {
   const sample_config = {
     num_chains: stan.num_chains ?? 2,
@@ -44,6 +50,9 @@ function createStanAdoController({
   if (sample_config.num_chains < 1 || sample_config.num_warmup < 0 || sample_config.num_samples < 1) {
     throw new Error("createStanAdoController: stan settings need num_chains>=1, num_warmup>=0, num_samples>=1");
   }
+  if (!["ado", "random"].includes(design_strategy)) {
+    throw new Error(`createStanAdoController: unknown design_strategy "${design_strategy}"`);
+  }
 
   // The candidate design grid is constant, so enumerate it once. An empty grid
   // (a dimension with no values) would make every design selection return null.
@@ -53,7 +62,7 @@ function createStanAdoController({
   }
 
   const trials = [];
-  const rng = createSeededRng(sample_config.seed);
+  const design_rng = createSeededRng(design_seed ?? sample_config.seed);
 
   let worker = null;
   // Requests are strictly sequential (init, then one awaited sample per trial),
@@ -137,6 +146,30 @@ function createStanAdoController({
     return draws;
   }
 
+  /**
+   * Draw one candidate design from the enumerated grid with replacement.
+   *
+   * This is used only for the recovery/dev baseline. It keeps the inference
+   * path identical to the MI controller, while replacing the design policy.
+   */
+  function sampleRandomDesign() {
+    const index = Math.floor(design_rng() * designs.length);
+    return designs[index];
+  }
+
+  /**
+   * Select the next design under the configured policy.
+   *
+   * The "random" policy intentionally ignores posterior draws for design
+   * selection but still receives them so this helper has one call shape.
+   */
+  function selectDesign(draws) {
+    if (design_strategy === "random") {
+      return sampleRandomDesign();
+    }
+    return selectOptimalDesign(designs, draws, model.choiceProbLL).design;
+  }
+
   return {
     /**
      * Load the WASM model and choose the first design from prior draws.
@@ -149,8 +182,13 @@ function createStanAdoController({
 
       trials.length = 0;
 
-      const prior = samplePriorDraws(model.prior, PRIOR_DRAWS, rng);
-      const { design } = selectOptimalDesign(designs, prior, model.choiceProbLL);
+      let design = null;
+      if (design_strategy === "random") {
+        design = sampleRandomDesign();
+      } else {
+        const prior = samplePriorDraws(model.prior, PRIOR_DRAWS, design_rng);
+        design = selectDesign(prior);
+      }
 
       return {
         session_id,
@@ -181,7 +219,7 @@ function createStanAdoController({
       // ~1M-evaluation MI scan on the last update.
       let next_design = null;
       if (!n_trials || trials.length < n_trials) {
-        next_design = selectOptimalDesign(designs, draws, model.choiceProbLL).design;
+        next_design = selectDesign(draws);
       }
 
       return {

@@ -178,6 +178,9 @@ async function prepareModels({ compileServer, authToken = DEFAULT_TOKEN } = {}) 
  * @param {Object} [config.stan]       - Sampler overrides {num_chains,num_warmup,num_samples,seed}.
  * @param {number} [config.n_trials]   - Trial count override.
  * @param {string} [config.session_id] - Session id saved into the data.
+ * @param {string} [config.design_strategy="ado"] - "ado" for MI-selected
+ *   designs, "random" for a recovery/dev baseline sampled from the same grid.
+ * @param {?number} [config.design_seed] - Optional seed for prior/random design selection.
  * @param {Object} [run_context]       - Passed through to the timeline (e.g. {debug:true}).
  * @returns {Array} jsPsych timeline fragment (spreadable into jsPsych.run).
  */
@@ -214,6 +217,8 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
     stan,
     n_trials,
     session_id: config.session_id,
+    design_strategy: config.design_strategy ?? "ado",
+    design_seed: config.design_seed ?? null,
   });
 
   // The generic timeline reads the model's presentation, choices, and (optional)

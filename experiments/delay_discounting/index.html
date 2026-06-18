@@ -90,18 +90,62 @@
 
         const using_jatos = typeof jatos !== 'undefined';
         const url_params = new URLSearchParams(window.location.search);
-        // Only "stan" (in-browser Stan inference + ADO, the live path) and "mock"
-        // (fast deterministic dev controller, no WASM) are supported. Normalize the
-        // recorded mode to what actually ran so data provenance is correct.
+        const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
+        const session_id = using_jatos ? jatos.studyResultId : "local-" + Date.now();
         const requested_ado_mode = url_params.get("ado");
-        const ado_mode = requested_ado_mode === "mock" ? "mock" : "stan";
-        if (requested_ado_mode && requested_ado_mode !== "mock" && requested_ado_mode !== "stan") {
-            console.warn(`Unknown ado mode "${requested_ado_mode}"; running Stan.`);
+        const valid_ado_modes = ["mock", "stan", "ado", "random"];
+        const ado_mode = valid_ado_modes.includes(requested_ado_mode) ? requested_ado_mode : "stan";
+        if (requested_ado_mode && !valid_ado_modes.includes(requested_ado_mode)) {
+            console.warn(`Unknown ado mode "${requested_ado_mode}"; running Stan ADO.`);
         }
         const debug = url_params.get("debug") === "1";
         const requested_simulation_mode = url_params.get("simulate");
         const simulation_mode = ["data-only", "visual"].includes(requested_simulation_mode) ? requested_simulation_mode : null;
-        const simulation_rng = createSeededRng(default_dd_simulation_config.seed);
+
+        /**
+         * Return the simulation override from the injected browser run config.
+         *
+         * Preferred shape is {simulation: {seed, params, rt}}, but accepting a
+         * top-level {seed, params, rt} object keeps manual browser injection simple.
+         */
+        function getSimulationOverride(config) {
+            if (config.simulation) {
+                return config.simulation;
+            }
+            if ("seed" in config || "params" in config || "rt" in config) {
+                return config;
+            }
+            return {};
+        }
+
+        /**
+         * Merge editable simulation settings without URL-level model parameters.
+         *
+         * The params object is intentionally generic: any active model parameter
+         * supplied in the override is recorded as sim_<param> and passed to the
+         * model adapter's likelihood by dd_simulation.js.
+         */
+        function mergeSimulationConfig(default_config, override) {
+            override = override || {};
+            return {
+                ...default_config,
+                ...override,
+                params: {
+                    ...default_config.params,
+                    ...(override.params || {}),
+                },
+                rt: {
+                    ...default_config.rt,
+                    ...(override.rt || {}),
+                },
+            };
+        }
+
+        const simulation_config = mergeSimulationConfig(
+            default_dd_simulation_config,
+            getSimulationOverride(run_config)
+        );
+        const simulation_rng = createSeededRng(simulation_config.seed);
 
         /**
          * Build jsPsych instructions-plugin simulation data.
@@ -126,7 +170,6 @@
         }
 
         const param_history = {};
-        const session_id = using_jatos ? jatos.studyResultId : "local-" + Date.now();
 
         const run_context = {
             ado_mode: ado_mode,
@@ -144,7 +187,7 @@
              * @returns {Object} response/rt plus sim_* audit fields.
              */
             simulate_choice: function(design) {
-                return simulateDelayDiscountingChoice(design, default_dd_simulation_config, simulation_rng, hyperbolicModel);
+                return simulateDelayDiscountingChoice(design, simulation_config, simulation_rng, hyperbolicModel);
             },
             jatos: using_jatos ? {
                 studyResultId: jatos.studyResultId,
@@ -189,7 +232,7 @@
             button_label_previous: 'Previous (<strong>Z</strong>)',
             button_label_next: 'Next (<strong>M</strong>)',
             simulation_options: {
-                data: makeInstructionSimulationData(3, default_dd_simulation_config),
+                data: makeInstructionSimulationData(3, simulation_config),
             },
         };
 
@@ -207,7 +250,7 @@
             simulation_options: {
                 data: {
                     response: 0,
-                    rt: default_dd_simulation_config.rt.end,
+                    rt: simulation_config.rt.end,
                 },
             },
         };
@@ -218,10 +261,10 @@
             model_id: hyperbolicModel.id,
             debug: debug,
             simulate: simulation_mode,
-            simulation_seed: default_dd_simulation_config.seed,
+            simulation_seed: simulation_config.seed,
             // Record the data-generating parameters generically (sim_k, sim_tau, ...).
             ...Object.fromEntries(
-                Object.entries(default_dd_simulation_config.params).map(([name, value]) => ["sim_" + name, value])
+                Object.entries(simulation_config.params).map(([name, value]) => ["sim_" + name, value])
             ),
         });
 
@@ -246,6 +289,8 @@
                 model: hyperbolicModel.id,
                 session_id: session_id,
                 task: "delay_discounting",
+                design_strategy: ado_mode === "random" ? "random" : "ado",
+                design_seed: run_config.controller ? run_config.controller.design_seed : null,
             }, run_context));
         }
         timeline.push(end_screen);
