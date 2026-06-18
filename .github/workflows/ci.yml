@@ -19,8 +19,10 @@ jobs:
           node-version: '22'
       - name: Unit tests (MI engine, model adapter, façade)
         run: node --test tests/js/*.test.mjs
-      - name: Stan recovery smoke (real WASM via fetch shim)
+      - name: Stan recovery smoke — hyperbolic (real WASM via fetch shim)
         run: node tests/js/stan_recovery.smoke.mjs
+      - name: Stan recovery smoke — weber dots (real WASM via fetch shim)
+        run: node tests/js/weber_recovery.smoke.mjs
 
   browser:
     name: Headless Worker/WASM smoke
