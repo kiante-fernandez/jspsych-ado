@@ -5,20 +5,25 @@ in the browser with a Stan model compiled to WebAssembly.
 
 This experiment is a thin consumer of the general [`jspsych-ado/`](../../jspsych-ado)
 package. `index.html` registers a delay-discounting task, registers the hyperbolic
-model, and asks the `jsPsychADO` facade to build the adaptive timeline:
+model, and uses the shared experiment shell to build the adaptive timeline:
 
 ```js
-import { jsPsychADO } from "./jspsych-ado/index.js";
+import {
+  createExperimentAdoTimeline,
+  registerAdoExperiment,
+} from "./jspsych-ado/ado/experiment_shell.js";
 import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
 import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
 
-jsPsychADO.registerTask(delayDiscountingTask.id, delayDiscountingTask);
-jsPsychADO.registerModelPackage(hyperbolicModel, { stan, n_trials, testlet_size });
+registerAdoExperiment({ task: delayDiscountingTask, model: hyperbolicModel, config });
 
-const timeline = jsPsychADO.createTimeline(jsPsych, {
-  task: delayDiscountingTask.id,
-  model: hyperbolicModel.id,
-}, run_context);
+const timeline = createExperimentAdoTimeline(jsPsych, {
+  QuestPlus,
+  task: delayDiscountingTask,
+  model: hyperbolicModel,
+  config,
+  run_context,
+});
 ```
 
 What lives where:

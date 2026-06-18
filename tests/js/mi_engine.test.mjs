@@ -2,13 +2,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  asResponseProbs,
   binaryEntropy,
+  categoricalEntropy,
   mutualInfo,
   enumerateDesigns,
   selectOptimalDesign,
   selectOptimalDesigns,
   summarizeDraws,
   samplePriorDraws,
+  validateResponseProbs,
 } from "../../jspsych-ado/ado/mi_engine.js";
 import { createSeededRng } from "../../jspsych-ado/ado/ado_simulation.js";
 
@@ -20,6 +23,19 @@ test("binaryEntropy is 0 at the endpoints and ln2 at 0.5", () => {
   assert.equal(binaryEntropy(-0.5), 0);
   assert.equal(binaryEntropy(1.5), 0);
   assert.ok(Math.abs(binaryEntropy(0.5) - LN2) < 1e-12);
+});
+
+test("categoricalEntropy is 0 for deterministic responses and ln3 for uniform 3-way responses", () => {
+  assert.equal(categoricalEntropy([1, 0, 0]), 0);
+  assert.ok(Math.abs(categoricalEntropy([1 / 3, 1 / 3, 1 / 3]) - Math.log(3)) < 1e-12);
+});
+
+test("response probability helpers wrap binary scalars and reject malformed vectors", () => {
+  assert.deepEqual(asResponseProbs(0.75), [0.25, 0.75]);
+  assert.deepEqual(validateResponseProbs([0.5, 0.25, 0.25]), [0.5, 0.25, 0.25]);
+  assert.throws(() => validateResponseProbs([2, 1, 1]), /sum to 1/);
+  assert.throws(() => validateResponseProbs([0, Number.NaN]), /finite and nonnegative/);
+  assert.throws(() => validateResponseProbs([0.5, -0.1, 0.6]), /finite and nonnegative/);
 });
 
 test("mutualInfo is ~0 when every draw answers a design the same way", () => {
@@ -35,6 +51,17 @@ test("mutualInfo is maximal (ln2) when draws split a design 50/50 deterministica
   const responseProb = (_design, draw) => (draw.s === 1 ? 1 : 0);
   const mi = mutualInfo({}, draws, responseProb);
   assert.ok(Math.abs(mi - LN2) < 1e-9, `expected ln2, got ${mi}`);
+});
+
+test("mutualInfo supports 3-category deterministic response splits", () => {
+  const draws = [{ s: 0 }, { s: 1 }, { s: 2 }];
+  const responseProbs = (_design, draw) => {
+    const probs = [0, 0, 0];
+    probs[draw.s] = 1;
+    return probs;
+  };
+  const mi = mutualInfo({}, draws, responseProbs);
+  assert.ok(Math.abs(mi - Math.log(3)) < 1e-9, `expected ln3, got ${mi}`);
 });
 
 test("enumerateDesigns produces the full cartesian product", () => {
@@ -92,6 +119,23 @@ test("selectOptimalDesigns returns distinct designs and avoids a redundant secon
     return 0.99;
   };
   const picks = selectOptimalDesigns(designs, draws, responseProb, 2, { rng: createSeededRng(3) });
+  assert.deepEqual(picks.map((p) => p.design.d), [0, 2]);
+});
+
+test("selectOptimalDesigns supports categorical fantasy updates", () => {
+  const draws = [
+    { a: 0, b: 0 },
+    { a: 0, b: 1 },
+    { a: 1, b: 0 },
+    { a: 1, b: 1 },
+  ];
+  const designs = enumerateDesigns({ d: [0, 1, 2] });
+  const responseProbs = (design, draw) => {
+    if (design.d === 0) return draw.a === 0 ? [1, 0, 0] : [0, 1, 0];
+    if (design.d === 1) return draw.a === 0 ? [1, 0, 0] : [0, 1, 0];
+    return draw.b === 0 ? [1, 0, 0] : [0, 0, 1];
+  };
+  const picks = selectOptimalDesigns(designs, draws, responseProbs, 2, { rng: createSeededRng(4) });
   assert.deepEqual(picks.map((p) => p.design.d), [0, 2]);
 });
 

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Delay Discounting</title>
+        <title>3IFC Line-Length Discrimination</title>
         <script src="jatos.js"></script>
         <base href="../../">
         <script>
@@ -16,76 +16,83 @@
         <link href="core/jspsych/css/jspsych.css" rel="stylesheet" type="text/css"></link>
         <script src="core/init_experiment.js"></script>
         <style>
-          .dd-option-card {
-            all: unset;
-            box-sizing: border-box;
-            cursor: pointer;
-            display: inline-flex;
-            flex-direction: column;
+          .ll-stimulus-wrap {
+            width: min(720px, calc(100vw - 48px));
+            margin: 0 auto;
+            text-align: center;
+          }
+          .ll-line-list {
+            display: grid;
+            gap: 18px;
+            width: min(560px, calc(100vw - 48px));
+            margin: 0 auto;
+          }
+          .ll-line-row {
+            display: grid;
+            grid-template-columns: 36px 1fr;
+            align-items: center;
+            gap: 12px;
+          }
+          .ll-line-label {
+            display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
-            width: 220px;
-            min-height: 140px;
-            padding: 1.75rem 1.25rem;
-            background: #ffffff;
-            border: 2px solid #d1d5db;
-            border-radius: 10px;
-            position: relative;
-            vertical-align: middle;
-            transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
-          }
-          .dd-option-card:hover {
-            border-color: #4f46e5;
-            box-shadow: 0 6px 20px -6px rgba(0, 0, 0, 0.22);
-            transform: translateY(-2px);
-          }
-          .dd-option-card:focus-visible {
-            outline: 3px solid #818cf8;
-            outline-offset: 2px;
-          }
-          .dd-option-card[disabled] {
-            opacity: 0.5;
-            cursor: default;
-            pointer-events: none;
-          }
-          .dd-amount {
-            font-family: ui-monospace, "Courier New", monospace;
-            font-size: 2rem;
+            width: 36px;
+            height: 36px;
+            border: 1px solid #d1d5db;
+            border-radius: 50%;
+            color: #111827;
             font-weight: 700;
-            font-variant-numeric: tabular-nums;
+          }
+          .ll-line-stage {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: calc(100vw - 48px);
+            height: 82px;
+            margin: 0 auto;
+            border: 1px solid #e5e7eb;
+            background: #ffffff;
+          }
+          .ll-line {
+            height: 12px;
+            background: #111827;
+          }
+          .ll-prompt {
+            margin: 1.75rem 0 1rem;
+            font-size: 1.25rem;
             color: #111827;
           }
-          .dd-when {
-            font-size: 0.9rem;
-            color: #6b7280;
+          .ll-choice-button {
+            min-width: 120px;
+            min-height: 48px;
+            padding: 0.75rem 1.25rem;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            background: #ffffff;
+            color: #111827;
+            font: inherit;
+            cursor: pointer;
           }
-          .dd-key-hint {
-            position: absolute;
-            top: 6px;
-            right: 9px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: #9ca3af;
-            letter-spacing: 0.05em;
+          .ll-choice-button:hover {
+            border-color: #2563eb;
           }
-          @media (prefers-reduced-motion: reduce) {
-            .dd-option-card { transition: none; }
-            .dd-option-card:hover { transform: none; }
+          .ll-choice-button:focus-visible {
+            outline: 3px solid #93c5fd;
+            outline-offset: 2px;
+          }
+          .ll-choice-button[disabled] {
+            opacity: 0.5;
+            cursor: default;
           }
         </style>
     </head>
     <body></body>
     <script type="module">
-        // The delay-discounting experiment is now a THIN CONSUMER of the general
-        // jspsych-ado package: it registers the task/model pair and builds the
-        // adaptive timeline from package controllers. Nothing here is ADO-engine-
-        // or timeline-specific; all of that lives in ../../jspsych-ado/.
         import QuestPlus from "./core/jsquest-plus/jsQuestPlus.module.js";
-        import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
-        import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
         import { makeDebriefStimulus } from "./jspsych-ado/ado/ado_timeline.js";
-        import { createSeededRng, simulateDelayDiscountingChoice } from "./jspsych-ado/ado/ado_simulation.js";
+        import { createSeededRng, simulateCategoricalChoice } from "./jspsych-ado/ado/ado_simulation.js";
         import {
             addAdoDataProperties,
             createExperimentAdoTimeline,
@@ -96,42 +103,46 @@
             registerAdoExperiment,
             resolveSimulationConfig,
         } from "./jspsych-ado/ado/experiment_shell.js";
-        import { default_dd_config, default_dd_simulation_config } from "./experiments/delay_discounting/dd_config.js";
+        import lineLengthTask from "./jspsych-ado/tasks/line_length_discrimination/task.js";
+        import lineLengthModel from "./jspsych-ado/models/line_length_discrimination_3ifc/model.js";
+        import {
+            default_line_length_config,
+            default_line_length_simulation_config,
+        } from "./experiments/line_length_discrimination/line_length_config.js";
 
         const using_jatos = typeof jatos !== 'undefined';
         const jatos_instance = using_jatos ? jatos : null;
         const url_params = new URLSearchParams(window.location.search);
         const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
         const session_id = using_jatos ? jatos.studyResultId : "local-" + Date.now();
-
-        const run_settings = getExperimentRunSettings(url_params, { allow_legacy_ado: true });
-        const simulation_config = resolveSimulationConfig(default_dd_simulation_config, run_config);
+        const run_settings = getExperimentRunSettings(url_params);
+        const simulation_config = resolveSimulationConfig(default_line_length_simulation_config, run_config);
         const simulation_rng = createSeededRng(simulation_config.seed);
 
         const run_context = makeAdoRunContext({
             run_settings: run_settings,
-            model: hyperbolicModel,
+            model: lineLengthModel,
             using_jatos: using_jatos,
             session_id: session_id,
             simulate_choice: function(design) {
-                return simulateDelayDiscountingChoice(design, simulation_config, simulation_rng, hyperbolicModel);
+                return simulateCategoricalChoice(design, simulation_config, simulation_rng, lineLengthModel, {
+                    response_labels: lineLengthTask.response_labels,
+                });
             },
             jatos_instance: jatos_instance,
         });
 
         registerAdoExperiment({
-            task: delayDiscountingTask,
-            model: hyperbolicModel,
-            config: default_dd_config,
+            task: lineLengthTask,
+            model: lineLengthModel,
+            config: default_line_length_config,
         });
-
-        const plain_finish_stimulus = '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
 
         const instructions = {
             type: jsPsychInstructions,
             pages: [
-                '<p>Welcome to the delay discounting task.</p><p>On each trial, choose between a smaller reward available sooner and a larger reward available later.</p>',
-                '<p>The task will adapt after each response. Choose the option you genuinely prefer on each trial.</p>',
+                '<p>Welcome to the line-length discrimination task.</p><p>You will see three horizontal lines on each trial.</p>',
+                '<p>Two lines are the same length. One line is longer.</p><p>Choose which line is longest: <strong>A</strong>, <strong>B</strong>, or <strong>C</strong>.</p><p>There is no feedback in this prototype.</p>',
                 '<p>Press Next when you are ready to begin.</p>',
             ],
             show_clickable_nav: true,
@@ -146,13 +157,13 @@
 
         const end_screen = {
             type: jsPsychHtmlButtonResponse,
-            stimulus: plain_finish_stimulus,
+            stimulus: '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>',
             on_start: function(trial) {
                 var bar = document.getElementById("ado-live-posterior-chart");
                 if (bar) { bar.remove(); }
                 trial.stimulus = run_context.debug
                     ? makeDebriefStimulus(run_context.param_history || {}, run_context.posterior_display)
-                    : plain_finish_stimulus;
+                    : '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
             },
             choices: ["SUBMIT"],
             simulation_options: {
@@ -163,7 +174,7 @@
         jsPsych = initializeExperiment();
         addAdoDataProperties(jsPsych, {
             run_settings: run_settings,
-            model: hyperbolicModel,
+            model: lineLengthModel,
             simulation_config: simulation_config,
             using_jatos: using_jatos,
         });
@@ -171,9 +182,9 @@
         let timeline = [instructions];
         timeline = timeline.concat(createExperimentAdoTimeline(jsPsych, {
             QuestPlus: QuestPlus,
-            task: delayDiscountingTask,
-            model: hyperbolicModel,
-            config: default_dd_config,
+            task: lineLengthTask,
+            model: lineLengthModel,
+            config: default_line_length_config,
             run_context: run_context,
             session_id: session_id,
             design_seed: run_config.controller ? run_config.controller.design_seed : null,

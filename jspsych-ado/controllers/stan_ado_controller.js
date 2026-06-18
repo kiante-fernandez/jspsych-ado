@@ -1,5 +1,6 @@
 import {
   enumerateDesigns,
+  getResponseProbsFunction,
   selectOptimalDesigns,
   summarizeDraws,
   samplePriorDraws,
@@ -20,7 +21,7 @@ const PRIOR_DRAWS = 2000;
  * the next design. No Python, no network.
  *
  * @param {Object} options
- * @param {Object} options.model - Model adapter (params, prior, moduleUrl, buildData, responseProb).
+ * @param {Object} options.model - Model adapter (params, prior, moduleUrl, buildData, responseProb/responseProbs).
  * @param {Object} options.grid_design - Candidate design grid for MI optimization.
  * @param {Object} [options.stan] - Sampler settings {num_chains, num_warmup, num_samples, seed}.
  * @param {string} [options.session_id] - Session identifier saved into the data.
@@ -65,6 +66,7 @@ function createStanAdoController({
   // The candidate design grid is constant, so enumerate it once. An empty grid
   // (a dimension with no values) would make every design selection return null.
   const designs = enumerateDesigns(grid_design);
+  const responseProbs = getResponseProbsFunction(model);
   if (designs.length === 0) {
     throw new Error("createStanAdoController: grid_design produced no candidate designs (a dimension is empty)");
   }
@@ -210,7 +212,6 @@ function createStanAdoController({
         max_mutual_info: null,
       };
     }
-
     const selection_started_at = now();
     let next_designs = [];
     let next_design_metrics = [];
@@ -218,7 +219,7 @@ function createStanAdoController({
       next_designs = sampleRandomDesigns(count);
       next_design_metrics = nullDesignMetrics(next_designs.length);
     } else {
-      const picks = selectOptimalDesigns(designs, draws, model.responseProb, count, { rng: design_rng });
+      const picks = selectOptimalDesigns(designs, draws, responseProbs, count, { rng: design_rng });
       next_designs = picks.map((pick) => pick.design);
       next_design_metrics = picks.map((pick) => ({ mutual_info: pick.mutual_info }));
     }

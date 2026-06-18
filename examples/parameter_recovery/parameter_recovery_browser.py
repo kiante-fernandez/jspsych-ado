@@ -232,8 +232,6 @@ def normalize_run(
                 "abs_error": abs(error),
                 "choice": choice_row.get("choice"),
                 "choice_label": choice_row.get("choice_label"),
-                "sim_p_ll": choice_row.get("sim_p_ll"),
-                "sim_draw": choice_row.get("sim_draw"),
                 "ado_mode": choice_row.get("ado_mode"),
                 "controller_mode": choice_row.get("controller_mode"),
                 "design_strategy": choice_row.get("design_strategy"),
@@ -244,6 +242,9 @@ def normalize_run(
                 "ado_next_design": update_row.get("ado_next_design"),
                 "ado_api_latency_ms": update_row.get("ado_api_latency_ms"),
             })
+            for field, value in choice_row.items():
+                if field.startswith("sim_"):
+                    normalized[-1][field] = value
             for field in design_fields:
                 normalized[-1][field] = choice_row.get(field)
     return normalized
@@ -331,6 +332,7 @@ def run_recovery(
     repo_root: Path = REPO_ROOT,
     quick: bool = False,
     include_raw: bool = False,
+    directional_checks: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run the configured experiment-level recovery audit and return JSON data."""
 
@@ -373,6 +375,7 @@ def run_recovery(
         "choice_task": choice_task,
         "trial_number_field": trial_number_field,
         "design_fields": design_fields,
+        "directional_checks": directional_checks or [],
         "trial_count": len(result["rows"]) // max(1, len(strategies) * len(simulation_profiles) * len(seeds) * len(parameters)),
         "quick": quick,
     }

@@ -10,7 +10,12 @@
 import { createStanAdoController } from "./controllers/stan_ado_controller.js";
 import { createAdoTimeline } from "./ado/ado_timeline.js";
 import { createSeededRng } from "./ado/ado_simulation.js";
-import { enumerateDesigns, samplePriorDraws } from "./ado/mi_engine.js";
+import {
+  enumerateDesigns,
+  getResponseProbsFunction,
+  samplePriorDraws,
+  validateResponseProbs,
+} from "./ado/mi_engine.js";
 
 const DEFAULT_STAN = { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 };
 const DEFAULT_N_TRIALS = 42;
@@ -32,7 +37,7 @@ const _compileCache = new Map();   // stanCode -> moduleUrl (per page session)
  * @param {Object} spec
  * @param {Object|Array<Object>} spec.design_grid - Candidate designs.
  * @param {string[]} spec.designKeys - Design keys the task provides.
- * @param {Object} spec.responseSpace - Currently {type:"binary"}.
+ * @param {Object} spec.responseSpace - {type:"binary"} or {type:"categorical", n_categories}.
  * @param {Object} spec.presentation - getChoiceTrials(ctx) OR makeStimulus(design).
  * @param {string[]} [spec.choices] - Button/key labels in index order.
  * @param {string[]|Object} spec.response_labels - ["SS","LL"] or {0:"SS",1:"LL"}.
@@ -80,8 +85,9 @@ function registerTask(name, spec) {
  * @param {Array}    spec.params          - ["k","tau"] or [{name,lower}, ...].
  * @param {Object}   [spec.prior]         - Optional explicit JS prior.
  * @param {string[]} spec.designKeys      - Design fields consumed by the model.
- * @param {Object}   spec.responseSpace   - Currently {type:"binary"}.
- * @param {Function} spec.responseProb    - (design, draw) => P(outcome = 1).
+ * @param {Object}   spec.responseSpace   - {type:"binary"} or {type:"categorical", n_categories}.
+ * @param {Function} [spec.responseProb]  - Binary likelihood: (design, draw) => P(outcome = 1).
+ * @param {Function} [spec.responseProbs] - Categorical likelihood: (design, draw) => [p0, p1, ...].
  * @param {Function} [spec.toStanData]    - (trials:[{design,response}]) => Stan data.
  * @param {Function} [spec.buildData]     - (trials:[{...design,choice}]) => Stan data.
  * @param {Object}   [spec.posterior_display] - Per-parameter chart labels/ranges.
@@ -110,7 +116,7 @@ function registerModel(name, spec) {
       `registerModel("${name}"): provide exactly one of stanCode | stanUrl | moduleUrl (got ${sources.length}).`
     );
   }
-  for (const k of ["params", "designKeys", "responseSpace", "responseProb"]) {
+  for (const k of ["params", "designKeys", "responseSpace"]) {
     if (spec[k] == null) throw new Error(`registerModel("${name}"): missing required field "${k}".`);
   }
   if (spec.toStanData == null && spec.buildData == null) {
@@ -130,8 +136,15 @@ function registerModel(name, spec) {
   if (!spec.responseSpace || typeof spec.responseSpace.type !== "string") {
     throw new Error(`registerModel("${name}"): responseSpace.type must be a string.`);
   }
-  if (typeof spec.responseProb !== "function") {
-    throw new Error(`registerModel("${name}"): responseProb(design, draw) must be a function.`);
+  const response_count = getResponseCount(spec.responseSpace);
+  if (response_count == null) {
+    throw new Error(`registerModel("${name}"): unsupported responseSpace ${JSON.stringify(spec.responseSpace)}.`);
+  }
+  if (spec.responseSpace.type === "categorical" && typeof spec.responseProbs !== "function") {
+    throw new Error(`registerModel("${name}"): categorical models must provide responseProbs(design, draw).`);
+  }
+  if (typeof spec.responseProb !== "function" && typeof spec.responseProbs !== "function") {
+    throw new Error(`registerModel("${name}"): provide responseProb(design, draw) or responseProbs(design, draw).`);
   }
   if (MODEL_REGISTRY.has(name)) {
     console.warn(`registerModel: overwriting already-registered model "${name}".`);
@@ -308,7 +321,7 @@ function normalizeTestletSize(value) {
 // trial-shape mismatch between inline source models and the engine.
 function buildAdapter(entry) {
   const { spec, name, paramNames, prior, moduleUrl } = entry;
-  const { responseProb, toStanData, buildData } = spec;
+  const { responseProb, responseProbs, toStanData, buildData } = spec;
 
   // The engine pushes flat rows {...design, choice} (any design keys). A model
   // package's native buildData already reads that shape, so use it as-is. The
@@ -326,6 +339,12 @@ function buildAdapter(entry) {
     responseSpace: spec.responseSpace,
     buildData: adaptedBuildData,
     responseProb,
+    responseProbs: responseProbs || (typeof responseProb === "function"
+      ? (design, draw) => {
+          const p = responseProb(design, draw);
+          return [1 - p, p];
+        }
+      : null),
   };
 }
 
@@ -348,6 +367,45 @@ function requirePriorCoverage(prior, paramNames, context) {
   }
 }
 
+function getResponseCount(responseSpace) {
+  if (!responseSpace || typeof responseSpace.type !== "string") {
+    return null;
+  }
+  if (responseSpace.type === "binary") {
+    return 2;
+  }
+  if (responseSpace.type === "categorical" && Number.isInteger(responseSpace.n_categories) && responseSpace.n_categories >= 2) {
+    return responseSpace.n_categories;
+  }
+  return null;
+}
+
+function validateResponseSpace(responseSpace, context) {
+  if (!responseSpace || typeof responseSpace.type !== "string") {
+    return `${context}: responseSpace.type must be a string.`;
+  }
+  if (responseSpace.type === "binary") {
+    return null;
+  }
+  if (responseSpace.type === "categorical") {
+    if (!Number.isInteger(responseSpace.n_categories) || responseSpace.n_categories < 2) {
+      return `${context}: categorical responseSpace needs integer n_categories >= 2.`;
+    }
+    return null;
+  }
+  return `${context}: responseSpace type "${responseSpace.type}" is not supported.`;
+}
+
+function countLabels(labels) {
+  if (Array.isArray(labels)) {
+    return labels.length;
+  }
+  if (labels && typeof labels === "object") {
+    return Object.keys(labels).length;
+  }
+  return null;
+}
+
 function validateTaskModelPair(task, model, taskName, modelName) {
   const problems = [];
   const task_keys = new Set(task.designKeys || []);
@@ -361,8 +419,8 @@ function validateTaskModelPair(task, model, taskName, modelName) {
   const model_type = model.responseSpace && model.responseSpace.type;
   if (task_type !== model_type) {
     problems.push(`responseSpace mismatch: task has "${task_type}", model has "${model_type}"`);
-  } else if (task_type !== "binary") {
-    problems.push(`responseSpace type "${task_type}" is not supported yet`);
+  } else if (getResponseCount(task.responseSpace) !== getResponseCount(model.responseSpace)) {
+    problems.push(`responseSpace category count mismatch: task has ${getResponseCount(task.responseSpace)}, model has ${getResponseCount(model.responseSpace)}`);
   }
 
   let sample_design = null;
@@ -391,12 +449,14 @@ function validateTaskModelPair(task, model, taskName, modelName) {
   if (sample_design) {
     try {
       sample_draw = samplePriorDraws(model.prior, 1, createSeededRng(8675309))[0];
-      const p = model.responseProb(sample_design, sample_draw);
-      if (typeof p !== "number" || !Number.isFinite(p) || p < 0 || p > 1) {
-        problems.push(`responseProb(sampleDesign, sampleDraw) returned ${p}; expected a probability in [0, 1]`);
+      const responseProbs = getResponseProbsFunction(model);
+      const probs = validateResponseProbs(responseProbs(sample_design, sample_draw), "response likelihood probe");
+      const response_count = getResponseCount(model.responseSpace);
+      if (probs.length !== response_count) {
+        problems.push(`response likelihood returned ${probs.length} probabilities; expected ${response_count}`);
       }
     } catch (e) {
-      problems.push(`responseProb probe failed: ${String((e && e.message) || e)}`);
+      problems.push(`response likelihood probe failed: ${String((e && e.message) || e)}`);
     }
 
     try {
@@ -555,6 +615,11 @@ function validateTask(task) {
   }
   if (!task.responseSpace || typeof task.responseSpace.type !== "string") {
     err("`responseSpace.type` must be a string.");
+  } else {
+    const response_space_error = validateResponseSpace(task.responseSpace, "validateTask");
+    if (response_space_error) {
+      err(response_space_error);
+    }
   }
 
   const presentation = task.presentation;
@@ -564,6 +629,16 @@ function validateTask(task) {
   if (task.response_labels == null) err("`response_labels` is required.");
   if (task.choices == null && presentation && typeof presentation.makeStimulus === "function") {
     warn("`choices` is missing; the single-button presentation path needs choices in index order.");
+  }
+  const response_count = getResponseCount(task.responseSpace);
+  if (response_count != null) {
+    const label_count = countLabels(task.response_labels);
+    if (label_count != null && label_count !== response_count) {
+      err(`response_labels has ${label_count} entries; expected ${response_count}.`);
+    }
+    if (Array.isArray(task.choices) && task.choices.length !== response_count) {
+      err(`choices has ${task.choices.length} entries; expected ${response_count}.`);
+    }
   }
 
   if (task.design_grid != null) {
@@ -586,8 +661,8 @@ function validateTask(task) {
  *
  * @param {Object} model - The model package default export.
  * @param {Object} [opts]
- * @param {Object} [opts.sampleDesign] - A design to probe responseProb/buildData with.
- * @param {Object} [opts.sampleDraw]   - A parameter draw to probe responseProb with.
+ * @param {Object} [opts.sampleDesign] - A design to probe responseProb/responseProbs/buildData with.
+ * @param {Object} [opts.sampleDraw]   - A parameter draw to probe responseProb/responseProbs with.
  * @returns {{valid: boolean, problems: Array<{level: "error"|"warn", message: string}>}}
  */
 function validateModel(model, opts = {}) {
@@ -613,10 +688,23 @@ function validateModel(model, opts = {}) {
   }
   if (!model.responseSpace || typeof model.responseSpace.type !== "string") {
     err("`responseSpace.type` must be a string.");
+  } else {
+    const response_space_error = validateResponseSpace(model.responseSpace, "validateModel");
+    if (response_space_error) {
+      err(response_space_error);
+    }
   }
   if (typeof model.buildData !== "function") err("`buildData(trials)` must be a function.");
-  if (typeof model.responseProb !== "function") err("`responseProb(design, draw)` must be a function.");
-  if (typeof model.choiceProbLL === "function") err("`choiceProbLL` has been renamed to `responseProb`.");
+  if (model.responseSpace && model.responseSpace.type === "categorical") {
+    if (typeof model.responseProbs !== "function") {
+      err("categorical models must provide `responseProbs(design, draw)`.");
+    }
+  } else if (typeof model.responseProb !== "function" && typeof model.responseProbs !== "function") {
+    err("`responseProb(design, draw)` or `responseProbs(design, draw)` must be a function.");
+  }
+  if (typeof model.choiceProbLL === "function") {
+    err("`choiceProbLL` has been replaced by `responseProb` for binary models or `responseProbs` for categorical models.");
+  }
   for (const k of ["design_grid", "presentation", "choices", "response_labels", "responseToOutcome", "task"]) {
     if (model[k] != null) {
       err(`\`${k}\` belongs on a task package, not a model package.`);
@@ -639,14 +727,16 @@ function validateModel(model, opts = {}) {
   }
 
   // Optional runtime probe.
-  if (opts.sampleDesign && typeof model.responseProb === "function") {
+  if (opts.sampleDesign && (typeof model.responseProb === "function" || typeof model.responseProbs === "function")) {
     try {
-      const p = model.responseProb(opts.sampleDesign, opts.sampleDraw || {});
-      if (typeof p !== "number" || !Number.isFinite(p) || p < 0 || p > 1) {
-        err(`responseProb(sampleDesign, sampleDraw) returned ${p}; expected a probability in [0, 1].`);
+      const responseProbs = getResponseProbsFunction(model);
+      const probs = validateResponseProbs(responseProbs(opts.sampleDesign, opts.sampleDraw || {}), "validateModel");
+      const response_count = getResponseCount(model.responseSpace);
+      if (response_count != null && probs.length !== response_count) {
+        err(`response likelihood returned ${probs.length} probabilities; expected ${response_count}.`);
       }
     } catch (e) {
-      err(`responseProb threw on the sample design: ${String((e && e.message) || e)}.`);
+      err(`response likelihood threw on the sample design: ${String((e && e.message) || e)}.`);
     }
   }
 
@@ -695,6 +785,7 @@ function registerModelPackage(model, overrides = {}) {
     designKeys: model.designKeys,
     responseSpace: model.responseSpace,
     responseProb: model.responseProb,
+    responseProbs: model.responseProbs,
     buildData: model.buildData,
     posterior_display: model.posterior_display,
     stan: overrides.stan ?? model.stan,

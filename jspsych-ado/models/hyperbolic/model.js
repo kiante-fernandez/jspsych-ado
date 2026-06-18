@@ -55,6 +55,11 @@ function responseProb(design, params) {
   return logistic(params.tau * (v_ll - v_ss));
 }
 
+function responseProbs(design, params) {
+  const p_ll = responseProb(design, params);
+  return [1 - p_ll, p_ll];
+}
+
 /**
  * Optional model-specific diagnostics for the simulator: the hyperbolically
  * discounted subjective values of each option.
@@ -113,6 +118,7 @@ const hyperbolicModel = {
   moduleUrl: new URL("./main.js", import.meta.url).href,
   buildData,
   responseProb,
+  responseProbs,
   subjectiveValues,
 };
 
@@ -122,5 +128,6 @@ export {
   getHyperbolicValue,
   logistic,
   buildData,
+  responseProbs,
   subjectiveValues,
 };

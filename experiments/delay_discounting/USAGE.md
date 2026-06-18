@@ -27,7 +27,8 @@ URL parameters:
 - `strategy=ado` (default) — select Stan designs by mutual information.
 - `strategy=random` — keep Stan posterior updates but sample designs randomly
   from the same grid.
-- `debug=1` — per-trial console summaries plus live posterior trajectory charts.
+- `debug=1` — per-trial console summaries, design-selection diagnostics, and
+  live posterior trajectory charts.
 - `simulate=data-only` / `simulate=visual` — run a simulated participant.
 
 Legacy `ado=stan|mock|ado|random|quest_plus` URLs are still accepted as aliases,
@@ -182,6 +183,7 @@ setup while prototyping, but deployed studies should use committed compiled asse
 
 Each choice trial records the design shown, the response (`choice`, `choice_raw`,
 `choice_label`, and `ado_design`), per-trial posterior summaries named from model
-parameters (`post_mean_<param>`, `post_sd_<param>`), and timing. Run-level
-properties include `controller_mode`, `design_strategy`, `ado_mode`, and
-`model_id`; simulated runs also save data-generating `sim_<param>` values.
+parameters (`post_mean_<param>`, `post_sd_<param>`), design-selection diagnostics
+(`ado_mutual_info`, `ado_selection_time_ms`), and timing. Run-level properties
+include `controller_mode`, `design_strategy`, `ado_mode`, and `model_id`;
+simulated runs also save data-generating `sim_<param>` values.
