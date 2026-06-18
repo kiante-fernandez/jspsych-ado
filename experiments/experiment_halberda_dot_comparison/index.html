@@ -1,15 +1,162 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <title>Halberda-style Dot Comparison Task</title>
+    <head>
+        <meta charset="utf-8">
+        <title>Halberda Dot Comparison ADO</title>
+        <script src="jatos.js"></script>
+        <base href="../../">
+        <script>
+            const base = document.querySelector("base");
+            base.href = typeof jatos !== "undefined" ? "." : "../../";
+        </script>
+        <script src="core/jspsych/jspsych.js"></script>
+        <script src="core/jspsych/plugins/plugin-canvas-keyboard-response.js"></script>
+        <script src="core/jspsych/plugins/plugin-html-button-response.js"></script>
+        <script src="core/jspsych/plugins/plugin-call-function.js"></script>
+        <script src="core/jspsych/plugins/plugin-instructions.js"></script>
+        <link href="core/jspsych/css/jspsych.css" rel="stylesheet" type="text/css">
+        <link href="experiments/experiment_halberda_dot_comparison/style.css" rel="stylesheet" type="text/css">
+        <script src="core/init_experiment.js"></script>
+    </head>
+    <body></body>
+    <script type="module">
+        import QuestPlus from "./core/jsquest-plus/jsQuestPlus.module.js";
+        import { makeDebriefStimulus } from "./jspsych-ado/ado/ado_timeline.js";
+        import { createSeededRng } from "./jspsych-ado/ado/ado_simulation.js";
+        import {
+            addAdoDataProperties,
+            createExperimentAdoTimeline,
+            getExperimentRunSettings,
+            makeAdoRunContext,
+            makeEndSimulationData,
+            makeInstructionSimulationData,
+            registerAdoExperiment,
+            resolveSimulationConfig,
+        } from "./jspsych-ado/ado/experiment_shell.js";
+        import halberdaTask, {
+            correctChoiceIndex,
+        } from "./jspsych-ado/tasks/halberda_dot_comparison/task.js";
+        import weberDotsModel from "./jspsych-ado/models/weber_dots/model.js";
+        import {
+            default_halberda_config,
+            default_halberda_simulation_config,
+        } from "./experiments/experiment_halberda_dot_comparison/halberda_config.js";
 
-  <!-- jsPsych v7 + canvas keyboard plugin from CDN -->
-  <script src="https://unpkg.com/jspsych@7.3.4"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-canvas-keyboard-response@1.1.3"></script>
+        const using_jatos = typeof jatos !== "undefined";
+        const jatos_instance = using_jatos ? jatos : null;
+        const url_params = new URLSearchParams(window.location.search);
+        const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
+        const session_id = using_jatos ? jatos.studyResultId : "local-" + Date.now();
+        const run_settings = getExperimentRunSettings(url_params);
+        const simulation_config = resolveSimulationConfig(
+            default_halberda_simulation_config,
+            run_config,
+            run_settings.simulation_mode
+        );
+        const simulation_rng = createSeededRng(simulation_config.seed);
 
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body></body>
-<script src="experiment.js"></script>
+        function sampleBinary(probs, rng) {
+            const draw = rng();
+            return {
+                outcome: draw < probs[0] ? 0 : 1,
+                draw,
+            };
+        }
+
+        function simulateDotComparisonChoice(design) {
+            const probs = weberDotsModel.responseProbs(design, simulation_config.params);
+            const sampled = sampleBinary(probs, simulation_rng);
+            const correct_index = correctChoiceIndex(design);
+            const response = sampled.outcome === 1 ? correct_index : 1 - correct_index;
+            const values = weberDotsModel.subjectiveValues(design, simulation_config.params);
+            return {
+                response,
+                rt: simulation_config.rt.choice,
+                sim_draw: sampled.draw,
+                sim_w: simulation_config.params.w,
+                sim_p_incorrect: probs[0],
+                sim_p_correct: probs[1],
+                sim_n_large: values.n_large,
+                sim_n_small: values.n_small,
+                sim_correct_response: correct_index,
+                sim_correct: sampled.outcome === 1,
+            };
+        }
+
+        const run_context = makeAdoRunContext({
+            run_settings: run_settings,
+            model: weberDotsModel,
+            using_jatos: using_jatos,
+            session_id: session_id,
+            simulate_choice: simulateDotComparisonChoice,
+            jatos_instance: jatos_instance,
+        });
+
+        registerAdoExperiment({
+            task: halberdaTask,
+            model: weberDotsModel,
+            config: default_halberda_config,
+        });
+
+        const plain_finish_stimulus = "<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>";
+
+        const instructions = {
+            type: jsPsychInstructions,
+            pages: [
+                "<p>Welcome to the dot comparison task.</p><p>You will briefly see blue and yellow dots.</p>",
+                "<p>Your job is to decide which color has more dots. Press <strong>B</strong> for blue and <strong>Y</strong> for yellow.</p><p>The display is very fast, so do not try to count.</p>",
+                "<p>The task will adapt after each response. Press Next when you are ready to begin.</p>",
+            ],
+            show_clickable_nav: true,
+            key_forward: "m",
+            key_backward: "z",
+            button_label_previous: "Previous (<strong>Z</strong>)",
+            button_label_next: "Next (<strong>M</strong>)",
+            simulation_options: {
+                data: makeInstructionSimulationData(3, simulation_config),
+            },
+        };
+
+        const end_screen = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: plain_finish_stimulus,
+            on_start: function(trial) {
+                var bar = document.getElementById("ado-live-posterior-chart");
+                if (bar) { bar.remove(); }
+                trial.stimulus = run_context.debug
+                    ? makeDebriefStimulus(run_context.param_history || {}, run_context.posterior_display)
+                    : plain_finish_stimulus;
+            },
+            choices: ["SUBMIT"],
+            simulation_options: {
+                data: makeEndSimulationData(simulation_config),
+            },
+        };
+
+        jsPsych = initializeExperiment();
+        addAdoDataProperties(jsPsych, {
+            run_settings: run_settings,
+            model: weberDotsModel,
+            simulation_config: simulation_config,
+            using_jatos: using_jatos,
+        });
+
+        let timeline = [instructions];
+        timeline = timeline.concat(createExperimentAdoTimeline(jsPsych, {
+            QuestPlus: QuestPlus,
+            task: halberdaTask,
+            model: weberDotsModel,
+            config: default_halberda_config,
+            run_context: run_context,
+            session_id: session_id,
+            design_seed: run_config.controller ? run_config.controller.design_seed : null,
+        }));
+        timeline.push(end_screen);
+
+        if (run_settings.simulation_mode) {
+            jsPsych.simulate(timeline, run_settings.simulation_mode);
+        } else {
+            jsPsych.run(timeline);
+        }
+    </script>
 </html>
