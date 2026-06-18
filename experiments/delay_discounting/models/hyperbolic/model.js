@@ -94,6 +94,10 @@ const hyperbolicModel = {
     k: { dist: "lognormal", meanlog: -4, sdlog: 2 },
     tau: { dist: "lognormal", meanlog: 0, sdlog: 1 },
   },
+  posterior_display: {
+    k: { label: "k", y_min: 0, y_max: 700, lower_bound: 0 },
+    tau: { label: "τ", y_min: 0, y_max: 7, lower_bound: 0 },
+  },
   // Absolute URL of the compiled emscripten module, resolved next to this file so
   // a Web Worker can dynamic-import() it regardless of the page's <base href>.
   moduleUrl: new URL("./main.js", import.meta.url).href,

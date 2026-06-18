@@ -79,7 +79,7 @@
     <script type="module">
         import { default_dd_config, default_dd_simulation_config } from "./experiments/delay_discounting/dd_config.js";
         import { createSeededRng, simulateDelayDiscountingChoice } from "./experiments/delay_discounting/dd_simulation.js";
-        import { createDelayDiscountingTimeline } from "./experiments/delay_discounting/delay_discounting_timeline.js";
+        import { createDelayDiscountingTimeline, makeDebriefStimulus } from "./experiments/delay_discounting/delay_discounting_timeline.js";
         import { createMockAdoController } from "./experiments/delay_discounting/controllers/mock_ado_controller.js";
         import { createStanAdoController } from "./experiments/delay_discounting/controllers/stan_ado_controller.js";
         import hyperbolicModel from "./experiments/delay_discounting/models/hyperbolic/model.js";
@@ -121,6 +121,7 @@
             };
         }
 
+        const param_history = {};
         let adaptive_controller;
         if (ado_mode === "mock") {
             adaptive_controller = createMockAdoController(default_dd_config);
@@ -138,6 +139,8 @@
             ado_mode: ado_mode,
             model_id: hyperbolicModel.id,
             debug: debug,
+            param_history: param_history,
+            posterior_display: hyperbolicModel.posterior_display,
             simulation_mode: simulation_mode,
             using_jatos: using_jatos,
             session_id: using_jatos ? jatos.studyResultId : "local-" + Date.now(),
@@ -158,6 +161,8 @@
             } : null,
         };
 
+        const plain_finish_stimulus = '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
+
         const instructions = {
             type: jsPsychInstructions,
             pages: [
@@ -177,8 +182,13 @@
 
         const end_screen = {
             type: jsPsychHtmlButtonResponse,
-            stimulus: function() {
-                return '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
+            stimulus: plain_finish_stimulus,
+            on_start: function(trial) {
+                var bar = document.getElementById("dd-live-posterior-chart");
+                if (bar) { bar.remove(); }
+                trial.stimulus = run_context.debug
+                    ? makeDebriefStimulus(run_context.param_history || {}, run_context.posterior_display)
+                    : plain_finish_stimulus;
             },
             choices: ["SUBMIT"],
             simulation_options: {
