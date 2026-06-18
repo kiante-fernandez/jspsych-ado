@@ -157,19 +157,7 @@ function makeEndSimulationData(simulation_config) {
   };
 }
 
-function jatosProperties(jatos_instance) {
-  if (!jatos_instance) {
-    return null;
-  }
-  return {
-    studyResultId: jatos_instance.studyResultId,
-    componentResultId: jatos_instance.componentResultId,
-    workerId: jatos_instance.workerId,
-    batchId: jatos_instance.batchId,
-  };
-}
-
-function makeAdoRunContext({ run_settings, model, using_jatos, session_id, simulate_choice, jatos_instance = null }) {
+function makeAdoRunContext({ run_settings, model, session_id, simulate_choice }) {
   return {
     ado_mode: run_settings.ado_mode,
     controller_mode: run_settings.controller_mode,
@@ -179,14 +167,12 @@ function makeAdoRunContext({ run_settings, model, using_jatos, session_id, simul
     param_history: {},
     posterior_display: model.posterior_display,
     simulation_mode: run_settings.simulation_mode,
-    using_jatos,
     session_id,
     simulate_choice,
-    jatos: jatosProperties(jatos_instance),
   };
 }
 
-function addAdoDataProperties(jsPsych, { run_settings, model, simulation_config, using_jatos }) {
+function addAdoDataProperties(jsPsych, { run_settings, model, simulation_config }) {
   jsPsych.data.addProperties({
     ado_mode: run_settings.ado_mode,
     controller_mode: run_settings.controller_mode,
@@ -198,7 +184,6 @@ function addAdoDataProperties(jsPsych, { run_settings, model, simulation_config,
     ...Object.fromEntries(
       Object.entries(simulation_config.params).map(([name, value]) => ["sim_" + name, value])
     ),
-    using_jatos,
   });
 }
 

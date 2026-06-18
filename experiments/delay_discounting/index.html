@@ -2,13 +2,7 @@
 <html>
     <head>
         <title>Delay Discounting</title>
-        <script src="jatos.js"></script>
         <base href="../../">
-        <script>
-            // Set base URL of file paths different for JATOS than other hosting environments
-            const base = document.querySelector('base');
-            base.href = typeof jatos !== 'undefined' ? '.' : '../../';
-        </script>
         <script src="core/jspsych/jspsych.js"></script>
         <script src="core/jspsych/plugins/plugin-html-button-response.js"></script>
         <script src="core/jspsych/plugins/plugin-call-function.js"></script>
@@ -98,11 +92,9 @@
         } from "./jspsych-ado/ado/experiment_shell.js";
         import { default_dd_config, default_dd_simulation_config } from "./experiments/delay_discounting/dd_config.js";
 
-        const using_jatos = typeof jatos !== 'undefined';
-        const jatos_instance = using_jatos ? jatos : null;
         const url_params = new URLSearchParams(window.location.search);
         const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
-        const session_id = using_jatos ? jatos.studyResultId : "local-" + Date.now();
+        const session_id = "local-" + Date.now();
 
         const run_settings = getExperimentRunSettings(url_params, { allow_legacy_ado: true });
         const simulation_config = resolveSimulationConfig(
@@ -115,12 +107,10 @@
         const run_context = makeAdoRunContext({
             run_settings: run_settings,
             model: hyperbolicModel,
-            using_jatos: using_jatos,
             session_id: session_id,
             simulate_choice: function(design) {
                 return simulateDelayDiscountingChoice(design, simulation_config, simulation_rng, hyperbolicModel);
             },
-            jatos_instance: jatos_instance,
         });
 
         registerAdoExperiment({
@@ -168,7 +158,6 @@
             run_settings: run_settings,
             model: hyperbolicModel,
             simulation_config: simulation_config,
-            using_jatos: using_jatos,
         });
 
         let timeline = [instructions];

@@ -88,7 +88,7 @@ def get_error(post_mean: float, true_value: float, scale: str) -> float:
 
 
 def get_displayed_json(page) -> list[dict[str, Any]]:
-    """Read the jsPsych JSON rendered by init_experiment.js outside JATOS."""
+    """Read the jsPsych JSON rendered by init_experiment.js."""
 
     page.wait_for_function(
         """() => {

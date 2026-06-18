@@ -11,7 +11,7 @@ import { startStaticServer } from "./static_server.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PAGE = "/experiments/line_length_discrimination/index.html";
 const TASK = "line_length_discrimination_3ifc";
-const BENIGN = [/jatos\.js$/, /favicon\.ico$/];
+const BENIGN = [/favicon\.ico$/];
 const isBenign = (url) => BENIGN.some((re) => re.test(url));
 
 async function runMode(browser, baseUrl, spec) {

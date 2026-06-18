@@ -2,13 +2,7 @@
 <html>
     <head>
         <title>3IFC Line-Length Discrimination</title>
-        <script src="jatos.js"></script>
         <base href="../../">
-        <script>
-            // Set base URL of file paths different for JATOS than other hosting environments
-            const base = document.querySelector('base');
-            base.href = typeof jatos !== 'undefined' ? '.' : '../../';
-        </script>
         <script src="core/jspsych/jspsych.js"></script>
         <script src="core/jspsych/plugins/plugin-html-button-response.js"></script>
         <script src="core/jspsych/plugins/plugin-call-function.js"></script>
@@ -110,11 +104,9 @@
             default_line_length_simulation_config,
         } from "./experiments/line_length_discrimination/line_length_config.js";
 
-        const using_jatos = typeof jatos !== 'undefined';
-        const jatos_instance = using_jatos ? jatos : null;
         const url_params = new URLSearchParams(window.location.search);
         const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
-        const session_id = using_jatos ? jatos.studyResultId : "local-" + Date.now();
+        const session_id = "local-" + Date.now();
         const run_settings = getExperimentRunSettings(url_params);
         const simulation_config = resolveSimulationConfig(
             default_line_length_simulation_config,
@@ -126,14 +118,12 @@
         const run_context = makeAdoRunContext({
             run_settings: run_settings,
             model: lineLengthModel,
-            using_jatos: using_jatos,
             session_id: session_id,
             simulate_choice: function(design) {
                 return simulateCategoricalChoice(design, simulation_config, simulation_rng, lineLengthModel, {
                     response_labels: lineLengthTask.response_labels,
                 });
             },
-            jatos_instance: jatos_instance,
         });
 
         registerAdoExperiment({
@@ -180,7 +170,6 @@
             run_settings: run_settings,
             model: lineLengthModel,
             simulation_config: simulation_config,
-            using_jatos: using_jatos,
         });
 
         let timeline = [instructions];
