@@ -10,6 +10,11 @@ const CONNECTORS = {
   falling_top: "╮",
   falling_bottom: "╰",
 };
+const JUNCTION_CONNECTORS = {
+  vertical: "│",
+  from: "┤",
+  to: "├",
+};
 
 function coerceNumericSeries(series) {
   if (!Array.isArray(series)) {
@@ -23,8 +28,20 @@ function defaultFormat(value, _index, padding = DEFAULT_PADDING) {
   return (padding + value.toFixed(2)).slice(-padding.length);
 }
 
-function drawVerticalConnector(canvas, x, from_row, to_row) {
+function drawVerticalConnector(canvas, x, from_row, to_row, style = "corner") {
   if (from_row === to_row) {
+    canvas[from_row][x] = PLOT_POINT;
+    return;
+  }
+
+  if (style === "junction") {
+    const top = Math.min(from_row, to_row);
+    const bottom = Math.max(from_row, to_row);
+    for (let row = top + 1; row < bottom; row++) {
+      canvas[row][x] = JUNCTION_CONNECTORS.vertical;
+    }
+    canvas[from_row][x] = JUNCTION_CONNECTORS.from;
+    canvas[to_row][x] = JUNCTION_CONNECTORS.to;
     return;
   }
 
@@ -56,18 +73,20 @@ function plot(series, config = {}) {
   const range = spread === 0 ? 1 : spread;
   const format = typeof config.format === "function" ? config.format : defaultFormat;
   const padding = typeof config.padding === "string" ? config.padding : DEFAULT_PADDING;
-  const canvas = Array.from({ length: height + 1 }, () => Array(values.length).fill(" "));
+  const connector_style = config.connector_style === "junction" ? "junction" : "corner";
+  const canvas = Array.from({ length: height + 1 }, () => Array(values.length + 1).fill(" "));
   const rows = values.map(value => {
     const normalized = spread === 0 ? 0.5 : (value - min) / range;
     return Math.max(0, Math.min(height, Math.round(height - normalized * height)));
   });
 
-  for (let i = 0; i < rows.length; i++) {
-    canvas[rows[i]][i] = PLOT_POINT;
-  }
+  canvas[rows[0]][0] = PLOT_POINT;
 
   for (let i = 0; i < rows.length - 1; i++) {
-    drawVerticalConnector(canvas, i, rows[i], rows[i + 1]);
+    drawVerticalConnector(canvas, i + 1, rows[i], rows[i + 1], connector_style);
+  }
+  if (rows.length > 1) {
+    canvas[rows[rows.length - 1]][rows.length] = PLOT_POINT;
   }
 
   return canvas.map((row, index) => {

@@ -48,6 +48,50 @@ function mutualInfo(design, draws, choiceProbLL) {
 }
 
 /**
+ * Realized information gain after observing one binary response to a design.
+ *
+ * This is KL(p(theta | y, d) || p(theta)) estimated from the pre-trial posterior
+ * draws via likelihood weighting. Its expectation over y is the mutual
+ * information for the design.
+ *
+ * @param {Object} design - Presented design.
+ * @param {Array<Object>} draws - Pre-response posterior/prior draws.
+ * @param {number} choice - Observed response, 1 for LL and 0 for SS.
+ * @param {Function} choiceProbLL - Model likelihood: (design, draw) -> P(response=1).
+ * @returns {number} Realized information gain in nats.
+ */
+function realizedInformationGain(design, draws, choice, choiceProbLL) {
+  const likelihoods = [];
+  for (const draw of draws) {
+    const p_ll = choiceProbLL(design, draw);
+    const likelihood = choice === 1 ? p_ll : 1 - p_ll;
+    if (Number.isFinite(likelihood) && likelihood >= 0) {
+      likelihoods.push(likelihood);
+    }
+  }
+
+  if (likelihoods.length === 0) {
+    return 0;
+  }
+
+  const total_likelihood = likelihoods.reduce((sum, likelihood) => sum + likelihood, 0);
+  if (total_likelihood <= 0) {
+    return 0;
+  }
+
+  const predictive_likelihood = total_likelihood / likelihoods.length;
+  let gain = 0;
+  for (const likelihood of likelihoods) {
+    if (likelihood <= 0) {
+      continue;
+    }
+    const posterior_weight = likelihood / total_likelihood;
+    gain += posterior_weight * Math.log(likelihood / predictive_likelihood);
+  }
+  return Math.max(0, gain);
+}
+
+/**
  * Expand a design grid (object of value arrays) into every design combination.
  *
  * @param {Object} grid_design - e.g. {t_ss: [...], t_ll: [...], r_ss: [...], r_ll: [...]}.
@@ -181,6 +225,7 @@ function samplePriorDraws(prior, n, rng) {
 export {
   binaryEntropy,
   mutualInfo,
+  realizedInformationGain,
   enumerateDesigns,
   selectOptimalDesign,
   summarizeDraws,

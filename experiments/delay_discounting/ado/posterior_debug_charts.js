@@ -136,7 +136,10 @@ function formatPosteriorDrawCharts(draws, params = null, options = {}) {
     return "";
   }
 
-  return ["Posterior draw histograms (asciichart):", ...charts].join("\n\n");
+  return [
+    "Posterior draw histograms (asciichart):",
+    ...charts,
+  ].join("\n\n");
 }
 
 export {

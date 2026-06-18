@@ -42,6 +42,7 @@ test("formatPosteriorDrawCharts renders every requested posterior parameter", ()
   assert.match(output, /─/u);
   assert.match(output, /[│╭╮╰╯]/u);
   assert.doesNotMatch(output, /\*/);
+  assert.doesNotMatch(output, /# /);
 });
 
 test("formatPosteriorDrawCharts infers parameter names when no list is provided", () => {

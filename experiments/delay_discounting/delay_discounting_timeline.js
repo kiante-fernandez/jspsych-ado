@@ -1,4 +1,5 @@
 import { formatPosteriorDrawCharts } from "./ado/posterior_debug_charts.js";
+import { updateInfoGainDebugPanel } from "./ado/debug_trace_charts.js";
 
 /**
  * @typedef {Object} DelayDiscountingDesign
@@ -22,6 +23,7 @@ import { formatPosteriorDrawCharts } from "./ado/posterior_debug_charts.js";
  * @property {?DelayDiscountingPosteriorSummary} post_mean - Posterior means after the latest update.
  * @property {?DelayDiscountingPosteriorSummary} post_sd - Posterior SDs after the latest update.
  * @property {?Array<Object>} posterior_draws - Raw posterior draws for debug-only charting.
+ * @property {?number} realized_information_gain - Information gained from the observed response.
  * @property {?number} selection_time_ms - Time spent selecting next_design.
  * @property {?number} max_mutual_info - Mutual information value for next_design.
  * @property {?number} api_latency_ms - API round-trip time when available.
@@ -176,6 +178,7 @@ function logAdoTrial(run_context, trial_data, ado_result, config) {
       `  ${formatDebugOffer("LL", trial_data.r_ll, trial_data.t_ll)}`,
       `  selection time: ${formatDebugLatency(presented_selection_time)}`,
       `  max mutual information: ${formatDebugNumber(presented_max_mutual_info, 6)}`,
+      `  realized information gain: ${formatDebugNumber(ado_result.realized_information_gain, 6)}`,
       "",
       "Posterior after response:",
       ...Object.keys(post_mean).map(param =>
@@ -285,6 +288,8 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
   let current_design = null;
   let last_choice_data = null;
   let active_key_handler = null;
+  const max_mutual_info_history = [];
+  const realized_information_gain_history = [];
 
   /**
    * Surface an adaptive-controller failure instead of letting the async trial hang
@@ -394,6 +399,11 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
         adaptive_controller.update(last_choice_data).then(result => {
           ado_state = result;
           current_design = result.next_design;
+          max_mutual_info_history.push(last_choice_data.ado_max_mutual_info);
+          realized_information_gain_history.push(result.realized_information_gain);
+          if (run_context.debug) {
+            updateInfoGainDebugPanel(max_mutual_info_history, realized_information_gain_history);
+          }
           logAdoTrial(run_context, last_choice_data, result, config);
           done({
             ado_event: "update",
@@ -402,6 +412,7 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
             ado_next_design: result.next_design,
             ado_post_mean: result.post_mean,
             ado_post_sd: result.post_sd,
+            ado_realized_information_gain: result.realized_information_gain,
             ado_selection_time_ms: result.selection_time_ms,
             ado_max_mutual_info: result.max_mutual_info,
             ado_api_latency_ms: result.api_latency_ms,

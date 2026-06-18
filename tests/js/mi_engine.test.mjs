@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   binaryEntropy,
   mutualInfo,
+  realizedInformationGain,
   enumerateDesigns,
   selectOptimalDesign,
   summarizeDraws,
@@ -34,6 +35,25 @@ test("mutualInfo is maximal (ln2) when draws split a design 50/50 deterministica
   const choiceProbLL = (_design, draw) => (draw.s === 1 ? 1 : 0);
   const mi = mutualInfo({}, draws, choiceProbLL);
   assert.ok(Math.abs(mi - LN2) < 1e-9, `expected ln2, got ${mi}`);
+});
+
+test("realizedInformationGain is ln2 for a deterministic split after either response", () => {
+  const draws = [{ s: 0 }, { s: 1 }, { s: 0 }, { s: 1 }];
+  const choiceProbLL = (_design, draw) => (draw.s === 1 ? 1 : 0);
+
+  assert.ok(Math.abs(realizedInformationGain({}, draws, 1, choiceProbLL) - LN2) < 1e-9);
+  assert.ok(Math.abs(realizedInformationGain({}, draws, 0, choiceProbLL) - LN2) < 1e-9);
+});
+
+test("expected realizedInformationGain matches mutualInfo for a binary response", () => {
+  const draws = [{ p: 0.1 }, { p: 0.3 }, { p: 0.7 }, { p: 0.9 }];
+  const choiceProbLL = (_design, draw) => draw.p;
+  const mean_p = draws.reduce((sum, draw) => sum + draw.p, 0) / draws.length;
+  const expected_gain =
+    mean_p * realizedInformationGain({}, draws, 1, choiceProbLL) +
+    (1 - mean_p) * realizedInformationGain({}, draws, 0, choiceProbLL);
+
+  assert.ok(Math.abs(expected_gain - mutualInfo({}, draws, choiceProbLL)) < 1e-12);
 });
 
 test("enumerateDesigns produces the full cartesian product", () => {

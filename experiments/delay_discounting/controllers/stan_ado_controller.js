@@ -1,5 +1,6 @@
 import {
   enumerateDesigns,
+  realizedInformationGain,
   selectOptimalDesign,
   summarizeDraws,
   samplePriorDraws,
@@ -54,6 +55,7 @@ function createStanAdoController({
 
   const trials = [];
   const rng = createSeededRng(sample_config.seed);
+  let current_design_draws = null;
 
   let worker = null;
   // Requests are strictly sequential (init, then one awaited sample per trial),
@@ -160,6 +162,7 @@ function createStanAdoController({
       trials.length = 0;
 
       const prior = samplePriorDraws(model.prior, PRIOR_DRAWS, rng);
+      current_design_draws = prior;
       const selection = selectDesignWithMetrics(prior);
 
       return {
@@ -169,6 +172,7 @@ function createStanAdoController({
         post_mean: null,
         post_sd: null,
         posterior_draws: null,
+        realized_information_gain: null,
         selection_time_ms: selection.selection_time_ms,
         max_mutual_info: selection.max_mutual_info,
         api_latency_ms: null,
@@ -184,6 +188,9 @@ function createStanAdoController({
      */
     update: async function(trial_data) {
       const started_at = now();
+      const realized_information_gain = current_design_draws
+        ? realizedInformationGain(trial_data.ado_design, current_design_draws, trial_data.choice, model.choiceProbLL)
+        : null;
 
       trials.push({ ...trial_data.ado_design, choice: trial_data.choice });
 
@@ -200,6 +207,7 @@ function createStanAdoController({
       if (!n_trials || trials.length < n_trials) {
         selection = selectDesignWithMetrics(draws);
       }
+      current_design_draws = draws;
 
       return {
         session_id,
@@ -208,6 +216,7 @@ function createStanAdoController({
         post_mean,
         post_sd,
         posterior_draws: draws,
+        realized_information_gain,
         selection_time_ms: selection.selection_time_ms,
         max_mutual_info: selection.max_mutual_info,
         // Reuse the latency field to report local sampling+MI time (ms).

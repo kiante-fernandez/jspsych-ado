@@ -25,9 +25,11 @@ work.
 
 `debug=1` prints a readable console summary after each adaptive update — the design
 presented, the response, posterior mean/sd for each estimated parameter, selection time,
-max mutual information, posterior draw histograms for each estimated parameter, the next
-selected design, and the local sampling time. In DevTools each summary also has a
-collapsed details group with tables.
+max mutual information, realized information gain, posterior draw histograms for each
+estimated parameter, the next selected design, and the local sampling time. It also shows
+a small on-page SVG panel that plots expected max MI and realized information gain across
+trials as connected lines. In DevTools each summary has a collapsed details group with
+tables.
 
 ## Run simulated participants
 
