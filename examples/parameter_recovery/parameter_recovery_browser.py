@@ -29,7 +29,12 @@ DEFAULT_CHOICE_TASK_FIELD = "task"
 DEFAULT_CHOICE_TASK = "delay_discounting"
 DEFAULT_TRIAL_NUMBER_FIELD = "trial_number"
 DEFAULT_DESIGN_FIELDS = ["r_ss", "t_ss", "r_ll", "t_ll"]
-DEFAULT_STRATEGIES = ["ado", "random"]
+DEFAULT_RUN_SPECS = [
+    {"strategy": "ado", "query": {"controller": "stan", "strategy": "ado"}},
+    {"strategy": "random", "query": {"controller": "stan", "strategy": "random"}},
+    {"strategy": "quest_plus", "query": {"controller": "quest_plus"}},
+]
+DEFAULT_STRATEGIES = [spec["strategy"] for spec in DEFAULT_RUN_SPECS]
 DEFAULT_SEEDS = [101, 102, 103, 104, 105]
 DEFAULT_PARAMETERS = [
     {"name": "k", "scale": "log10", "label": "Discount rate k"},
@@ -113,6 +118,43 @@ def make_run_config(profile: dict[str, Any], seed: int) -> dict[str, Any]:
             "design_seed": seed + 10000,
         },
     }
+
+
+def normalize_run_spec(run_spec: str | dict[str, Any]) -> dict[str, Any]:
+    """Return a run spec with a display label and URL query parameters."""
+
+    if isinstance(run_spec, str):
+        return {
+            "strategy": run_spec,
+            "query": {
+                "controller": "stan",
+                "strategy": run_spec,
+            },
+        }
+
+    strategy = run_spec["strategy"]
+    query = dict(run_spec.get("query", {}))
+    if "controller" in run_spec:
+        query["controller"] = run_spec["controller"]
+    if "design_strategy" in run_spec:
+        query["strategy"] = run_spec["design_strategy"]
+    return {
+        "strategy": strategy,
+        "query": query,
+    }
+
+
+def get_run_specs(
+    run_specs: list[dict[str, Any]] | None,
+    strategies: list[str] | None,
+) -> list[dict[str, Any]]:
+    """Resolve new run specs, preserving the old strategies fallback."""
+
+    if run_specs is not None:
+        return [normalize_run_spec(spec) for spec in run_specs]
+    if strategies is not None:
+        return [normalize_run_spec(strategy) for strategy in strategies]
+    return [normalize_run_spec(spec) for spec in DEFAULT_RUN_SPECS]
 
 
 def get_choice_rows(
@@ -211,7 +253,7 @@ def run_browser_grid(
     base_url: str,
     experiment_path: str,
     model_id: str,
-    strategies: list[str],
+    run_specs: list[dict[str, Any]],
     simulation_profiles: list[dict[str, Any]],
     seeds: list[int],
     parameters: list[dict[str, Any]],
@@ -228,7 +270,8 @@ def run_browser_grid(
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         try:
-            for strategy in strategies:
+            for run_spec in run_specs:
+                strategy = run_spec["strategy"]
                 for profile in simulation_profiles:
                     for seed in seeds:
                         page = browser.new_page()
@@ -236,11 +279,9 @@ def run_browser_grid(
                         page.add_init_script(
                             "window.__JSPSYCH_ADO_RUN_CONFIG__ = " + json.dumps(run_config) + ";"
                         )
-                        query = urlencode({
-                            "controller": "stan",
-                            "strategy": strategy,
-                            "simulate": "data-only",
-                        })
+                        query_params = dict(run_spec["query"])
+                        query_params["simulate"] = "data-only"
+                        query = urlencode(query_params)
                         page.goto(f"{base_url}/{experiment_path}?{query}", wait_until="domcontentloaded")
                         raw_rows = get_displayed_json(page)
                         page.close()
@@ -278,6 +319,7 @@ def run_browser_grid(
 def run_recovery(
     experiment_path: str = DEFAULT_EXPERIMENT_PATH,
     model_id: str = DEFAULT_MODEL_ID,
+    run_specs: list[dict[str, Any]] | None = None,
     strategies: list[str] | None = None,
     simulation_profiles: list[dict[str, Any]] | None = None,
     seeds: list[int] | None = None,
@@ -292,8 +334,8 @@ def run_recovery(
 ) -> dict[str, Any]:
     """Run the configured experiment-level recovery audit and return JSON data."""
 
-    if strategies is None:
-        strategies = DEFAULT_STRATEGIES
+    run_specs = get_run_specs(run_specs, strategies)
+    strategies = [spec["strategy"] for spec in run_specs]
     if parameters is None:
         parameters = DEFAULT_PARAMETERS
     if simulation_profiles is None:
@@ -308,7 +350,7 @@ def run_recovery(
             base_url,
             experiment_path,
             model_id,
-            strategies,
+            run_specs,
             simulation_profiles,
             seeds,
             parameters,
@@ -322,6 +364,7 @@ def run_recovery(
     metadata = {
         "experiment_path": experiment_path,
         "model_id": model_id,
+        "run_specs": run_specs,
         "strategies": strategies,
         "simulation_profiles": simulation_profiles,
         "seeds": seeds,

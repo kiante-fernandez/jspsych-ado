@@ -78,13 +78,15 @@
     <body></body>
     <script type="module">
         // The delay-discounting experiment is now a THIN CONSUMER of the general
-        // jspsych-ado package: it registers the hyperbolic model and asks the
-        // façade to build the adaptive timeline. Nothing here is ADO-engine- or
-        // timeline-specific; all of that lives in ../../jspsych-ado/.
+        // jspsych-ado package: it registers the hyperbolic model and builds the
+        // adaptive timeline from package controllers. Nothing here is ADO-engine-
+        // or timeline-specific; all of that lives in ../../jspsych-ado/.
+        import QuestPlus from "./core/jsquest-plus/jsQuestPlus.module.js";
         import { jsPsychADO } from "./jspsych-ado/index.js";
         import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
         import { createAdoTimeline, makeDebriefStimulus } from "./jspsych-ado/ado/ado_timeline.js";
         import { createMockAdoController } from "./jspsych-ado/controllers/mock_ado_controller.js";
+        import { createQuestPlusController } from "./jspsych-ado/controllers/quest_plus_controller.js";
         import { createSeededRng, simulateDelayDiscountingChoice } from "./jspsych-ado/ado/ado_simulation.js";
         import { default_dd_config, default_dd_simulation_config } from "./experiments/delay_discounting/dd_config.js";
         import { getRunSelection } from "./experiments/delay_discounting/dd_url.js";
@@ -272,6 +274,24 @@
                 params: hyperbolicModel.params,
             });
             timeline = timeline.concat(createAdoTimeline(jsPsych, mock_controller, {
+                n_trials: default_dd_config.n_trials,
+                response_labels: default_dd_config.response_labels,
+                presentation: hyperbolicModel.presentation,
+                choices: hyperbolicModel.choices,
+                task: "delay_discounting",
+            }, run_context));
+        } else if (controller_mode === "quest_plus") {
+            // Comparator path: Quest+ owns the discrete posterior and next-design
+            // rule, while the same generic timeline records choices/posteriors.
+            const quest_plus_controller = createQuestPlusController({
+                QuestPlus: QuestPlus,
+                model: hyperbolicModel,
+                grid_design: default_dd_config.grid_design,
+                quest_plus: default_dd_config.quest_plus,
+                session_id: session_id,
+                n_trials: default_dd_config.n_trials,
+            });
+            timeline = timeline.concat(createAdoTimeline(jsPsych, quest_plus_controller, {
                 n_trials: default_dd_config.n_trials,
                 response_labels: default_dd_config.response_labels,
                 presentation: hyperbolicModel.presentation,

@@ -27,6 +27,9 @@ function getRunSelection(params) {
     } else if (requested_ado_mode === "random") {
       controller_mode = "stan";
       design_strategy = "random";
+    } else if (requested_ado_mode === "quest_plus") {
+      controller_mode = "quest_plus";
+      design_strategy = null;
     } else {
       console.warn(`Unknown legacy ado mode "${requested_ado_mode}"; running controller=stan&strategy=ado.`);
     }
@@ -39,9 +42,10 @@ function getRunSelection(params) {
   }
 
   // Canonical controller/backend choice: mock is the deterministic no-WASM
-  // controller, stan is the live posterior update path.
+  // controller, stan is the live posterior update path, and quest_plus is the
+  // discrete-grid Quest+ comparator.
   if (requested_controller) {
-    if (["mock", "stan"].includes(requested_controller)) {
+    if (["mock", "stan", "quest_plus"].includes(requested_controller)) {
       controller_mode = requested_controller;
     } else {
       console.warn(`Unknown controller "${requested_controller}"; using controller=${controller_mode}.`);
@@ -68,12 +72,20 @@ function getRunSelection(params) {
     }
     design_strategy = null;
   }
+  if (controller_mode === "quest_plus") {
+    if (requested_strategy) {
+      console.warn("strategy= is ignored when controller=quest_plus.");
+    }
+    design_strategy = null;
+  }
 
   return {
     controller_mode,
     design_strategy,
     // Legacy flat field used in older data/debug logs.
-    ado_mode: controller_mode === "mock" ? "mock" : (design_strategy === "random" ? "random" : "stan"),
+    ado_mode: controller_mode === "mock" || controller_mode === "quest_plus"
+      ? controller_mode
+      : (design_strategy === "random" ? "random" : "stan"),
   };
 }
 

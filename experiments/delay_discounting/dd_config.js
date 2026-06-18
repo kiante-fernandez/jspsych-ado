@@ -35,6 +35,12 @@ const default_dd_config = {
     num_samples: 500,
     seed: 123,
   },
+  quest_plus: {
+    parameter_samples: {
+      k: [1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2],
+      tau: [0.5, 1, 1.5, 2.5, 3.5, 5, 7],
+    },
+  },
   response_labels: {
     0: "SS",
     1: "LL",
