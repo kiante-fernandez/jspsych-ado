@@ -121,6 +121,7 @@
             };
         }
 
+        const param_history = {};
         let adaptive_controller;
         if (ado_mode === "mock") {
             adaptive_controller = createMockAdoController(default_dd_config);
@@ -138,6 +139,8 @@
             ado_mode: ado_mode,
             model_id: hyperbolicModel.id,
             debug: debug,
+            param_history: param_history,
+            posterior_display: hyperbolicModel.posterior_display,
             simulation_mode: simulation_mode,
             using_jatos: using_jatos,
             session_id: using_jatos ? jatos.studyResultId : "local-" + Date.now(),
@@ -158,6 +161,8 @@
             } : null,
         };
 
+        const plain_finish_stimulus = '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
+
         const instructions = {
             type: jsPsychInstructions,
             pages: [
@@ -175,18 +180,15 @@
             },
         };
 
-        let dd_result = null;
-
         const end_screen = {
             type: jsPsychHtmlButtonResponse,
-            // Placeholder overwritten in on_start once all trials are done and
-            // param_history is fully populated. Using on_start (not stimulus:function)
-            // guarantees lazy evaluation right before the trial is presented.
-            stimulus: "<h2>Finished</h2>",
+            stimulus: plain_finish_stimulus,
             on_start: function(trial) {
                 var bar = document.getElementById("dd-live-posterior-chart");
                 if (bar) { bar.remove(); }
-                trial.stimulus = makeDebriefStimulus(dd_result ? dd_result.param_history : {});
+                trial.stimulus = run_context.debug
+                    ? makeDebriefStimulus(run_context.param_history || {}, run_context.posterior_display)
+                    : plain_finish_stimulus;
             },
             choices: ["SUBMIT"],
             simulation_options: {
@@ -210,14 +212,13 @@
             ),
         });
 
-        dd_result = createDelayDiscountingTimeline(
+        let timeline = [instructions];
+        timeline = timeline.concat(createDelayDiscountingTimeline(
             jsPsych,
             adaptive_controller,
             default_dd_config,
             run_context
-        );
-        let timeline = [instructions];
-        timeline = timeline.concat(dd_result.trials);
+        ));
         timeline.push(end_screen);
 
         if (simulation_mode) {

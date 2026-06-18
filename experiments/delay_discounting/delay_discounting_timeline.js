@@ -34,6 +34,8 @@
  * @property {boolean} debug - Whether to print ADO trial summaries.
  * @property {?string} simulation_mode - jsPsych simulation mode, usually data-only or visual.
  * @property {?Function} simulate_choice - Function(design) returning simulated jsPsych trial data.
+ * @property {?Object} param_history - Mutable posterior history for debug charts.
+ * @property {?Object} posterior_display - Optional parameter labels and preferred chart ranges.
  */
 
 function formatDelay(delay) {
@@ -210,39 +212,35 @@ function makeChoiceSimulationOptions(run_context, design) {
   };
 }
 
-// Fixed y-axis display ranges for known parameter names.
-// Using fixed ranges prevents the chart from rescaling every trial, making
-// convergence visually trackable. These cover the realistic posterior range
-// for the hyperbolic model's lognormal priors (k: LN(-4,2); tau: LN(0,1)).
-const PARAM_FIXED_RANGES = {
-  k: { min: 0, max: 0.2 },
-  tau: { min: 0, max: 5 },
-};
-
 function formatAxisTick(v) {
   if (v === 0) return "0";
   if (Math.abs(v) < 0.01) return v.toExponential(1);
   return Number(v.toPrecision(2)).toString();
 }
 
-function formatParamLabel(param) {
-  return param === "tau" ? "τ" : param;
+function getParamDisplay(param_name, posterior_display) {
+  if (posterior_display && posterior_display[param_name]) {
+    return posterior_display[param_name];
+  }
+  return { label: param_name };
 }
 
 /**
  * Render a parameter posterior trajectory (mean ± SD per trial) as an SVG string.
  *
- * When fixed_min/fixed_max are provided (or looked up from PARAM_FIXED_RANGES) the
- * y-axis is locked, making it easy to see the posterior narrowing toward a value.
- * Falls back to auto-scaling from data if no fixed range is available.
+ * When y_min/y_max are provided, they are treated as preferred display ranges.
+ * If the posterior mean ± SD exceeds those ranges, the axis expands and the
+ * chart notes that expansion instead of silently clipping values.
  *
  * @param {Array<{trial: number, mean: number, sd: number}>} series
  * @param {string} param_name - Parameter name ("k", "tau", ...).
  * @param {Object} [opts]
  * @param {number} [opts.width=500]
  * @param {number} [opts.height=200]
- * @param {number} [opts.fixed_min] - Override fixed y minimum.
- * @param {number} [opts.fixed_max] - Override fixed y maximum.
+ * @param {string} [opts.label] - Display label for the parameter.
+ * @param {number} [opts.y_min] - Preferred y minimum.
+ * @param {number} [opts.y_max] - Preferred y maximum.
+ * @param {number} [opts.lower_bound] - Hard lower display bound for constrained parameters.
  * @returns {string} SVG markup.
  */
 function makeParamConvergenceSvg(series, param_name, opts) {
@@ -257,28 +255,50 @@ function makeParamConvergenceSvg(series, param_name, opts) {
     return "<svg width=\"" + W + "\" height=\"" + H + "\"><text x=\"" + (W / 2) + "\" y=\"" + (H / 2) + "\" text-anchor=\"middle\" font-size=\"12\" fill=\"#6b7280\">No data yet</text></svg>";
   }
 
-  var fixed = PARAM_FIXED_RANGES[param_name] || null;
+  var data_min = Infinity, data_max = -Infinity;
+  series.forEach(function(d) {
+    data_min = Math.min(data_min, d.mean - (d.sd || 0));
+    data_max = Math.max(data_max, d.mean + (d.sd || 0));
+  });
+
+  var has_preferred_range = typeof opts.y_min === "number" && typeof opts.y_max === "number";
+  var has_lower_bound = typeof opts.lower_bound === "number";
+  var bounded_data_min = has_lower_bound ? Math.max(opts.lower_bound, data_min) : data_min;
+  var axis_expanded = false;
+  var axis_bounded = false;
   var y_min, y_max;
-  if (typeof opts.fixed_min === "number" && typeof opts.fixed_max === "number") {
-    y_min = opts.fixed_min;
-    y_max = opts.fixed_max;
-  } else if (fixed) {
-    y_min = fixed.min;
-    y_max = fixed.max;
+  if (has_preferred_range) {
+    y_min = Math.min(opts.y_min, bounded_data_min);
+    if (has_lower_bound) {
+      y_min = Math.max(opts.lower_bound, y_min);
+      axis_bounded = data_min < opts.lower_bound;
+    }
+    y_max = Math.max(opts.y_max, data_max);
+    axis_expanded = y_min < opts.y_min || y_max > opts.y_max;
   } else {
-    y_min = Infinity; y_max = -Infinity;
-    series.forEach(function(d) {
-      y_min = Math.min(y_min, d.mean - (d.sd || 0));
-      y_max = Math.max(y_max, d.mean + (d.sd || 0));
-    });
+    y_min = bounded_data_min;
+    y_max = data_max;
     var y_pad = (y_max - y_min) * 0.10 || 0.001;
     y_min -= y_pad; y_max += y_pad;
+    if (has_lower_bound) {
+      y_min = Math.max(opts.lower_bound, y_min);
+      axis_bounded = data_min < opts.lower_bound;
+    }
+  }
+  if (y_min === y_max) {
+    y_min -= 0.001;
+    y_max += 0.001;
   }
 
   function sx(i) { return ml + (n === 1 ? pw / 2 : (i / (n - 1)) * pw); }
   function sy(v) {
-    var clamped = Math.max(y_min, Math.min(y_max, v));
-    return mt + ph - ((clamped - y_min) / (y_max - y_min)) * ph;
+    if (v < y_min) {
+      v = y_min;
+    }
+    if (v > y_max) {
+      v = y_max;
+    }
+    return mt + ph - ((v - y_min) / (y_max - y_min)) * ph;
   }
 
   var band_top = [], band_bot = [];
@@ -303,11 +323,22 @@ function makeParamConvergenceSvg(series, param_name, opts) {
     x_ticks += "<text x=\"" + sx(i) + "\" y=\"" + (mt + ph + 16) + "\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6b7280\">" + series[i].trial + "</text>";
   });
 
-  var param_label = formatParamLabel(param_name);
+  var param_label = opts.label || param_name;
+  var axis_notes = [];
+  if (axis_expanded) {
+    axis_notes.push("axis expanded");
+  }
+  if (axis_bounded) {
+    axis_notes.push("lower bound");
+  }
+  var axis_note = axis_notes.length
+    ? "<text x=\"" + (ml + pw) + "\" y=\"" + (mt + 10) + "\" text-anchor=\"end\" font-size=\"9\" fill=\"#b45309\">" + axis_notes.join("; ") + "</text>"
+    : "";
 
   return "<svg width=\"" + W + "\" height=\"" + H + "\" style=\"display:block;\">"
     + "<rect x=\"" + ml + "\" y=\"" + mt + "\" width=\"" + pw + "\" height=\"" + ph + "\" fill=\"#f9fafb\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>"
     + y_ticks
+    + axis_note
     + "<polygon points=\"" + band_pts + "\" fill=\"rgba(99,102,241,0.15)\"/>"
     + "<polyline points=\"" + line_pts + "\" fill=\"none\" stroke=\"#4f46e5\" stroke-width=\"2\" stroke-linejoin=\"round\"/>"
     + x_ticks
@@ -349,10 +380,18 @@ function updateLiveCharts(param_history, ado_state, run_context) {
   var header = "<div style=\"text-align:center;font-size:0.7rem;color:#9ca3af;margin-bottom:0.1rem;\">Running posterior [debug]</div>";
   var charts_html = "<div style=\"display:flex;justify-content:center;gap:0.75rem;\">";
   params.forEach(function(param) {
-    var label = formatParamLabel(param);
+    var display = getParamDisplay(param, run_context.posterior_display);
+    var label = display.label || param;
     charts_html += "<div style=\"text-align:center;\">"
       + "<div style=\"font-size:0.7rem;color:#6b7280;margin-bottom:2px;\">" + label + "</div>"
-      + makeParamConvergenceSvg(param_history[param], param, { width: 280, height: 150 })
+      + makeParamConvergenceSvg(param_history[param], param, {
+        width: 280,
+        height: 150,
+        label: label,
+        y_min: display.y_min,
+        y_max: display.y_max,
+        lower_bound: display.lower_bound,
+      })
       + "</div>";
   });
   charts_html += "</div>";
@@ -368,9 +407,10 @@ function updateLiveCharts(param_history, ado_state, run_context) {
  * all trials have completed and param_history is fully populated.
  *
  * @param {Object<string, Array<{trial, mean, sd}>>} param_history
+ * @param {Object} posterior_display - Optional parameter labels and preferred y ranges.
  * @returns {string} HTML string with summary values and SVG charts.
  */
-function makeDebriefStimulus(param_history) {
+function makeDebriefStimulus(param_history, posterior_display) {
   var params = Object.keys(param_history);
   if (params.length === 0) {
     return "<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>";
@@ -379,16 +419,26 @@ function makeDebriefStimulus(param_history) {
     var series = param_history[param];
     if (!series.length) { return ""; }
     var last = series[series.length - 1];
-    var label = formatParamLabel(param);
+    var display = getParamDisplay(param, posterior_display);
+    var label = display.label || param;
     return "<p style=\"margin:0.25rem 0;font-size:0.9rem;color:#374151;\">"
       + "<strong>" + label + "</strong>: "
       + last.mean.toPrecision(3) + " ± " + last.sd.toPrecision(2) + "</p>";
   }).join("");
   var charts = "<div style=\"display:flex;justify-content:center;gap:1rem;flex-wrap:wrap;margin-top:0.75rem;\">"
     + params.map(function(param) {
+      var display = getParamDisplay(param, posterior_display);
+      var label = display.label || param;
       return "<div style=\"text-align:center;\">"
-        + "<div style=\"font-size:0.8rem;color:#6b7280;margin-bottom:4px;\">" + formatParamLabel(param) + " posterior trajectory</div>"
-        + makeParamConvergenceSvg(param_history[param], param, { width: 380, height: 220 })
+        + "<div style=\"font-size:0.8rem;color:#6b7280;margin-bottom:4px;\">" + label + " posterior trajectory</div>"
+        + makeParamConvergenceSvg(param_history[param], param, {
+          width: 380,
+          height: 220,
+          label: label,
+          y_min: display.y_min,
+          y_max: display.y_max,
+          lower_bound: display.lower_bound,
+        })
         + "</div>";
     }).join("")
     + "</div>";
@@ -397,6 +447,25 @@ function makeDebriefStimulus(param_history) {
     + last_values
     + charts
     + "<p style=\"margin-top:1rem;\">Click SUBMIT to finish.</p>";
+}
+
+function appendPosteriorHistory(run_context, ado_result) {
+  if (!ado_result.post_mean) {
+    return;
+  }
+  if (!run_context.param_history) {
+    run_context.param_history = {};
+  }
+  for (const param of Object.keys(ado_result.post_mean)) {
+    if (!run_context.param_history[param]) {
+      run_context.param_history[param] = [];
+    }
+    run_context.param_history[param].push({
+      trial: ado_result.trial_index,
+      mean: ado_result.post_mean[param],
+      sd: ado_result.post_sd ? (ado_result.post_sd[param] || 0) : 0,
+    });
+  }
 }
 
 /**
@@ -411,16 +480,13 @@ function makeDebriefStimulus(param_history) {
  * @param {DelayDiscountingAdoController} adaptive_controller - Controller with start/update methods.
  * @param {Object} config - Delay-discounting config with n_trials and response_labels.
  * @param {DelayDiscountingRunContext} run_context - Run settings and optional simulation hook.
- * @returns {{ trials: Array, param_history: Object }} Timeline fragment and posterior history.
+ * @returns {Array} jsPsych timeline fragment.
  */
 function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, run_context = {}) {
   let ado_state = null;
   let current_design = null;
   let last_choice_data = null;
   let active_key_handler = null;
-  // param_history[param] = [{trial, mean, sd}, ...] — built directly from controller results
-  // so it is immune to the call-function plugin's done()-payload nesting under "value".
-  const param_history = {};
 
   /**
    * Surface an adaptive-controller failure instead of letting the async trial hang
@@ -529,17 +595,7 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
           ado_state = result;
           current_design = result.next_design;
           logAdoTrial(run_context, last_choice_data, result, config);
-          // Accumulate posterior history before done() so on_finish can render charts.
-          if (result.post_mean) {
-            for (const param of Object.keys(result.post_mean)) {
-              if (!param_history[param]) { param_history[param] = []; }
-              param_history[param].push({
-                trial: result.trial_index,
-                mean: result.post_mean[param],
-                sd: result.post_sd ? (result.post_sd[param] || 0) : 0,
-              });
-            }
-          }
+          appendPosteriorHistory(run_context, result);
           done({
             ado_event: "update",
             ado_session_id: result.session_id,
@@ -552,12 +608,12 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
         }).catch(error => failExperiment(error, done));
       },
       on_finish: function() {
-        updateLiveCharts(param_history, ado_state, run_context);
+        updateLiveCharts(run_context.param_history || {}, ado_state, run_context);
       }
     });
   }
 
-  return { trials, param_history };
+  return trials;
 }
 
 export { createDelayDiscountingTimeline, makeChoiceStimulus, makeParamConvergenceSvg, makeDebriefStimulus };
