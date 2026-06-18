@@ -19,7 +19,7 @@ const PRIOR_DRAWS = 2000;
  * the next design. No Python, no network.
  *
  * @param {Object} options
- * @param {Object} options.model - Model adapter (params, prior, moduleUrl, buildData, choiceProbLL).
+ * @param {Object} options.model - Model adapter (params, prior, moduleUrl, buildData, responseProb).
  * @param {Object} options.grid_design - Candidate design grid for MI optimization.
  * @param {Object} [options.stan] - Sampler settings {num_chains, num_warmup, num_samples, seed}.
  * @param {string} [options.session_id] - Session identifier saved into the data.
@@ -183,7 +183,7 @@ function createStanAdoController({
     if (design_strategy === "random") {
       return sampleRandomDesigns(count);
     }
-    return selectOptimalDesigns(designs, draws, model.choiceProbLL, count, { rng: design_rng })
+    return selectOptimalDesigns(designs, draws, model.responseProb, count, { rng: design_rng })
       .map((pick) => pick.design);
   }
 

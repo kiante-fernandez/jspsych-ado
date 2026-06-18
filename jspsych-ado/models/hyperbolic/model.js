@@ -1,19 +1,15 @@
-// Hyperbolic delay-discounting model package (Mazur, 1987).
+// Hyperbolic discounting model package (Mazur, 1987).
 //
 // This adapter is the SINGLE SOURCE OF TRUTH for the model likelihood in JS. The
 // simulated participant (ado/ado_simulation.js) and the ADO mutual-information
-// engine (ado/mi_engine.js) both call choiceProbLL from here, and it must match
+// engine (ado/mi_engine.js) both call responseProb from here, and it must match
 // the likelihood in hyperbolic.stan. The prior block below must match the priors
 // in hyperbolic.stan. The compiled main.js / main.wasm are produced from
 // hyperbolic.stan by the stan-playground compile server (see models/README.md).
 //
-// This package is also the SINGLE SOURCE OF TRUTH for how the task is shown: the
-// `presentation` block below renders the SS/LL option cards and maps keys to the
-// generic timeline (jspsych-ado/ado/ado_timeline.js), which is stimulus-agnostic.
-//
 // Adding a new model = copy this folder, write the new <model>.stan, compile it,
-// and edit params/prior/buildData/choiceProbLL/presentation. The generic engine,
-// worker, controller, and timeline never change.
+// and edit params/prior/buildData/responseProb. Task presentation and design
+// grids live under jspsych-ado/tasks/.
 //
 // The compiled artifacts are kept under their downloaded names (main.js + main.wasm)
 // because the emscripten glue in main.js hardcodes its sibling "main.wasm"; the
@@ -53,7 +49,7 @@ function getHyperbolicValue(reward, delay, k) {
  * @param {Object} params - {k, tau}.
  * @returns {number} P(response = 1 = LL).
  */
-function choiceProbLL(design, params) {
+function responseProb(design, params) {
   const v_ss = getHyperbolicValue(design.r_ss, design.t_ss, params.k);
   const v_ll = getHyperbolicValue(design.r_ll, design.t_ll, params.k);
   return logistic(params.tau * (v_ll - v_ss));
@@ -99,80 +95,11 @@ function buildData(trials) {
 // page supplies the .dd-option-card CSS used by the markup below.
 // ---------------------------------------------------------------------------
 
-function formatDelay(delay) {
-  if (delay === 0) {
-    return "now";
-  }
-  if (delay === 1) {
-    return "1 week";
-  }
-  return `${delay} weeks`;
-}
-
-function formatReward(reward) {
-  return `$${Number(reward).toFixed(2).replace(".00", "")}`;
-}
-
-/**
- * Build the prompt HTML shown above the two option cards.
- *
- * @param {Object} design - {t_ss, t_ll, r_ss, r_ll}.
- * @returns {string} HTML stimulus for jsPsychHtmlButtonResponse.
- */
-function makeStimulus(design) {
-  return `<p style="font-size: 1.3rem; margin: 0 0 1.75rem;">Which would you prefer?</p>`;
-}
-
-/**
- * Build the HTML for one option card (index 0 = SS, 1 = LL).
- *
- * @param {Object} design - {t_ss, t_ll, r_ss, r_ll}.
- * @param {number} index - 0 for smaller-sooner, 1 for larger-later.
- * @returns {string} Button HTML for jsPsychHtmlButtonResponse.button_html.
- */
-function makeOptionCardHtml(design, index) {
-  const is_ss = index === 0;
-  const amount = is_ss ? design.r_ss : design.r_ll;
-  const delay = is_ss ? design.t_ss : design.t_ll;
-  const key_hint = is_ss ? "S" : "L";
-  const delay_text = delay === 0 ? "available now" : "available in " + formatDelay(delay);
-  return "<button class=\"dd-option-card\">"
-    + "<span class=\"dd-key-hint\">" + key_hint + "</span>"
-    + "<span class=\"dd-amount\">" + formatReward(amount) + "</span>"
-    + "<span class=\"dd-when\">" + delay_text + "</span>"
-    + "</button>";
-}
-
-/**
- * One-line offer description for the debug log.
- *
- * @param {string} label - "SS" or "LL".
- * @param {number} reward - Reward amount.
- * @param {number} delay - Delay in weeks.
- * @returns {string} e.g. "SS: $400 now" or "LL: $800 in 52 weeks".
- */
-function formatDebugOffer(label, reward, delay) {
-  const delay_label = formatDelay(delay);
-  const delay_text = delay_label === "now" ? delay_label : `in ${delay_label}`;
-  return `${label}: ${formatReward(reward)} ${delay_text}`;
-}
-
-const presentation = {
-  makeStimulus,
-  button_html: (design) => [makeOptionCardHtml(design, 0), makeOptionCardHtml(design, 1)],
-  // Physical key -> button index, so S/L select the SS/LL cards.
-  keymap: { s: 0, l: 1 },
-  prompt: "<p style=\"margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;\">Press <strong>S</strong> for Smaller-sooner &nbsp;·&nbsp; Press <strong>L</strong> for Larger-later</p>",
-  // Pretty offer lines for the debug console (falls back to key=value otherwise).
-  describeDesign: (design) => [
-    formatDebugOffer("SS", design.r_ss, design.t_ss),
-    formatDebugOffer("LL", design.r_ll, design.t_ll),
-  ],
-};
-
 const hyperbolicModel = {
   id: "hyperbolic",
   params: ["k", "tau"],
+  designKeys: ["t_ss", "t_ll", "r_ss", "r_ll"],
+  responseSpace: { type: "binary" },
   prior: {
     k: { dist: "lognormal", meanlog: -4, sdlog: 2 },
     tau: { dist: "lognormal", meanlog: 0, sdlog: 1 },
@@ -185,20 +112,15 @@ const hyperbolicModel = {
   // a Web Worker can dynamic-import() it regardless of the page's <base href>.
   moduleUrl: new URL("./main.js", import.meta.url).href,
   buildData,
-  choiceProbLL,
+  responseProb,
   subjectiveValues,
-  // Stimulus + response contract consumed by the generic timeline.
-  presentation,
-  choices: ["SS", "LL"],
-  response_labels: { 0: "SS", 1: "LL" },
 };
 
 export default hyperbolicModel;
 export {
-  choiceProbLL,
+  responseProb,
   getHyperbolicValue,
   logistic,
   buildData,
   subjectiveValues,
-  presentation,
 };

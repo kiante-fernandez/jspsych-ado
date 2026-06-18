@@ -1,7 +1,7 @@
 // Generic adaptive-design-optimization (ADO) math, shared by every model.
 //
 // This module is model-agnostic: it never references hyperbolic discounting,
-// k, or tau. A model supplies a `choiceProbLL(design, paramDraw)` likelihood and
+// k, or tau. A model supplies a `responseProb(design, paramDraw)` likelihood and
 // the engine computes mutual information (MI) over a candidate design grid from
 // posterior draws. Swapping the Stan model never requires editing this file.
 //
@@ -26,21 +26,21 @@ function binaryEntropy(p) {
  * Expected information gain (mutual information between the binary response and
  * the parameters) for one candidate design, estimated from posterior draws.
  *
- * MI(d) = H( mean_s p_s ) - mean_s H( p_s ), where p_s = choiceProbLL(d, draw_s).
+ * MI(d) = H( mean_s p_s ) - mean_s H( p_s ), where p_s = responseProb(d, draw_s).
  *
  * @param {Object} design - Candidate design (e.g. {t_ss, t_ll, r_ss, r_ll}).
  * @param {Array<Object>} draws - Posterior/prior draws, one object per draw.
- * @param {Function} choiceProbLL - Model likelihood: (design, draw) -> P(response=1).
+ * @param {Function} responseProb - Model likelihood: (design, draw) -> P(response=1).
  * @param {?Array<number>|?Float64Array} [weights] - Optional per-draw weights.
  * @returns {number} Estimated mutual information for the design (nats).
  */
-function mutualInfo(design, draws, choiceProbLL, weights = null) {
+function mutualInfo(design, draws, responseProb, weights = null) {
   const n = draws.length;
   if (weights) {
     let meanP = 0;
     let condEntropy = 0;
     for (let s = 0; s < n; s++) {
-      const p = choiceProbLL(design, draws[s]);
+      const p = responseProb(design, draws[s]);
       meanP += weights[s] * p;
       condEntropy += weights[s] * binaryEntropy(p);
     }
@@ -50,7 +50,7 @@ function mutualInfo(design, draws, choiceProbLL, weights = null) {
   let sumP = 0;
   let sumCondEntropy = 0;
   for (let s = 0; s < n; s++) {
-    const p = choiceProbLL(design, draws[s]);
+    const p = responseProb(design, draws[s]);
     sumP += p;
     sumCondEntropy += binaryEntropy(p);
   }
@@ -70,16 +70,16 @@ function mutualInfo(design, draws, choiceProbLL, weights = null) {
  * @param {Object} design - Selected candidate design.
  * @param {Array<Object>} draws - Posterior/prior draws.
  * @param {Float64Array} weights - Per-draw weights, mutated in place.
- * @param {Function} choiceProbLL - Model likelihood.
+ * @param {Function} responseProb - Model likelihood.
  * @param {Function} rng - Seeded uniform RNG in [0, 1).
  */
-function applyFantasyUpdate(design, draws, weights, choiceProbLL, rng) {
+function applyFantasyUpdate(design, draws, weights, responseProb, rng) {
   const n = draws.length;
   const p = new Float64Array(n);
   let meanP = 0;
 
   for (let s = 0; s < n; s++) {
-    p[s] = choiceProbLL(design, draws[s]);
+    p[s] = responseProb(design, draws[s]);
     meanP += weights[s] * p[s];
   }
 
@@ -140,13 +140,13 @@ function enumerateDesigns(grid_design) {
  *
  * @param {Array<Object>} designs - Candidate designs to score.
  * @param {Array<Object>} draws - Posterior/prior draws.
- * @param {Function} choiceProbLL - Model likelihood.
+ * @param {Function} responseProb - Model likelihood.
  * @param {number} [count=1] - Number of designs to return.
  * @param {Object} [options]
  * @param {Function} [options.rng] - Required when count > 1.
  * @returns {Array<{design: Object, mutual_info: number}>} Ordered design picks.
  */
-function selectOptimalDesigns(designs, draws, choiceProbLL, count = 1, options = {}) {
+function selectOptimalDesigns(designs, draws, responseProb, count = 1, options = {}) {
   const n = draws.length;
   const k = Math.min(count, designs.length);
   if (k > 1 && typeof options.rng !== "function") {
@@ -165,7 +165,7 @@ function selectOptimalDesigns(designs, draws, choiceProbLL, count = 1, options =
       if (used.has(i)) {
         continue;
       }
-      const mi = mutualInfo(designs[i], draws, choiceProbLL, j === 0 ? null : weights);
+      const mi = mutualInfo(designs[i], draws, responseProb, j === 0 ? null : weights);
       if (mi > best_mi) {
         best_mi = mi;
         best_index = i;
@@ -180,7 +180,7 @@ function selectOptimalDesigns(designs, draws, choiceProbLL, count = 1, options =
     picks.push({ design: designs[best_index], mutual_info: best_mi });
 
     if (j < k - 1) {
-      applyFantasyUpdate(designs[best_index], draws, weights, choiceProbLL, options.rng);
+      applyFantasyUpdate(designs[best_index], draws, weights, responseProb, options.rng);
     }
   }
 
@@ -194,11 +194,11 @@ function selectOptimalDesigns(designs, draws, choiceProbLL, count = 1, options =
  *
  * @param {Array<Object>} designs - Candidate designs to score.
  * @param {Array<Object>} draws - Posterior/prior draws.
- * @param {Function} choiceProbLL - Model likelihood.
+ * @param {Function} responseProb - Model likelihood.
  * @returns {{design: Object, mutual_info: number}} Best design and its MI.
  */
-function selectOptimalDesign(designs, draws, choiceProbLL) {
-  const picks = selectOptimalDesigns(designs, draws, choiceProbLL, 1);
+function selectOptimalDesign(designs, draws, responseProb) {
+  const picks = selectOptimalDesigns(designs, draws, responseProb, 1);
   return picks[0] || { design: null, mutual_info: -Infinity };
 }
 

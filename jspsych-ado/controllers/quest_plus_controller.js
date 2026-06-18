@@ -90,11 +90,11 @@ function clipProbability(value) {
  *
  * Quest+ uses a discrete stimulus domain and a discrete parameter grid. For the
  * current jsPsych-ADO design-grid shape, the stimulus domain is the index of one
- * enumerated design; the likelihood still comes from model.choiceProbLL.
+ * enumerated design; the likelihood still comes from model.responseProb.
  *
  * @param {Object} options
  * @param {Function} options.QuestPlus - jsQuestPlus class.
- * @param {Object} options.model - Model adapter (params, prior, choiceProbLL).
+ * @param {Object} options.model - Model adapter (params, prior, responseProb).
  * @param {Object|Array} options.grid_design - Candidate design grid.
  * @param {Object} options.quest_plus - Quest+ settings.
  * @param {Object} options.quest_plus.parameter_samples - {param: [sample, ...]}.
@@ -113,8 +113,8 @@ function createQuestPlusController({
   if (typeof QuestPlus !== "function") {
     throw new Error("createQuestPlusController: QuestPlus class is required");
   }
-  if (!model || !Array.isArray(model.params) || typeof model.choiceProbLL !== "function") {
-    throw new Error("createQuestPlusController: model must define params and choiceProbLL");
+  if (!model || !Array.isArray(model.params) || typeof model.responseProb !== "function") {
+    throw new Error("createQuestPlusController: model must define params and responseProb");
   }
   if (!quest_plus || !quest_plus.parameter_samples) {
     throw new Error("createQuestPlusController: quest_plus.parameter_samples is required");
@@ -157,7 +157,7 @@ function createQuestPlusController({
   }
 
   function probResponseOne(design_index, ...values) {
-    return clipProbability(model.choiceProbLL(designs[design_index], paramsFromValues(values)));
+    return clipProbability(model.responseProb(designs[design_index], paramsFromValues(values)));
   }
 
   function makePostSummary() {

@@ -3,13 +3,13 @@
 // This module is MODEL- AND STIMULUS-AGNOSTIC. It knows nothing about delay
 // discounting, dots, or any particular task. It wires together:
 //   - an ADO controller (start/update; mock or in-browser Stan), and
-//   - a model "presentation" spec that supplies the per-trial stimulus,
+//   - a task "presentation" spec that supplies the per-trial stimulus,
 // into the standard ADO loop: pick a design -> show it -> record the choice ->
 // re-infer + pick the next design. Everything task-specific (how a design is
 // rendered, which raw response maps to which binary outcome) is provided by the
-// registered model, so adding a model never requires editing this file.
+// registered task, so adding a model never requires editing this file.
 //
-// The presentation contract (supplied by the model, threaded through config):
+// The presentation contract (supplied by the task, threaded through config):
 //   - presentation.getChoiceTrials(ctx) -> Array<jsPsychTrial>
 //       Return the jsPsych trials shown for one choice. EXACTLY ONE of them must
 //       be the response-collecting trial built by one of the factories below
@@ -437,7 +437,7 @@ function appendPosteriorHistory(run_context, ado_result) {
 // Response-trial factories (the stimulus seam)
 // ---------------------------------------------------------------------------
 //
-// A model's presentation builds its choice trials from these. Each factory that
+// A task's presentation builds its choice trials from these. Each factory that
 // COLLECTS a response marks its trial with __ado_is_response and stores the raw
 // response index on data.__ado_response; the timeline then composes the ADO
 // finalize step (outcome mapping, design recording, posterior copy) on top.
@@ -598,7 +598,7 @@ function canvasResponse({ draw, getDesign, choices }, ctx) {
  *
  * The timeline depends only on the ADO controller contract (start() provides the
  * first design(s); update(trial_data) returns posterior summaries plus the next
- * design(s)) and on the model's presentation spec. It is independent of whether
+ * design(s)) and on the task's presentation spec. It is independent of whether
  * the controller is mock-backed or the in-browser Stan controller, and of how the
  * stimulus is drawn.
  *

@@ -18,7 +18,7 @@ const TEST_MODEL = {
     k: { dist: "lognormal", meanlog: -4, sdlog: 2 },
     tau: { dist: "lognormal", meanlog: 0, sdlog: 1 },
   },
-  choiceProbLL: (design, params) => logistic(params.tau * (design.value - params.k)),
+  responseProb: (design, params) => logistic(params.tau * (design.value - params.k)),
 };
 
 test("priorDensity supports the model-package prior families", () => {

@@ -13,7 +13,9 @@ import {
   prepareModels,
   registerModel,
   registerModelPackage,
+  registerTask,
   validateModel,
+  validateTask,
 } from "../../jspsych-ado/index.js";
 
 const STAN_CODE = `
@@ -58,6 +60,9 @@ const TESTLET_DESIGN_GRID = {
   r_ll: [200],
 };
 
+const DESIGN_KEYS = ["t_ss", "t_ll", "r_ss", "r_ll"];
+const RESPONSE_SPACE = { type: "binary" };
+
 const TO_STAN_DATA = (trials) => ({
   N: trials.length,
   y: trials.map((trial) => trial.response),
@@ -66,7 +71,7 @@ const TO_STAN_DATA = (trials) => ({
 // A minimal presentation that satisfies the timeline's single-button path.
 const TEST_PRESENTATION = { makeStimulus: () => "<p>choose</p>" };
 
-function linkProb(theta, design) {
+function responseProb(design, theta) {
   const gap = design.r_ll - design.r_ss - theta.k * design.t_ll;
   return 1 / (1 + Math.exp(-theta.tau * gap));
 }
@@ -112,15 +117,27 @@ function installFakeFetch() {
   };
 }
 
+function registerTestTask(name, overrides = {}) {
+  registerTask(name, {
+    id: name,
+    design_grid: DESIGN_GRID,
+    designKeys: DESIGN_KEYS,
+    responseSpace: RESPONSE_SPACE,
+    presentation: TEST_PRESENTATION,
+    choices: ["SS", "LL"],
+    response_labels: ["SS", "LL"],
+    ...overrides,
+  });
+}
+
 function registerTestModel(name, overrides = {}) {
   registerModel(name, {
     stanCode: STAN_CODE,
     params: ["k", "tau", "beta"],
-    design_grid: DESIGN_GRID,
-    linkProb,
+    designKeys: DESIGN_KEYS,
+    responseSpace: RESPONSE_SPACE,
+    responseProb,
     toStanData: TO_STAN_DATA,
-    response_labels: ["SS", "LL"],
-    presentation: TEST_PRESENTATION,
     ...overrides,
   });
 }
@@ -149,19 +166,20 @@ test("stanUrl registration derives priors after prepareModels fetches the source
   globalThis.jsPsychHtmlButtonResponse = "html-button-response";
 
   try {
+    registerTestTask("stan-url-task");
     registerModel("stan-url-model", {
       stanUrl: "/models/test-model.stan",
       params: ["k", "tau", "beta"],
-      design_grid: DESIGN_GRID,
-      linkProb,
+      designKeys: DESIGN_KEYS,
+      responseSpace: RESPONSE_SPACE,
+      responseProb,
       toStanData: TO_STAN_DATA,
-      response_labels: ["SS", "LL"],
-      presentation: TEST_PRESENTATION,
     });
 
     await prepareModels({ compileServer: "http://compile.test" });
 
     const timeline = createTimeline({}, {
+      task: "stan-url-task",
       model: "stan-url-model",
       n_trials: 1,
       stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 17 },
@@ -176,8 +194,6 @@ test("stanUrl registration derives priors after prepareModels fetches the source
     assert.equal(start_data.ado_mode, "stan");
     assert.equal(start_data.controller_mode, "stan");
     assert.equal(start_data.design_strategy, "ado");
-    // The generic timeline spreads the live ADO design into the choice row, so the
-    // design keys are present without the timeline knowing they are DD-shaped.
     const row = timeline[1].data();
     assert.equal(typeof row.t_ss, "number");
     assert.equal(row.r_ll, 200);
@@ -197,25 +213,17 @@ test("createTimeline composes on_finish: raw response -> outcome, full design, l
   globalThis.jsPsychHtmlButtonResponse = "html-button-response";
 
   try {
-    registerModel("data-flow-model", {
-      stanCode: STAN_CODE,
-      params: ["k", "tau", "beta"],
-      design_grid: DESIGN_GRID,
-      linkProb,
-      toStanData: TO_STAN_DATA,
-      response_labels: ["SS", "LL"],
-      presentation: TEST_PRESENTATION,
-      // Flip the raw button index so we can see responseToOutcome actually applied
-      // (this is the generic seam that the dots task will use).
+    registerTestTask("data-flow-task", {
       responseToOutcome: (_design, index) => 1 - index,
     });
+    registerTestModel("data-flow-model");
 
     await prepareModels({ compileServer: "http://compile.test" });
 
     const timeline = createTimeline({}, {
+      task: "data-flow-task",
       model: "data-flow-model",
       n_trials: 1,
-      task: "demo",
       stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 5 },
     });
 
@@ -226,7 +234,7 @@ test("createTimeline composes on_finish: raw response -> outcome, full design, l
     });
 
     const response_trial = timeline[1];
-    assert.equal(response_trial.data().task, "demo");
+    assert.equal(response_trial.data().task, "data-flow-task");
 
     const data = { response: 1 };
     response_trial.on_finish(data);
@@ -251,20 +259,13 @@ test("createTimeline forwards design strategy into the Stan controller", async (
   globalThis.jsPsychHtmlButtonResponse = "html-button-response";
 
   try {
-    registerModel("strategy-forwarding-model", {
-      stanCode: STAN_CODE,
-      params: ["k", "tau", "beta"],
-      design_grid: DESIGN_GRID,
-      linkProb,
-      toStanData: TO_STAN_DATA,
-      response_labels: ["SS", "LL"],
-      presentation: TEST_PRESENTATION,
-    });
-
+    registerTestTask("strategy-task");
+    registerTestModel("strategy-forwarding-model");
     await prepareModels({ compileServer: "http://compile.test" });
 
     assert.throws(
       () => createTimeline({}, {
+        task: "strategy-task",
         model: "strategy-forwarding-model",
         design_strategy: "unsupported",
       }),
@@ -272,6 +273,7 @@ test("createTimeline forwards design strategy into the Stan controller", async (
     );
 
     const timeline = createTimeline({}, {
+      task: "strategy-task",
       model: "strategy-forwarding-model",
       n_trials: 1,
       design_strategy: "random",
@@ -303,12 +305,14 @@ test("createTimeline schedules updates at testlet boundaries", async () => {
   globalThis.jsPsychHtmlButtonResponse = "html-button-response";
 
   try {
-    registerTestModel("testlet-structure-model", {
+    registerTestTask("testlet-structure-task", {
       design_grid: TESTLET_DESIGN_GRID,
     });
+    registerTestModel("testlet-structure-model");
     await prepareModels({ compileServer: "http://compile.test" });
 
     const timeline = createTimeline({}, {
+      task: "testlet-structure-task",
       model: "testlet-structure-model",
       n_trials: 5,
       testlet_size: 2,
@@ -334,17 +338,18 @@ test("createTimeline rejects a non-positive-integer testlet_size", async () => {
   globalThis.jsPsychHtmlButtonResponse = "html-button-response";
 
   try {
-    registerTestModel("testlet-validation-model", {
+    registerTestTask("testlet-validation-task", {
       design_grid: TESTLET_DESIGN_GRID,
     });
+    registerTestModel("testlet-validation-model");
     await prepareModels({ compileServer: "http://compile.test" });
 
     assert.throws(
-      () => createTimeline({}, { model: "testlet-validation-model", testlet_size: 0 }),
+      () => createTimeline({}, { task: "testlet-validation-task", model: "testlet-validation-model", testlet_size: 0 }),
       /positive integer/
     );
     assert.throws(
-      () => createTimeline({}, { model: "testlet-validation-model", testlet_size: 1.5 }),
+      () => createTimeline({}, { task: "testlet-validation-task", model: "testlet-validation-model", testlet_size: 1.5 }),
       /positive integer/
     );
   } finally {
@@ -353,6 +358,113 @@ test("createTimeline rejects a non-positive-integer testlet_size", async () => {
     delete globalThis.jsPsychCallFunction;
     delete globalThis.jsPsychHtmlButtonResponse;
   }
+});
+
+test("createTimeline requires known task and model", () => {
+  assert.throws(
+    () => createTimeline({}, { task: "missing-task", model: "missing-model" }),
+    /unknown task/
+  );
+
+  registerTestTask("known-task");
+  assert.throws(
+    () => createTimeline({}, { task: "known-task", model: "missing-model" }),
+    /unknown model/
+  );
+});
+
+test("createTimeline rejects incompatible task/model design keys and response spaces", () => {
+  registerTestTask("compat-task");
+  registerModel("missing-key-model", {
+    moduleUrl: "/compiled/main.js",
+    params: ["k"],
+    prior: { k: { dist: "lognormal", meanlog: -4, sdlog: 2 } },
+    designKeys: ["missing_key"],
+    responseSpace: RESPONSE_SPACE,
+    responseProb: () => 0.5,
+    buildData: (trials) => ({ N: trials.length, y: trials.map((t) => t.choice) }),
+  });
+
+  assert.throws(
+    () => createTimeline({}, { task: "compat-task", model: "missing-key-model" }),
+    /missing design key "missing_key"/
+  );
+
+  registerTestTask("categorical-task", {
+    responseSpace: { type: "categorical" },
+  });
+  registerModel("binary-model-for-mismatch", {
+    moduleUrl: "/compiled/main.js",
+    params: ["k", "tau", "beta"],
+    designKeys: DESIGN_KEYS,
+    responseSpace: RESPONSE_SPACE,
+    prior: {
+      k: { dist: "lognormal", meanlog: -4, sdlog: 2 },
+      tau: { dist: "normal", mean: 1, sd: 3 },
+      beta: { dist: "halfnormal", sd: 2 },
+    },
+    responseProb,
+    toStanData: TO_STAN_DATA,
+  });
+
+  assert.throws(
+    () => createTimeline({}, { task: "categorical-task", model: "binary-model-for-mismatch" }),
+    /responseSpace mismatch/
+  );
+});
+
+test("createTimeline checks every curated design row for required keys", () => {
+  registerTestTask("curated-bad-row-task", {
+    design_grid: [
+      { t_ss: 0, t_ll: 1, r_ss: 100, r_ll: 200 },
+      { t_ss: 0, t_ll: 2, r_ss: 100 },
+    ],
+  });
+  registerModel("curated-bad-row-model", {
+    moduleUrl: "/compiled/main.js",
+    params: ["k"],
+    prior: { k: { dist: "lognormal", meanlog: -4, sdlog: 2 } },
+    designKeys: DESIGN_KEYS,
+    responseSpace: RESPONSE_SPACE,
+    responseProb: () => 0.5,
+    buildData: (trials) => ({ N: trials.length, y: trials.map((t) => t.choice) }),
+  });
+
+  assert.throws(
+    () => createTimeline({}, { task: "curated-bad-row-task", model: "curated-bad-row-model" }),
+    /row 1 is missing design key "r_ll"/
+  );
+});
+
+test("createTimeline rejects bad responseProb and buildData probes", () => {
+  registerTestTask("probe-task");
+  registerModel("bad-response-prob-model", {
+    moduleUrl: "/compiled/main.js",
+    params: ["k"],
+    prior: { k: { dist: "lognormal", meanlog: -4, sdlog: 2 } },
+    designKeys: DESIGN_KEYS,
+    responseSpace: RESPONSE_SPACE,
+    responseProb: () => Number.NaN,
+    buildData: (trials) => ({ N: trials.length, y: trials.map((t) => t.choice) }),
+  });
+  registerModel("bad-build-data-model", {
+    moduleUrl: "/compiled/main.js",
+    params: ["k"],
+    prior: { k: { dist: "lognormal", meanlog: -4, sdlog: 2 } },
+    designKeys: DESIGN_KEYS,
+    responseSpace: RESPONSE_SPACE,
+    responseProb: () => 0.5,
+    buildData: () => ({ N: 1, y: [undefined] }),
+  });
+
+  assert.throws(
+    () => createTimeline({}, { task: "probe-task", model: "bad-response-prob-model" }),
+    /responseProb\(sampleDesign, sampleDraw\) returned NaN/
+  );
+  assert.throws(
+    () => createTimeline({}, { task: "probe-task", model: "bad-build-data-model" }),
+    /buildData probe returned undefined/
+  );
 });
 
 test("createAdoTimeline passes completed testlets as batches and refills designs", async () => {
@@ -453,7 +565,9 @@ test("buildAdapter reshapes flat {...design, choice} rows to {design, response} 
   const adapter = buildAdapter({
     name: "reshape-model",
     spec: {
-      linkProb,
+      responseProb,
+      designKeys: DESIGN_KEYS,
+      responseSpace: RESPONSE_SPACE,
       toStanData: (trials) => {
         seen.push(...trials);
         return { N: trials.length };
@@ -474,36 +588,68 @@ test("buildAdapter reshapes flat {...design, choice} rows to {design, response} 
     { design: { a: 3, b: 4 }, response: 0 },
   ]);
 
-  // choiceProbLL bridges the argument order: choiceProbLL(design, draw) === linkProb(draw, design).
   const design = { r_ss: 100, r_ll: 200, t_ll: 1 };
   const draw = { k: 0.01, tau: 1 };
-  assert.equal(adapter.choiceProbLL(design, draw), linkProb(draw, design));
+  assert.equal(adapter.responseProb(design, draw), responseProb(design, draw));
 });
 
-test("registerModel requires a presentation with getChoiceTrials or makeStimulus", () => {
+test("registerTask validates presentation while registerModel stays stats-only", () => {
   assert.throws(
-    () => registerModel("no-presentation", {
-      stanCode: STAN_CODE,
-      params: ["k"],
+    () => registerTask("no-presentation-task", {
       design_grid: DESIGN_GRID,
-      linkProb,
-      toStanData: TO_STAN_DATA,
+      designKeys: DESIGN_KEYS,
+      responseSpace: RESPONSE_SPACE,
       response_labels: ["SS", "LL"],
     }),
-    /missing required field "presentation"/
+    /presentation/
   );
 
   assert.throws(
-    () => registerModel("bad-presentation", {
+    () => registerTask("no-response-label-task", {
+      design_grid: DESIGN_GRID,
+      designKeys: DESIGN_KEYS,
+      responseSpace: RESPONSE_SPACE,
+      presentation: TEST_PRESENTATION,
+      choices: ["SS", "LL"],
+    }),
+    /response_labels/
+  );
+
+  assert.throws(
+    () => registerModel("missing-response-prob", {
       stanCode: STAN_CODE,
       params: ["k"],
-      design_grid: DESIGN_GRID,
-      linkProb,
+      designKeys: DESIGN_KEYS,
+      responseSpace: RESPONSE_SPACE,
       toStanData: TO_STAN_DATA,
-      response_labels: ["SS", "LL"],
-      presentation: {},
     }),
-    /getChoiceTrials\(ctx\) or makeStimulus\(design\)/
+    /responseProb/
+  );
+});
+
+test("registerModel rejects stale task-owned fields", () => {
+  const base = {
+    stanCode: STAN_CODE,
+    params: ["k"],
+    designKeys: DESIGN_KEYS,
+    responseSpace: RESPONSE_SPACE,
+    responseProb: () => 0.5,
+    toStanData: TO_STAN_DATA,
+  };
+
+  assert.throws(
+    () => registerModel("old-response-mapper", {
+      ...base,
+      responseToOutcome: () => 1,
+    }),
+    /responseToOutcome belongs on a task/
+  );
+  assert.throws(
+    () => registerModel("old-task-label", {
+      ...base,
+      task: "demo",
+    }),
+    /task belongs on a task/
   );
 });
 
@@ -512,11 +658,10 @@ test("moduleUrl registration requires an explicit prior", () => {
     () => registerModel("module-needs-prior", {
       moduleUrl: "/compiled/main.js",
       params: ["k"],
-      design_grid: DESIGN_GRID,
-      linkProb,
+      designKeys: DESIGN_KEYS,
+      responseSpace: RESPONSE_SPACE,
+      responseProb: () => 0.5,
       toStanData: TO_STAN_DATA,
-      response_labels: ["SS", "LL"],
-      presentation: TEST_PRESENTATION,
     }),
     /Pass an explicit `prior` when registering with `moduleUrl`/
   );
@@ -529,15 +674,21 @@ test("explicit prior overrides parsed priors", async () => {
   globalThis.jsPsychHtmlButtonResponse = "html-button-response";
 
   try {
-    registerTestModel("explicit-prior-model", {
+    registerTestTask("explicit-prior-task");
+    registerModel("explicit-prior-model", {
       stanCode: UNSUPPORTED_STAN_CODE,
       params: ["k"],
+      designKeys: DESIGN_KEYS,
+      responseSpace: RESPONSE_SPACE,
       prior: { k: { dist: "lognormal", meanlog: -4, sdlog: 2 } },
+      responseProb: () => 0.5,
+      toStanData: TO_STAN_DATA,
     });
 
     await prepareModels({ compileServer: "http://compile.test" });
 
     const timeline = createTimeline({}, {
+      task: "explicit-prior-task",
       model: "explicit-prior-model",
       n_trials: 1,
       stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 19 },
@@ -567,30 +718,45 @@ test("labelsToConfig maps arrays to response-index objects", () => {
   assert.equal(labelsToConfig(labels), labels);
 });
 
-// A complete model-package default export (the models/<name>/model.js shape).
 function makePackage(overrides = {}) {
   return {
     id: "pkg-model",
     params: ["k", "tau"],
+    designKeys: DESIGN_KEYS,
+    responseSpace: RESPONSE_SPACE,
     prior: {
       k: { dist: "lognormal", meanlog: -4, sdlog: 2 },
       tau: { dist: "normal", mean: 1, sd: 3 },
     },
     moduleUrl: "/compiled/main.js",
     buildData: (trials) => ({ N: trials.length, y: trials.map((t) => t.choice) }),
-    choiceProbLL: (design, draw) => linkProb(draw, design),
-    presentation: TEST_PRESENTATION,
-    choices: ["SS", "LL"],
-    response_labels: { 0: "SS", 1: "LL" },
+    responseProb,
     posterior_display: { k: { label: "k" }, tau: { label: "τ" } },
     ...overrides,
   };
 }
 
+test("validateTask flags missing task pieces", () => {
+  assert.equal(validateTask({
+    id: "task",
+    design_grid: DESIGN_GRID,
+    designKeys: DESIGN_KEYS,
+    responseSpace: RESPONSE_SPACE,
+    presentation: TEST_PRESENTATION,
+    choices: ["SS", "LL"],
+    response_labels: ["SS", "LL"],
+  }).valid, true);
+
+  const bad = validateTask({ id: "bad", design_grid: DESIGN_GRID });
+  assert.equal(bad.valid, false);
+  assert.ok(bad.problems.some((p) => p.level === "error" && /designKeys/.test(p.message)));
+  assert.ok(bad.problems.some((p) => p.level === "error" && /presentation/.test(p.message)));
+  assert.ok(bad.problems.some((p) => p.level === "error" && /response_labels/.test(p.message)));
+});
+
 test("validateModel flags missing pieces, missing priors, and unsampleable prior families", () => {
   assert.equal(validateModel(makePackage()).valid, true);
 
-  // Missing buildData / choiceProbLL / presentation -> errors.
   const bad = validateModel({
     id: "b",
     params: ["k"],
@@ -598,9 +764,14 @@ test("validateModel flags missing pieces, missing priors, and unsampleable prior
     moduleUrl: "/m/main.js",
   });
   assert.equal(bad.valid, false);
-  assert.ok(bad.problems.some((p) => p.level === "error" && /choiceProbLL/.test(p.message)));
+  assert.ok(bad.problems.some((p) => p.level === "error" && /responseProb/.test(p.message)));
   assert.ok(bad.problems.some((p) => p.level === "error" && /buildData/.test(p.message)));
-  assert.ok(bad.problems.some((p) => p.level === "error" && /presentation/.test(p.message)));
+  assert.ok(bad.problems.some((p) => p.level === "error" && /designKeys/.test(p.message)));
+
+  const stale = validateModel(makePackage({ responseToOutcome: () => 1, task: "demo" }));
+  assert.equal(stale.valid, false);
+  assert.ok(stale.problems.some((p) => p.level === "error" && /responseToOutcome/.test(p.message)));
+  assert.ok(stale.problems.some((p) => p.level === "error" && /task/.test(p.message)));
 
   // A prior the first-design sampler can't draw is a warning, not an error.
   const warned = validateModel(makePackage({ prior: { k: { dist: "gamma", alpha: 2, beta: 3 }, tau: { dist: "normal", mean: 0, sd: 1 } } }));
@@ -613,20 +784,17 @@ test("validateModel flags missing pieces, missing priors, and unsampleable prior
   assert.ok(missingPrior.problems.some((p) => p.level === "error" && /tau/.test(p.message)));
 });
 
-test("registerModelPackage rejects an invalid package and requires a design_grid", () => {
-  // Invalid package (no buildData/choiceProbLL) -> throws even though a grid is given.
+test("registerModelPackage rejects invalid packages and design_grid overrides", () => {
   assert.throws(
     () => registerModelPackage(
-      { id: "invalid-pkg", params: ["k"], prior: { k: { dist: "lognormal", meanlog: 0, sdlog: 1 } }, moduleUrl: "/m/main.js", presentation: TEST_PRESENTATION },
-      { design_grid: DESIGN_GRID }
+      { id: "invalid-pkg", params: ["k"], prior: { k: { dist: "lognormal", meanlog: 0, sdlog: 1 } }, moduleUrl: "/m/main.js" }
     ),
     /invalid model package/
   );
 
-  // Valid package but no design_grid anywhere -> throws.
   assert.throws(
-    () => registerModelPackage(makePackage({ id: "needs-grid" }), {}),
-    /design_grid is required/
+    () => registerModelPackage(makePackage({ id: "old-grid-pkg" }), { design_grid: DESIGN_GRID }),
+    /design_grid belongs on a task/
   );
 });
 
@@ -636,14 +804,16 @@ test("registerModelPackage forwards testlet_size as a timeline default", async (
   globalThis.jsPsychHtmlButtonResponse = "html-button-response";
 
   try {
-    const name = registerModelPackage(makePackage({ id: "pkg-testlet-default" }), {
+    registerTestTask("pkg-testlet-task", {
       design_grid: TESTLET_DESIGN_GRID,
+    });
+    const name = registerModelPackage(makePackage({ id: "pkg-testlet-default" }), {
       n_trials: 5,
       testlet_size: 2,
       stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 3 },
     });
 
-    const timeline = createTimeline({}, { model: name });
+    const timeline = createTimeline({}, { task: "pkg-testlet-task", model: name });
     const choices = timeline.filter((t) => t.type === "html-button-response");
     const calls = timeline.filter((t) => t.type === "call-function");
     assert.equal(choices.length, 5);
@@ -655,41 +825,39 @@ test("registerModelPackage forwards testlet_size as a timeline default", async (
   }
 });
 
-test("registerModelPackage registers a package and wires choiceProbLL(design, draw) in the right order", async () => {
+test("registerModelPackage registers a package and wires responseProb(design, draw)", async () => {
   const restoreWorker = installFakeWorker();
   globalThis.jsPsychCallFunction = "call-function";
   globalThis.jsPsychHtmlButtonResponse = "html-button-response";
 
   const seen = [];
   try {
+    registerTestTask("pkg-order-task");
     const pkg = makePackage({
       id: "pkg-order",
-      // Spy on the call so we can confirm the façade derives linkProb without
-      // swapping the argument order (design first, parameter draw second).
-      choiceProbLL: (design, draw) => {
+      responseProb: (design, draw) => {
         seen.push({ design, draw });
-        return linkProb(draw, design);
+        return responseProb(design, draw);
       },
     });
 
     const name = registerModelPackage(pkg, {
-      design_grid: DESIGN_GRID,
       n_trials: 1,
       stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 3 },
     });
     assert.equal(name, "pkg-order");
 
-    const timeline = createTimeline({}, { model: "pkg-order", task: "demo" });
+    const timeline = createTimeline({}, { task: "pkg-order-task", model: "pkg-order" });
     await new Promise((resolve, reject) => {
       timeline[0].func((d) => resolve(d));
       setTimeout(() => reject(new Error("timed out waiting for fake worker")), 100);
     });
 
-    assert.ok(seen.length > 0, "choiceProbLL should run during first-design selection");
+    assert.ok(seen.length > 0, "responseProb should run during compatibility or design selection");
     const { design, draw } = seen[0];
     assert.ok("r_ss" in design && "t_ll" in design, "first arg should be the design");
     assert.ok("k" in draw && "tau" in draw, "second arg should be the parameter draw");
-    assert.equal(timeline[1].data().task, "demo");
+    assert.equal(timeline[1].data().task, "pkg-order-task");
   } finally {
     restoreWorker();
     delete globalThis.jsPsychCallFunction;

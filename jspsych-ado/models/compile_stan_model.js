@@ -4,7 +4,7 @@
 // setup and return a ready-to-use model adapter — the same shape the committed
 // models/<name>/model.js files export:
 //
-//     { id, params, prior, moduleUrl, buildData, choiceProbLL }
+//     { id, params, designKeys, responseSpace, prior, moduleUrl, buildData, responseProb }
 //
 // It does NOT touch the engine, the worker (ado/stan_worker.js), or the
 // controller (controllers/stan_ado_controller.js). It only produces the adapter
@@ -28,7 +28,7 @@ const _moduleUrlCache = new Map(); // stanSource -> moduleUrl
 /**
  * Compile a .stan source string and return a model adapter for
  * createStanAdoController. Resolves once the compile server has produced the
- * module; the adapter's choiceProbLL / buildData / prior are supplied by you and
+ * module; the adapter's responseProb / buildData / prior are supplied by you and
  * must match the .stan likelihood and priors (same rule as a hand-written
  * models/<name>/model.js).
  *
@@ -36,28 +36,32 @@ const _moduleUrlCache = new Map(); // stanSource -> moduleUrl
  * @param {string}   opts.id            - Model id saved into the data (e.g. "exponential").
  * @param {string}   opts.stan          - Full .stan source as a string.
  * @param {string[]} opts.params        - Parameter names to summarize, e.g. ["r","tau"].
+ * @param {string[]} opts.designKeys    - Design fields consumed by the model.
+ * @param {Object}   opts.responseSpace - Currently {type:"binary"}.
  * @param {Object}   opts.prior         - { param: { dist, ... } }, MUST match the .stan priors.
  * @param {Function} opts.buildData     - (trials) => Stan data block. trials are
  *                                        {t_ss,t_ll,r_ss,r_ll,choice} rows.
- * @param {Function} opts.choiceProbLL  - (design, paramDraw) => P(response = 1 = LL),
+ * @param {Function} opts.responseProb  - (design, paramDraw) => P(response = 1 = LL),
  *                                        MUST match the .stan likelihood. Design first.
  * @param {string}  [opts.server]       - Compile server base URL. Default: Flatiron public
  *                                        server. Local server: "http://localhost:8083".
  * @param {string}  [opts.authToken]    - Bearer token for the compile endpoint.
- * @returns {Promise<Object>} Resolves to { id, params, prior, moduleUrl, buildData, choiceProbLL }.
+ * @returns {Promise<Object>} Resolves to the committed model-package shape.
  */
 async function compileStanModel({
   id,
   stan,
   params,
+  designKeys,
+  responseSpace,
   prior,
   buildData,
-  choiceProbLL,
+  responseProb,
   server = DEFAULT_SERVER,
   authToken = DEFAULT_TOKEN,
 } = {}) {
   // Validate the adapter pieces up front so a typo fails here, not deep in the worker.
-  for (const [key, value] of Object.entries({ id, stan, params, prior, buildData, choiceProbLL })) {
+  for (const [key, value] of Object.entries({ id, stan, params, designKeys, responseSpace, prior, buildData, responseProb })) {
     if (value == null) {
       throw new Error(`compileStanModel: missing required option "${key}".`);
     }
@@ -108,7 +112,7 @@ async function compileStanModel({
   }
 
   // Identical shape to models/<name>/model.js default export.
-  return { id, params, prior, moduleUrl, buildData, choiceProbLL };
+  return { id, params, designKeys, responseSpace, prior, moduleUrl, buildData, responseProb };
 }
 
 export { compileStanModel };

@@ -23,7 +23,7 @@ test("binaryEntropy is 0 at the endpoints and ln2 at 0.5", () => {
 });
 
 test("mutualInfo is ~0 when every draw answers a design the same way", () => {
-  // choiceProbLL ignores the draw and returns a near-deterministic response.
+  // responseProb ignores the draw and returns a near-deterministic response.
   const draws = [{ x: 1 }, { x: 2 }, { x: 3 }];
   const mi = mutualInfo({}, draws, () => 0.999);
   assert.ok(mi < 1e-3, `expected ~0 MI, got ${mi}`);
@@ -32,8 +32,8 @@ test("mutualInfo is ~0 when every draw answers a design the same way", () => {
 test("mutualInfo is maximal (ln2) when draws split a design 50/50 deterministically", () => {
   // Half the draws say p=1, half say p=0 -> marginal 0.5, conditional entropy 0.
   const draws = [{ s: 0 }, { s: 1 }, { s: 0 }, { s: 1 }];
-  const choiceProbLL = (_design, draw) => (draw.s === 1 ? 1 : 0);
-  const mi = mutualInfo({}, draws, choiceProbLL);
+  const responseProb = (_design, draw) => (draw.s === 1 ? 1 : 0);
+  const mi = mutualInfo({}, draws, responseProb);
   assert.ok(Math.abs(mi - LN2) < 1e-9, `expected ln2, got ${mi}`);
 });
 
@@ -61,8 +61,8 @@ test("selectOptimalDesign returns a valid grid member and prefers the discrimina
   const designs = enumerateDesigns({ d: [0, 1] });
   // Design d=0 is uninformative (all draws -> p=0.99); d=1 splits the draws.
   const draws = [{ s: 0 }, { s: 1 }, { s: 0 }, { s: 1 }];
-  const choiceProbLL = (design, draw) => (design.d === 0 ? 0.99 : draw.s === 1 ? 1 : 0);
-  const { design, mutual_info } = selectOptimalDesign(designs, draws, choiceProbLL);
+  const responseProb = (design, draw) => (design.d === 0 ? 0.99 : draw.s === 1 ? 1 : 0);
+  const { design, mutual_info } = selectOptimalDesign(designs, draws, responseProb);
   assert.deepEqual(design, { d: 1 });
   assert.ok(mutual_info > 0);
   assert.ok(designs.includes(design));
@@ -71,9 +71,9 @@ test("selectOptimalDesign returns a valid grid member and prefers the discrimina
 test("selectOptimalDesigns with count 1 matches selectOptimalDesign", () => {
   const designs = enumerateDesigns({ d: [0, 1] });
   const draws = [{ s: 0 }, { s: 1 }, { s: 0 }, { s: 1 }];
-  const choiceProbLL = (design, draw) => (design.d === 0 ? 0.99 : draw.s === 1 ? 1 : 0);
-  const single = selectOptimalDesign(designs, draws, choiceProbLL);
-  const [batch_one] = selectOptimalDesigns(designs, draws, choiceProbLL, 1);
+  const responseProb = (design, draw) => (design.d === 0 ? 0.99 : draw.s === 1 ? 1 : 0);
+  const single = selectOptimalDesign(designs, draws, responseProb);
+  const [batch_one] = selectOptimalDesigns(designs, draws, responseProb, 1);
   assert.deepEqual(batch_one.design, single.design);
   assert.equal(batch_one.mutual_info, single.mutual_info);
 });
@@ -86,23 +86,23 @@ test("selectOptimalDesigns returns distinct designs and avoids a redundant secon
     { a: 1, b: 1 },
   ];
   const designs = enumerateDesigns({ d: [0, 1, 2, 3] });
-  const choiceProbLL = (design, draw) => {
+  const responseProb = (design, draw) => {
     if (design.d === 0 || design.d === 1) return draw.a;
     if (design.d === 2) return draw.b;
     return 0.99;
   };
-  const picks = selectOptimalDesigns(designs, draws, choiceProbLL, 2, { rng: createSeededRng(3) });
+  const picks = selectOptimalDesigns(designs, draws, responseProb, 2, { rng: createSeededRng(3) });
   assert.deepEqual(picks.map((p) => p.design.d), [0, 2]);
 });
 
 test("selectOptimalDesigns requires an rng when count > 1 and caps at the grid size", () => {
   const designs = enumerateDesigns({ d: [0, 1] });
   const draws = [{ s: 0 }, { s: 1 }];
-  const choiceProbLL = (_design, draw) => (draw.s === 1 ? 1 : 0);
+  const responseProb = (_design, draw) => (draw.s === 1 ? 1 : 0);
 
-  assert.throws(() => selectOptimalDesigns(designs, draws, choiceProbLL, 2), /rng is required/);
+  assert.throws(() => selectOptimalDesigns(designs, draws, responseProb, 2), /rng is required/);
 
-  const picks = selectOptimalDesigns(designs, draws, choiceProbLL, 5, { rng: createSeededRng(9) });
+  const picks = selectOptimalDesigns(designs, draws, responseProb, 5, { rng: createSeededRng(9) });
   assert.equal(picks.length, 2);
   assert.equal(new Set(picks.map((p) => p.design.d)).size, 2);
 });

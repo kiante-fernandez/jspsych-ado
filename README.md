@@ -20,16 +20,16 @@ model's parameters; the next design is chosen by maximizing **mutual information
 over a candidate design grid. There is **no server and no Python**: everything runs
 client-side, so an experiment deploys as static assets (e.g. a JATOS component).
 
-You bring a **model** (a Stan likelihood + a small JS adapter); `jsPsychADO` turns it
-into an adaptive jsPsych timeline.
+You bring a **task** (design grid + presentation) and a **model** (Stan likelihood +
+small JS adapter); `jsPsychADO` checks that they are compatible and turns them into
+an adaptive jsPsych timeline.
 
 ## Status
 
 🚧 **In active development.** The in-browser engine and the delay-discounting example
 work and are covered by CI (unit tests + a real headless Worker/WASM smoke). Two
-things are still settling: the public API (separating *task* from *model* — see
-[#55](https://github.com/githubpsyche/jspsych-ado/issues/55)) and an
-npm/bundler-friendly package build (see
+things are still settling: the experiment API around future task/model/controller
+extensions and an npm/bundler-friendly package build (see
 [#57](https://github.com/githubpsyche/jspsych-ado/issues/57)). For now, use it by
 serving the repo (below) — it is not yet published to npm.
 
@@ -51,35 +51,36 @@ experiments/delay_discounting/index.html?controller=stan&strategy=ado&debug=1
 
 ## Usage
 
-An experiment is a thin consumer: register a model package, then ask the façade for
-the timeline.
+An experiment is a thin consumer: register a task package and a model package, then
+ask the façade for the timeline.
 
 ```js
 import { jsPsychADO } from "./jspsych-ado/index.js";
 import hyperbolic from "./jspsych-ado/models/hyperbolic/model.js";
+import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
 import { default_dd_config } from "./experiments/delay_discounting/dd_config.js";
 
 const jsPsych = initJsPsych();
 
+jsPsychADO.registerTask(delayDiscountingTask.id, delayDiscountingTask);
 jsPsychADO.registerModelPackage(hyperbolic, {
-  design_grid: default_dd_config.grid_design,
   stan:        default_dd_config.stan,
   n_trials:    default_dd_config.n_trials,
 });
 
-const ado = jsPsychADO.createTimeline(jsPsych, { model: "hyperbolic", task: "delay_discounting" });
+const ado = jsPsychADO.createTimeline(jsPsych, {
+  task: delayDiscountingTask.id,
+  model: hyperbolic.id,
+});
 jsPsych.run([ /* instructions, */ ...ado /*, end screen */ ]);
 ```
 
-> The interface is being simplified toward `createTimeline({ task, model })` with
-> separate **task** and **model** registries (and a compatibility check between them)
-> — see [#55](https://github.com/githubpsyche/jspsych-ado/issues/55).
-
 ### API
 
-- `registerModel(name, spec)` / `registerModelPackage(model, overrides)` — register a model.
+- `registerTask(name, spec)` — register task presentation, design grid, and response labels.
+- `registerModel(name, spec)` / `registerModelPackage(model, overrides)` — register a statistical model.
 - `prepareModels({ compileServer })` — compile any models registered from Stan source.
-- `createTimeline(jsPsych, config, run_context)` — build the adaptive timeline fragment.
+- `createTimeline(jsPsych, { task, model, ... }, run_context)` — validate and build the adaptive timeline fragment.
 
 ## How it works
 
@@ -98,19 +99,20 @@ controller is the entire abstraction; the timeline never sees Stan or WASM.
 
 - **`jspsych-ado/`** — the general, model- and stimulus-agnostic library (engine,
   worker, controllers, generic timeline, façade). It knows nothing about any task.
+- **`jspsych-ado/tasks/<name>/`** — a pluggable task package: design grid,
+  presentation, choices, response labels, and response mapping.
 - **`jspsych-ado/models/<name>/`** — a pluggable model package: a `model.js` adapter
-  (`params`, `prior`, `choiceProbLL`, `buildData`, `presentation`, …) plus its
-  compiled `.stan` artifacts.
+  (`params`, `prior`, `responseProb`, `buildData`, …) plus its compiled `.stan`
+  artifacts.
 - **`experiments/<name>/`** — thin consumers; `experiments/delay_discounting/` is the
   first example (the hyperbolic model).
 
-## Adding a model
+## Adding tasks and models
 
-Drop a package under `jspsych-ado/models/<name>/` and call `registerModel` — no edits
-to the engine, controller, or timeline. Walkthrough:
-[jspsych-ado/models/ADDING_A_MODEL.md](jspsych-ado/models/ADDING_A_MODEL.md). The Stan
-model compiles via the public stan-playground server (no local toolchain); steps in
-[jspsych-ado/models/README.md](jspsych-ado/models/README.md).
+Drop task packages under `jspsych-ado/tasks/<name>/` and model packages under
+`jspsych-ado/models/<name>/`. The engine, controller, and timeline stay generic.
+Model compilation steps are in [jspsych-ado/models/README.md](jspsych-ado/models/README.md);
+the task package contract is in [jspsych-ado/tasks/README.md](jspsych-ado/tasks/README.md).
 
 ## Development
 

@@ -7,7 +7,7 @@
 // (compiled with -sENVIRONMENT=web) in node by shimming `fetch` for file: URLs.
 // It exercises the full pipeline the browser uses minus the Web Worker: the
 // hyperbolic.stan model, buildData, paramName extraction, summarizeDraws, MI design
-// selection, and the (model-agnostic) simulator drawing from model.choiceProbLL.
+// selection, and the (model-agnostic) simulator drawing from model.responseProb.
 // All seeds are fixed, so the numbers below are deterministic across runs.
 //
 // Run:  node tests/js/stan_recovery.smoke.mjs
@@ -42,12 +42,13 @@ const { createSeededRng, simulateDelayDiscountingChoice } = await import(
   "../../jspsych-ado/ado/ado_simulation.js"
 );
 const { default_dd_config } = await import("../../experiments/delay_discounting/dd_config.js");
+const delayDiscountingTask = (await import("../../jspsych-ado/tasks/delay_discounting/task.js")).default;
 
 const createModule = (await import(hyp.moduleUrl)).default;
 const model = await StanModel.load(createModule, () => {});
 console.log("stan version:", model.stanVersion());
 
-const designs = enumerateDesigns(default_dd_config.grid_design);
+const designs = enumerateDesigns(delayDiscountingTask.design_grid);
 const sample_config = { ...default_dd_config.stan };
 
 /**
@@ -59,7 +60,7 @@ function runRecovery(trueParams, seed, nTrials) {
   const sim_rng = createSeededRng(seed + 1);
   const sim_config = { params: trueParams, rt: { choice: 0 } };
 
-  let { design } = selectOptimalDesign(designs, samplePriorDraws(hyp.prior, 2000, prior_rng), hyp.choiceProbLL);
+  let { design } = selectOptimalDesign(designs, samplePriorDraws(hyp.prior, 2000, prior_rng), hyp.responseProb);
   const trials = [];
   let summary = { post_mean: null, post_sd: null };
 
@@ -73,7 +74,7 @@ function runRecovery(trueParams, seed, nTrials) {
     const draws = fit.draws[ki].map((k, s) => ({ k, tau: fit.draws[ti][s] }));
 
     summary = summarizeDraws(draws, hyp.params);
-    ({ design } = selectOptimalDesign(designs, draws, hyp.choiceProbLL));
+    ({ design } = selectOptimalDesign(designs, draws, hyp.responseProb));
   }
   return summary;
 }

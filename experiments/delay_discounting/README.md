@@ -3,32 +3,34 @@
 An ADOpy-style delay discounting experiment whose adaptive inference runs entirely
 in the browser with a Stan model compiled to WebAssembly.
 
-This experiment is a **thin consumer** of the general [`jspsych-ado/`](../../jspsych-ado)
-package. `index.html` registers the hyperbolic model and asks the `jsPsychADO` façade
-to build the adaptive timeline:
+This experiment is a thin consumer of the general [`jspsych-ado/`](../../jspsych-ado)
+package. `index.html` registers a delay-discounting task, registers the hyperbolic
+model, and asks the `jsPsychADO` facade to build the adaptive timeline:
 
 ```js
 import { jsPsychADO } from "./jspsych-ado/index.js";
 import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
+import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
 
-jsPsychADO.registerModel("hyperbolic", { /* prior, params, design_grid, linkProb,
-  toStanData, presentation, choices, ... — all from the model package */ });
-const timeline = jsPsychADO.createTimeline(jsPsych, { model: "hyperbolic" }, run_context);
+jsPsychADO.registerTask(delayDiscountingTask.id, delayDiscountingTask);
+jsPsychADO.registerModelPackage(hyperbolicModel, { stan, n_trials, testlet_size });
+
+const timeline = jsPsychADO.createTimeline(jsPsych, {
+  task: delayDiscountingTask.id,
+  model: hyperbolicModel.id,
+}, run_context);
 ```
 
 What lives where:
 
 - **All adaptive machinery is in `jspsych-ado/`** — the MI engine, the in-browser
-  Stan controller + Web Worker, the generic timeline, and the façade. None of it is
-  delay-discounting-specific.
-- **The hyperbolic model package** (`jspsych-ado/models/hyperbolic/`) owns the
-  likelihood (`choiceProbLL`/`.stan`), the priors, and the **presentation** (the
-  SS/LL option cards, the S/L keymap, the prompt).
-- **This folder** holds only experiment-level config and the page:
-  - `dd_config.js` — `grid_design`, the `stan` sampler settings, and simulation config.
-  - `index.html` — registers the model and runs the timeline (`?controller=stan`
-    live inference, `?strategy=ado|random` design policy,
-    `?controller=mock` deterministic dev path, `?simulate=…` simulated participants).
+  Stan controller + Web Worker, the generic timeline, and the facade.
+- **The delay-discounting task package** owns the design grid, SS/LL option cards,
+  S/L keymap, response labels, and task id.
+- **The hyperbolic model package** owns the likelihood (`responseProb`/`.stan`),
+  priors, posterior display metadata, and Stan data builder.
+- **This folder** holds the page and run settings: sampler config, Quest+
+  parameter samples, trial count, testlet size, and simulation config.
 
 Response coding:
 

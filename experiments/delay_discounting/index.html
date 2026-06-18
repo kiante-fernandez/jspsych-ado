@@ -78,12 +78,13 @@
     <body></body>
     <script type="module">
         // The delay-discounting experiment is now a THIN CONSUMER of the general
-        // jspsych-ado package: it registers the hyperbolic model and builds the
+        // jspsych-ado package: it registers the task/model pair and builds the
         // adaptive timeline from package controllers. Nothing here is ADO-engine-
         // or timeline-specific; all of that lives in ../../jspsych-ado/.
         import QuestPlus from "./core/jsquest-plus/jsQuestPlus.module.js";
         import { jsPsychADO } from "./jspsych-ado/index.js";
         import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
+        import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
         import { createAdoTimeline, makeDebriefStimulus } from "./jspsych-ado/ado/ado_timeline.js";
         import { createMockAdoController } from "./jspsych-ado/controllers/mock_ado_controller.js";
         import { createQuestPlusController } from "./jspsych-ado/controllers/quest_plus_controller.js";
@@ -201,13 +202,12 @@
             } : null,
         };
 
-        // Register the hyperbolic model package with the façade. registerModelPackage
-        // takes the package's default export as-is (deriving linkProb from its
-        // choiceProbLL and using its native buildData/presentation/priors); the
-        // experiment only supplies what's experiment-level (the design grid, sampler
-        // settings, trial count). Adding another model is the same single call.
+        // Register the task/model pair with the façade. The task owns the design
+        // grid and SS/LL presentation; the model owns the likelihood, priors, and
+        // Stan data builder. Adding another compatible model is another model
+        // registration plus the same delayDiscountingTask.
+        jsPsychADO.registerTask(delayDiscountingTask.id, delayDiscountingTask);
         jsPsychADO.registerModelPackage(hyperbolicModel, {
-            design_grid: default_dd_config.grid_design,
             stan: default_dd_config.stan,
             n_trials: default_dd_config.n_trials,
             testlet_size: default_dd_config.testlet_size,
@@ -271,7 +271,7 @@
             // Dev path: drive the SAME generic timeline directly with the
             // deterministic mock controller (no WASM, no façade compile step).
             const mock_controller = createMockAdoController({
-                grid_design: default_dd_config.grid_design,
+                grid_design: delayDiscountingTask.design_grid,
                 params: hyperbolicModel.params,
                 n_trials: default_dd_config.n_trials,
                 testlet_size: default_dd_config.testlet_size,
@@ -279,10 +279,10 @@
             timeline = timeline.concat(createAdoTimeline(jsPsych, mock_controller, {
                 n_trials: default_dd_config.n_trials,
                 testlet_size: default_dd_config.testlet_size,
-                response_labels: default_dd_config.response_labels,
-                presentation: hyperbolicModel.presentation,
-                choices: hyperbolicModel.choices,
-                task: "delay_discounting",
+                response_labels: delayDiscountingTask.response_labels,
+                presentation: delayDiscountingTask.presentation,
+                choices: delayDiscountingTask.choices,
+                task: delayDiscountingTask.id,
             }, run_context));
         } else if (controller_mode === "quest_plus") {
             // Comparator path: Quest+ owns the discrete posterior and next-design
@@ -290,24 +290,24 @@
             const quest_plus_controller = createQuestPlusController({
                 QuestPlus: QuestPlus,
                 model: hyperbolicModel,
-                grid_design: default_dd_config.grid_design,
+                grid_design: delayDiscountingTask.design_grid,
                 quest_plus: default_dd_config.quest_plus,
                 session_id: session_id,
                 n_trials: default_dd_config.n_trials,
             });
             timeline = timeline.concat(createAdoTimeline(jsPsych, quest_plus_controller, {
                 n_trials: default_dd_config.n_trials,
-                response_labels: default_dd_config.response_labels,
-                presentation: hyperbolicModel.presentation,
-                choices: hyperbolicModel.choices,
-                task: "delay_discounting",
+                response_labels: delayDiscountingTask.response_labels,
+                presentation: delayDiscountingTask.presentation,
+                choices: delayDiscountingTask.choices,
+                task: delayDiscountingTask.id,
             }, run_context));
         } else {
             // Live path: the façade builds the in-browser Stan controller + timeline.
             timeline = timeline.concat(jsPsychADO.createTimeline(jsPsych, {
                 model: hyperbolicModel.id,
                 session_id: session_id,
-                task: "delay_discounting",
+                task: delayDiscountingTask.id,
                 design_strategy: design_strategy,
                 design_seed: run_config.controller ? run_config.controller.design_seed : null,
                 testlet_size: default_dd_config.testlet_size,

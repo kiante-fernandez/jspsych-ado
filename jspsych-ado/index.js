@@ -1,77 +1,108 @@
 // jspsych-ado/index.js — the jsPsychADO façade (package entry point).
 //
-// A thin façade that lets researchers register a model from a Stan SOURCE STRING
-// and a few JS callbacks, then build the timeline with a one-line call:
+// Researchers register two composable pieces:
+//   - a task:  design grid, presentation, choices, and response labels
+//   - a model: parameters, priors, likelihood, Stan data builder, and WASM module
 //
-//   jsPsychADO.registerModel("my-hyperbolic", { stanCode, params, design_grid,
-//                                                linkProb, toStanData, response_labels,
-//                                                presentation });
-//   await jsPsychADO.prepareModels({ compileServer: "https://compile.yourlab.org" });
-//   const dd = jsPsychADO.createTimeline(jsPsych, { model: "my-hyperbolic" });
-//   jsPsych.run([ ...dd ]);
-//
-// It does NOT modify the engine (ado/mi_engine.js), the worker (ado/stan_worker.js),
-// the controller (controllers/stan_ado_controller.js), or the generic timeline
-// (ado/ado_timeline.js). It only TRANSLATES the researcher-friendly spec into:
-//   - a model adapter   { id, params, prior, moduleUrl, buildData, choiceProbLL }
-//   - a controller via  createStanAdoController(...)
-//   - a timeline via    createAdoTimeline(...)
-//
-// Three things the façade reconciles, because the friendly spec and the engine
-// disagree on shape:
-//   1. linkProb(theta, design)  ->  choiceProbLL(design, draw)   (argument order)
-//   2. toStanData([{design,response}])  <-  engine passes flat {...design,choice} rows
-//   3. The engine needs a JS-side `prior` to pick the first design before any data.
-//      The snippet doesn't supply one, so we derive it from the Stan source (or you
-//      can pass an explicit `prior`, which always wins).
+// Then createTimeline validates the task/model pair and builds the standard ADO
+// timeline around the in-browser Stan controller.
 
 import { createStanAdoController } from "./controllers/stan_ado_controller.js";
 import { createAdoTimeline } from "./ado/ado_timeline.js";
+import { createSeededRng } from "./ado/ado_simulation.js";
+import { enumerateDesigns, samplePriorDraws } from "./ado/mi_engine.js";
 
 const DEFAULT_STAN = { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 };
 const DEFAULT_N_TRIALS = 42;
 const DEFAULT_TOKEN = "1234";
 
-const REGISTRY = new Map();        // name -> entry
+const MODEL_REGISTRY = new Map();  // name -> entry
+const TASK_REGISTRY = new Map();   // name -> task spec
 const _compileCache = new Map();   // stanCode -> moduleUrl (per page session)
+
+// ---------------------------------------------------------------------------
+// registerTask
+// ---------------------------------------------------------------------------
+
+/**
+ * Register a task. A task owns presentation and response coding; models only
+ * own the statistical likelihood and Stan data boundary.
+ *
+ * @param {string} name
+ * @param {Object} spec
+ * @param {Object|Array<Object>} spec.design_grid - Candidate designs.
+ * @param {string[]} spec.designKeys - Design keys the task provides.
+ * @param {Object} spec.responseSpace - Currently {type:"binary"}.
+ * @param {Object} spec.presentation - getChoiceTrials(ctx) OR makeStimulus(design).
+ * @param {string[]} [spec.choices] - Button/key labels in index order.
+ * @param {string[]|Object} spec.response_labels - ["SS","LL"] or {0:"SS",1:"LL"}.
+ * @param {Function} [spec.responseToOutcome] - (design, choiceIndex) => 0|1.
+ */
+function registerTask(name, spec) {
+  if (!name || typeof name !== "string") {
+    throw new Error("registerTask: a string name is required.");
+  }
+  const task_spec = { ...(spec || {}), id: spec && spec.id ? spec.id : name };
+  const { valid, problems } = validateTask(task_spec);
+  const errors = problems.filter((p) => p.level === "error");
+  if (errors.length) {
+    throw new Error(
+      `registerTask("${name}"): invalid task:\n  - ` +
+      errors.map((e) => e.message).join("\n  - ")
+    );
+  }
+  for (const w of problems.filter((p) => p.level === "warn")) {
+    console.warn(`registerTask("${name}"): ${w.message}`);
+  }
+  if (!valid) {
+    throw new Error(`registerTask("${name}"): invalid task.`);
+  }
+  if (TASK_REGISTRY.has(name)) {
+    console.warn(`registerTask: overwriting already-registered task "${name}".`);
+  }
+  TASK_REGISTRY.set(name, task_spec);
+}
 
 // ---------------------------------------------------------------------------
 // registerModel
 // ---------------------------------------------------------------------------
 
 /**
- * Register a model. Provide exactly one source: a Stan source string (`stanCode`),
- * a URL to a .stan file (`stanUrl`), or a precompiled module URL (`moduleUrl`).
+ * Register a statistical model. Provide exactly one source: a Stan source string
+ * (`stanCode`), a URL to a .stan file (`stanUrl`), or a precompiled module URL
+ * (`moduleUrl`).
  *
  * @param {string} name
  * @param {Object} spec
  * @param {string}   [spec.stanCode]      - Full .stan source as a string.
- * @param {string}   [spec.stanUrl]       - URL to a .stan file (fetched in prepareModels).
- * @param {string}   [spec.moduleUrl]     - Precompiled main.js URL (skips compilation).
- * @param {Array}    spec.params          - ["log_k","tau"] or [{name,scale,role,lower}, ...].
- * @param {Object}   [spec.prior]         - Optional explicit JS prior; overrides Stan-derived.
- * @param {Object}   spec.design_grid     - Candidate grid {t_ss,t_ll,r_ss,r_ll} arrays.
- * @param {Function} spec.linkProb        - (theta, design) => P(LL).
- * @param {Function} [spec.toStanData]    - (trials:[{design,response}]) => Stan data block.
- *                                          The friendly shape for inline/source models.
- * @param {Function} [spec.buildData]     - (trials:[{...design,choice}]) => Stan data block.
- *                                          A model package's native builder; used as-is
- *                                          (no reshape). Provide this OR toStanData.
- * @param {Object}   spec.presentation    - Stimulus spec for the generic timeline:
- *                                          getChoiceTrials(ctx) OR makeStimulus(design)
- *                                          (+ optional button_html/keymap/prompt/describeDesign).
- * @param {string[]} [spec.choices]       - Button/key labels in index order (e.g. ["SS","LL"]).
- * @param {Function} [spec.responseToOutcome] - (design, choiceIndex) => 0|1. Default identity.
- * @param {Object}   [spec.posterior_display] - Per-parameter chart labels/ranges for debug.
- * @param {string[]|Object} spec.response_labels - ["SS","LL"] or {0:"SS",1:"LL"}.
- * @param {string}   [spec.task]          - Task label saved into each data row.
- * @param {Object}   [spec.stan]          - Default sampler settings for this model.
- * @param {number}   [spec.n_trials]      - Default trial count for this model.
- * @param {number}   [spec.testlet_size]  - Default choice trials between Stan refits.
+ * @param {string}   [spec.stanUrl]       - URL to a .stan file.
+ * @param {string}   [spec.moduleUrl]     - Precompiled main.js URL.
+ * @param {Array}    spec.params          - ["k","tau"] or [{name,lower}, ...].
+ * @param {Object}   [spec.prior]         - Optional explicit JS prior.
+ * @param {string[]} spec.designKeys      - Design fields consumed by the model.
+ * @param {Object}   spec.responseSpace   - Currently {type:"binary"}.
+ * @param {Function} spec.responseProb    - (design, draw) => P(outcome = 1).
+ * @param {Function} [spec.toStanData]    - (trials:[{design,response}]) => Stan data.
+ * @param {Function} [spec.buildData]     - (trials:[{...design,choice}]) => Stan data.
+ * @param {Object}   [spec.posterior_display] - Per-parameter chart labels/ranges.
+ * @param {Object}   [spec.stan]          - Default sampler settings.
+ * @param {number}   [spec.n_trials]      - Default trial count.
+ * @param {number}   [spec.testlet_size]  - Default choice trials between refits.
  */
 function registerModel(name, spec) {
   if (!name || typeof name !== "string") {
     throw new Error("registerModel: a string name is required.");
+  }
+  if (!spec || typeof spec !== "object") {
+    throw new Error(`registerModel("${name}"): spec must be an object.`);
+  }
+  for (const k of ["design_grid", "presentation", "choices", "response_labels", "responseToOutcome", "task"]) {
+    if (spec[k] != null) {
+      throw new Error(`registerModel("${name}"): ${k} belongs on a task; register it with registerTask(...).`);
+    }
+  }
+  if (spec.linkProb != null) {
+    throw new Error(`registerModel("${name}"): linkProb has been renamed to responseProb.`);
   }
   const sources = ["stanCode", "stanUrl", "moduleUrl"].filter((k) => spec[k] != null);
   if (sources.length !== 1) {
@@ -79,7 +110,7 @@ function registerModel(name, spec) {
       `registerModel("${name}"): provide exactly one of stanCode | stanUrl | moduleUrl (got ${sources.length}).`
     );
   }
-  for (const k of ["params", "design_grid", "linkProb", "response_labels", "presentation"]) {
+  for (const k of ["params", "designKeys", "responseSpace", "responseProb"]) {
     if (spec[k] == null) throw new Error(`registerModel("${name}"): missing required field "${k}".`);
   }
   if (spec.toStanData == null && spec.buildData == null) {
@@ -87,12 +118,22 @@ function registerModel(name, spec) {
       `registerModel("${name}"): provide toStanData([{design,response}]) or buildData([{...design,choice}]).`
     );
   }
-  if (typeof spec.presentation.getChoiceTrials !== "function" && typeof spec.presentation.makeStimulus !== "function") {
-    throw new Error(
-      `registerModel("${name}"): presentation must provide getChoiceTrials(ctx) or makeStimulus(design).`
-    );
+  if (!Array.isArray(spec.params) || spec.params.length === 0) {
+    throw new Error(`registerModel("${name}"): params must be a non-empty array.`);
   }
-  if (REGISTRY.has(name)) {
+  if (!spec.params.every((p) => typeof p === "string" || (p && typeof p.name === "string"))) {
+    throw new Error(`registerModel("${name}"): params entries must be strings or objects with a name.`);
+  }
+  if (!Array.isArray(spec.designKeys) || spec.designKeys.length === 0) {
+    throw new Error(`registerModel("${name}"): designKeys must be a non-empty array.`);
+  }
+  if (!spec.responseSpace || typeof spec.responseSpace.type !== "string") {
+    throw new Error(`registerModel("${name}"): responseSpace.type must be a string.`);
+  }
+  if (typeof spec.responseProb !== "function") {
+    throw new Error(`registerModel("${name}"): responseProb(design, draw) must be a function.`);
+  }
+  if (MODEL_REGISTRY.has(name)) {
     console.warn(`registerModel: overwriting already-registered model "${name}".`);
   }
 
@@ -108,8 +149,11 @@ function registerModel(name, spec) {
       `registering with \`moduleUrl\`, because no Stan source is available to parse.`
     );
   }
+  if (prior) {
+    requirePriorCoverage(prior, paramNames, `registerModel("${name}")`);
+  }
 
-  REGISTRY.set(name, {
+  MODEL_REGISTRY.set(name, {
     name,
     spec,
     paramNames,
@@ -128,12 +172,11 @@ function registerModel(name, spec) {
  * are skipped. Compiled module URLs are cached by source within the page session.
  *
  * @param {Object} opts
- * @param {string} opts.compileServer - Base URL of a Stan-to-WASM compile server
- *   (e.g. "https://stan-wasm.flatironinstitute.org" or "http://localhost:8083").
+ * @param {string} opts.compileServer - Base URL of a Stan-to-WASM compile server.
  * @param {string} [opts.authToken]   - Bearer token for the compile endpoint.
  */
 async function prepareModels({ compileServer, authToken = DEFAULT_TOKEN } = {}) {
-  for (const entry of REGISTRY.values()) {
+  for (const entry of MODEL_REGISTRY.values()) {
     if (entry.moduleUrl) continue; // precompiled or already prepared
 
     const { spec } = entry;
@@ -155,6 +198,7 @@ async function prepareModels({ compileServer, authToken = DEFAULT_TOKEN } = {}) 
     if (!entry.prior) {
       entry.prior = parseStanPriors(stanCode, spec.params);
     }
+    requirePriorCoverage(entry.prior, entry.paramNames, `prepareModels("${entry.name}")`);
 
     let moduleUrl = _compileCache.get(stanCode);
     if (!moduleUrl) {
@@ -170,26 +214,31 @@ async function prepareModels({ compileServer, authToken = DEFAULT_TOKEN } = {}) 
 // ---------------------------------------------------------------------------
 
 /**
- * Build the adaptive timeline fragment for a registered model (any task).
+ * Build the adaptive timeline fragment for a registered task/model pair.
  *
  * @param {Object} jsPsych
  * @param {Object} config
- * @param {string} config.model        - A registered model name.
- * @param {string} [config.task]       - Task label saved into each data row.
- * @param {Object} [config.stan]       - Sampler overrides {num_chains,num_warmup,num_samples,seed}.
- * @param {number} [config.n_trials]   - Trial count override.
+ * @param {string} config.task        - A registered task name.
+ * @param {string} config.model       - A registered model name.
+ * @param {Object} [config.stan]      - Sampler overrides.
+ * @param {number} [config.n_trials]  - Trial count override.
  * @param {number} [config.testlet_size] - Choice trials shown between Stan refits.
  * @param {string} [config.session_id] - Session id saved into the data.
- * @param {string} [config.design_strategy="ado"] - "ado" for MI-selected
- *   designs, "random" for a recovery/dev baseline sampled from the same grid.
- * @param {?number} [config.design_seed] - Optional seed for prior/random design selection.
- * @param {Object} [run_context]       - Passed through to the timeline (e.g. {debug:true}).
- * @returns {Array} jsPsych timeline fragment (spreadable into jsPsych.run).
+ * @param {string} [config.design_strategy="ado"] - "ado" or "random".
+ * @param {?number} [config.design_seed] - Optional design-selection seed.
+ * @param {Object} [run_context]      - Passed through to the timeline.
+ * @returns {Array} jsPsych timeline fragment.
  */
 function createTimeline(jsPsych, config = {}, run_context = {}) {
-  const entry = REGISTRY.get(config.model);
+  const task = TASK_REGISTRY.get(config.task);
+  if (!task) {
+    const known = [...TASK_REGISTRY.keys()].map((n) => `"${n}"`).join(", ") || "none";
+    throw new Error(`createTimeline: unknown task "${config.task}". Registered: ${known}.`);
+  }
+
+  const entry = MODEL_REGISTRY.get(config.model);
   if (!entry) {
-    const known = [...REGISTRY.keys()].map((n) => `"${n}"`).join(", ") || "none";
+    const known = [...MODEL_REGISTRY.keys()].map((n) => `"${n}"`).join(", ") || "none";
     throw new Error(`createTimeline: unknown model "${config.model}". Registered: ${known}.`);
   }
   if (!entry.moduleUrl) {
@@ -199,13 +248,16 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
       `or register it with a precompiled \`moduleUrl\`.`
     );
   }
+
   const adapter = buildAdapter(entry);
+  validateTaskModelPair(task, adapter, config.task, config.model);
+
   const spec = entry.spec;
-  const grid_design = spec.design_grid;
+  const grid_design = task.design_grid;
   const stan = { ...DEFAULT_STAN, ...spec.stan, ...config.stan };
   const n_trials = config.n_trials ?? spec.n_trials ?? DEFAULT_N_TRIALS;
   const testlet_size = normalizeTestletSize(config.testlet_size ?? spec.testlet_size);
-  const response_labels = labelsToConfig(spec.response_labels);
+  const response_labels = labelsToConfig(task.response_labels);
 
   const controller = createStanAdoController({
     model: adapter,
@@ -218,16 +270,14 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
     design_seed: config.design_seed ?? null,
   });
 
-  // The generic timeline reads the model's presentation, choices, and (optional)
-  // responseToOutcome; everything stimulus-specific lives in the model package.
   const timeline_config = {
     n_trials,
     testlet_size,
     response_labels,
-    presentation: spec.presentation,
-    choices: spec.choices,
-    responseToOutcome: spec.responseToOutcome,
-    task: config.task ?? spec.task ?? adapter.id,
+    presentation: task.presentation,
+    choices: task.choices,
+    responseToOutcome: task.responseToOutcome,
+    task: task.id ?? config.task,
   };
 
   return createAdoTimeline(jsPsych, controller, timeline_config, {
@@ -255,10 +305,10 @@ function normalizeTestletSize(value) {
 }
 
 // Turn a registry entry into the engine's model adapter shape, bridging the
-// argument-order / trial-shape mismatches between the friendly spec and the engine.
+// trial-shape mismatch between inline source models and the engine.
 function buildAdapter(entry) {
   const { spec, name, paramNames, prior, moduleUrl } = entry;
-  const { linkProb, toStanData, buildData } = spec;
+  const { responseProb, toStanData, buildData } = spec;
 
   // The engine pushes flat rows {...design, choice} (any design keys). A model
   // package's native buildData already reads that shape, so use it as-is. The
@@ -272,9 +322,10 @@ function buildAdapter(entry) {
     params: paramNames,
     prior,
     moduleUrl,
+    designKeys: spec.designKeys,
+    responseSpace: spec.responseSpace,
     buildData: adaptedBuildData,
-    // Engine calls choiceProbLL(design, draw); the researcher wrote linkProb(theta, design).
-    choiceProbLL: (design, draw) => linkProb(draw, design),
+    responseProb,
   };
 }
 
@@ -286,11 +337,114 @@ function labelsToConfig(labels) {
   return labels;
 }
 
+function requirePriorCoverage(prior, paramNames, context) {
+  if (!prior || typeof prior !== "object") {
+    throw new Error(`${context}: prior must be an object mapping each parameter to a {dist, ...} spec.`);
+  }
+  for (const param of paramNames) {
+    if (!prior[param] || typeof prior[param] !== "object") {
+      throw new Error(`${context}: prior for "${param}" is missing.`);
+    }
+  }
+}
+
+function validateTaskModelPair(task, model, taskName, modelName) {
+  const problems = [];
+  const task_keys = new Set(task.designKeys || []);
+  for (const key of model.designKeys || []) {
+    if (!task_keys.has(key)) {
+      problems.push(`missing design key "${key}"`);
+    }
+  }
+
+  const task_type = task.responseSpace && task.responseSpace.type;
+  const model_type = model.responseSpace && model.responseSpace.type;
+  if (task_type !== model_type) {
+    problems.push(`responseSpace mismatch: task has "${task_type}", model has "${model_type}"`);
+  } else if (task_type !== "binary") {
+    problems.push(`responseSpace type "${task_type}" is not supported yet`);
+  }
+
+  let sample_design = null;
+  try {
+    const designs = enumerateDesigns(task.design_grid);
+    sample_design = designs[0] || null;
+    if (!sample_design) {
+      problems.push("task design_grid produced no candidate designs");
+    } else {
+      const required_keys = new Set([...(task.designKeys || []), ...(model.designKeys || [])]);
+      const seen_missing = new Set();
+      designs.forEach((design, index) => {
+        for (const key of required_keys) {
+          if (!(key in design) && !seen_missing.has(key)) {
+              problems.push(`task design_grid row ${index} is missing design key "${key}"`);
+              seen_missing.add(key);
+          }
+        }
+      });
+    }
+  } catch (e) {
+    problems.push(`task design_grid could not be enumerated: ${String((e && e.message) || e)}`);
+  }
+
+  let sample_draw = null;
+  if (sample_design) {
+    try {
+      sample_draw = samplePriorDraws(model.prior, 1, createSeededRng(8675309))[0];
+      const p = model.responseProb(sample_design, sample_draw);
+      if (typeof p !== "number" || !Number.isFinite(p) || p < 0 || p > 1) {
+        problems.push(`responseProb(sampleDesign, sampleDraw) returned ${p}; expected a probability in [0, 1]`);
+      }
+    } catch (e) {
+      problems.push(`responseProb probe failed: ${String((e && e.message) || e)}`);
+    }
+
+    try {
+      const stan_data = model.buildData([{ ...sample_design, choice: 1 }]);
+      if (!stan_data || typeof stan_data !== "object") {
+        problems.push("buildData probe did not return a Stan data object");
+      } else {
+        const undefined_path = findUndefined(stan_data);
+        if (undefined_path) {
+          problems.push(`buildData probe returned undefined at ${undefined_path}`);
+        }
+      }
+    } catch (e) {
+      problems.push(`buildData probe failed: ${String((e && e.message) || e)}`);
+    }
+  }
+
+  if (problems.length) {
+    throw new Error(
+      `model "${modelName}" is incompatible with task "${taskName}": ` +
+      problems.join("; ")
+    );
+  }
+}
+
+function findUndefined(value, path = "data") {
+  if (value === undefined) {
+    return path;
+  }
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      const found = findUndefined(value[i], `${path}[${i}]`);
+      if (found) {
+        return found;
+      }
+    }
+  } else if (value && typeof value === "object") {
+    for (const [key, child] of Object.entries(value)) {
+      const found = findUndefined(child, `${path}.${key}`);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
+}
+
 // POST a Stan source string to the compile server and return the main.js URL.
-// main.js loads its sibling main.wasm relative to its own URL, so pointing the
-// adapter's moduleUrl at the server's main.js needs no committing and no worker
-// changes. Mirrors models/compile_stan_model.js. Assumes /compile returns
-// {model_id} synchronously (as the documented curl does).
 async function compileToModuleUrl(stanCode, server, authToken) {
   const base = server.replace(/\/+$/, "");
 
@@ -320,11 +474,7 @@ async function compileToModuleUrl(stanCode, server, authToken) {
   return `${base}/download/${model_id}/main.js`;
 }
 
-// Derive the engine's JS prior {param:{dist,...}} from the Stan source. Deliberately
-// limited: it reads `param ~ dist(args);` sampling statements and supports normal,
-// lognormal, and (for <lower=0> params) normal-as-half-normal. Anything else throws
-// with a clear message asking for an explicit `prior`. This keeps the friendly path
-// working without ever silently inventing a wrong prior.
+// Derive the engine's JS prior {param:{dist,...}} from the Stan source.
 function parseStanPriors(stanCode, paramSpecs) {
   const prior = {};
 
@@ -379,24 +529,65 @@ function parseStanPriors(stanCode, paramSpecs) {
 }
 
 // ---------------------------------------------------------------------------
-// One-call registration for a committed model package
+// Validation and one-call registration for committed packages
 // ---------------------------------------------------------------------------
 
-// Prior families the JS first-design sampler (mi_engine.samplePriorValue) can draw.
 const SAMPLEABLE_PRIOR_DISTS = new Set(["lognormal", "normal", "halfnormal"]);
 
 /**
- * Validate a model-package default export (the shape under models/<name>/model.js)
- * before it is registered, so contributors fail fast with a clear message instead
- * of debugging a silent argument-order or shape bug deep in the worker.
+ * Validate a task package before registration.
  *
- * Static by default; pass a {sampleDesign, sampleDraw} to also probe choiceProbLL
- * and buildData at runtime.
+ * @param {Object} task - Task package default export.
+ * @returns {{valid: boolean, problems: Array<{level: "error"|"warn", message: string}>}}
+ */
+function validateTask(task) {
+  const problems = [];
+  const err = (message) => problems.push({ level: "error", message });
+  const warn = (message) => problems.push({ level: "warn", message });
+
+  if (!task || typeof task !== "object") {
+    return { valid: false, problems: [{ level: "error", message: "validateTask: task must be an object." }] };
+  }
+  if (typeof task.id !== "string" || !task.id) err("`id` must be a non-empty string.");
+  if (task.design_grid == null) err("`design_grid` is required.");
+  if (!Array.isArray(task.designKeys) || task.designKeys.length === 0) {
+    err("`designKeys` must be a non-empty array.");
+  }
+  if (!task.responseSpace || typeof task.responseSpace.type !== "string") {
+    err("`responseSpace.type` must be a string.");
+  }
+
+  const presentation = task.presentation;
+  if (!presentation || (typeof presentation.getChoiceTrials !== "function" && typeof presentation.makeStimulus !== "function")) {
+    err("`presentation` must provide getChoiceTrials(ctx) or makeStimulus(design).");
+  }
+  if (task.response_labels == null) err("`response_labels` is required.");
+  if (task.choices == null && presentation && typeof presentation.makeStimulus === "function") {
+    warn("`choices` is missing; the single-button presentation path needs choices in index order.");
+  }
+
+  if (task.design_grid != null) {
+    try {
+      const designs = enumerateDesigns(task.design_grid);
+      if (designs.length === 0) {
+        err("`design_grid` produced no candidate designs.");
+      }
+    } catch (e) {
+      err(`design_grid could not be enumerated: ${String((e && e.message) || e)}.`);
+    }
+  }
+
+  const valid = !problems.some((pr) => pr.level === "error");
+  return { valid, problems };
+}
+
+/**
+ * Validate a model-package default export (the shape under models/<name>/model.js).
  *
  * @param {Object} model - The model package default export.
  * @param {Object} [opts]
- * @param {Object} [opts.sampleDesign] - A design to probe choiceProbLL/buildData with.
- * @param {Object} [opts.sampleDraw]   - A parameter draw to probe choiceProbLL with.
+ * @param {Object} [opts.sampleDesign] - A design to probe responseProb/buildData with.
+ * @param {Object} [opts.sampleDraw]   - A parameter draw to probe responseProb with.
  * @returns {{valid: boolean, problems: Array<{level: "error"|"warn", message: string}>}}
  */
 function validateModel(model, opts = {}) {
@@ -408,7 +599,6 @@ function validateModel(model, opts = {}) {
     return { valid: false, problems: [{ level: "error", message: "validateModel: model must be an object (the model package default export)." }] };
   }
 
-  const id = typeof model.id === "string" && model.id ? model.id : "<model>";
   if (typeof model.id !== "string" || !model.id) err("`id` must be a non-empty string.");
 
   const params = Array.isArray(model.params) ? model.params : null;
@@ -418,16 +608,19 @@ function validateModel(model, opts = {}) {
   if (typeof model.moduleUrl !== "string" || !model.moduleUrl) {
     err("`moduleUrl` must be the compiled module URL (e.g. new URL(\"./main.js\", import.meta.url).href).");
   }
-  if (typeof model.buildData !== "function") err("`buildData(trials)` must be a function.");
-  if (typeof model.choiceProbLL !== "function") err("`choiceProbLL(design, draw)` must be a function.");
-
-  const presentation = model.presentation;
-  if (!presentation || (typeof presentation.getChoiceTrials !== "function" && typeof presentation.makeStimulus !== "function")) {
-    err("`presentation` must provide getChoiceTrials(ctx) or makeStimulus(design).");
+  if (!Array.isArray(model.designKeys) || model.designKeys.length === 0) {
+    err("`designKeys` must be a non-empty array.");
   }
-  if (model.response_labels == null) warn("`response_labels` is missing; recorded responses will have no human labels.");
-  if (model.choices == null && presentation && typeof presentation.makeStimulus === "function") {
-    warn("`choices` is missing; the single-button presentation path needs choices in index order.");
+  if (!model.responseSpace || typeof model.responseSpace.type !== "string") {
+    err("`responseSpace.type` must be a string.");
+  }
+  if (typeof model.buildData !== "function") err("`buildData(trials)` must be a function.");
+  if (typeof model.responseProb !== "function") err("`responseProb(design, draw)` must be a function.");
+  if (typeof model.choiceProbLL === "function") err("`choiceProbLL` has been renamed to `responseProb`.");
+  for (const k of ["design_grid", "presentation", "choices", "response_labels", "responseToOutcome", "task"]) {
+    if (model[k] != null) {
+      err(`\`${k}\` belongs on a task package, not a model package.`);
+    }
   }
 
   // Prior must cover every parameter, with a family the first-design sampler can draw.
@@ -446,14 +639,14 @@ function validateModel(model, opts = {}) {
   }
 
   // Optional runtime probe.
-  if (opts.sampleDesign && typeof model.choiceProbLL === "function") {
+  if (opts.sampleDesign && typeof model.responseProb === "function") {
     try {
-      const p = model.choiceProbLL(opts.sampleDesign, opts.sampleDraw || {});
+      const p = model.responseProb(opts.sampleDesign, opts.sampleDraw || {});
       if (typeof p !== "number" || !Number.isFinite(p) || p < 0 || p > 1) {
-        err(`choiceProbLL(sampleDesign, sampleDraw) returned ${p}; expected a probability in [0, 1].`);
+        err(`responseProb(sampleDesign, sampleDraw) returned ${p}; expected a probability in [0, 1].`);
       }
     } catch (e) {
-      err(`choiceProbLL threw on the sample design: ${String((e && e.message) || e)}.`);
+      err(`responseProb threw on the sample design: ${String((e && e.message) || e)}.`);
     }
   }
 
@@ -462,24 +655,24 @@ function validateModel(model, opts = {}) {
 }
 
 /**
- * Register a committed model package in one call. Auto-derives the engine's
- * `linkProb` from the package's `choiceProbLL` (flipping the argument order),
- * uses the package's native `buildData`, and forwards its presentation/priors/etc.
- * — so an experiment page does `registerModelPackage(model, { design_grid })`
- * instead of restating the whole spec.
+ * Register a committed model package in one call.
  *
  * @param {Object} model - The model package default export.
  * @param {Object} [overrides]
- * @param {Object|Array} [overrides.design_grid] - Candidate designs; falls back to model.design_grid.
  * @param {string} [overrides.name]      - Registry name; defaults to model.id.
  * @param {Object} [overrides.stan]      - Sampler settings; falls back to model.stan.
  * @param {number} [overrides.n_trials]  - Trial count; falls back to model.n_trials.
  * @param {number} [overrides.testlet_size] - Testlet size; falls back to model.testlet_size.
- * @param {string} [overrides.task]      - Task label; falls back to model.task.
  * @returns {string} The registered model name.
  */
 function registerModelPackage(model, overrides = {}) {
   const name = overrides.name ?? (model && model.id);
+  if (Object.prototype.hasOwnProperty.call(overrides, "design_grid")) {
+    throw new Error(
+      `registerModelPackage("${name ?? "<model>"}"): design_grid belongs on a task; ` +
+      `register it with registerTask(...).`
+    );
+  }
   const { valid, problems } = validateModel(model);
   const errors = problems.filter((p) => p.level === "error");
   if (errors.length) {
@@ -491,42 +684,42 @@ function registerModelPackage(model, overrides = {}) {
   for (const w of problems.filter((p) => p.level === "warn")) {
     console.warn(`registerModelPackage("${name}"): ${w.message}`);
   }
-
-  const design_grid = overrides.design_grid ?? model.design_grid;
-  if (design_grid == null) {
-    throw new Error(
-      `registerModelPackage("${name}"): a design_grid is required ` +
-      `(pass it in overrides, or set model.design_grid on the package).`
-    );
+  if (!valid) {
+    throw new Error(`registerModelPackage("${name ?? "<model>"}"): invalid model package.`);
   }
 
   registerModel(name, {
     moduleUrl: model.moduleUrl,
     prior: model.prior,
     params: model.params,
-    design_grid,
-    // The engine calls choiceProbLL(design, draw); registerModel wants linkProb(theta, design).
-    linkProb: (theta, design) => model.choiceProbLL(design, theta),
+    designKeys: model.designKeys,
+    responseSpace: model.responseSpace,
+    responseProb: model.responseProb,
     buildData: model.buildData,
-    responseToOutcome: model.responseToOutcome,
-    response_labels: model.response_labels,
-    presentation: model.presentation,
-    choices: model.choices,
     posterior_display: model.posterior_display,
     stan: overrides.stan ?? model.stan,
     n_trials: overrides.n_trials ?? model.n_trials,
     testlet_size: overrides.testlet_size ?? model.testlet_size,
-    task: overrides.task ?? model.task,
   });
   return name;
 }
 
-const jsPsychADO = { registerModel, registerModelPackage, validateModel, prepareModels, createTimeline };
+const jsPsychADO = {
+  registerTask,
+  registerModel,
+  registerModelPackage,
+  validateTask,
+  validateModel,
+  prepareModels,
+  createTimeline,
+};
 
 export {
   jsPsychADO,
+  registerTask,
   registerModel,
   registerModelPackage,
+  validateTask,
   validateModel,
   prepareModels,
   createTimeline,
