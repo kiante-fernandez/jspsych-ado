@@ -1,6 +1,6 @@
 # jspsych-ado: Adaptive Design Optimization for jsPsych
 
-> A 5-minute walkthrough of what changes — and what stays the same — when you run an ADO experiment instead of a standard fixed-design one.
+> A walkthrough of what changes — and what stays the same — when you run an ADO experiment instead of a standard fixed-design one.
 
 ---
 
@@ -23,7 +23,7 @@ const trial = {
 jsPsych.run([instructions, trial, trial, trial, end_screen]);
 ```
 
-The key property: the stimulus is **fixed at authoring time**. Every participant sees identical questions.
+The key property: the stimulus is **fixed at the time it's written/created**. Every participant sees identical questions.
 
 ---
 
@@ -48,7 +48,7 @@ jspsych-ado:  instructions → [ADO timeline fragment] → end_screen
 
 ## Drop-In Usage: Built-In Delay Discounting Model
 
-For the most common case — delay discounting with the hyperbolic model — jspsych-ado ships a ready-to-run controller. The change from a standard experiment is minimal:
+For one of the most common cases — delay discounting with the hyperbolic model — jspsych-ado ships a ready-to-run controller. The change from a standard experiment is minimal:
 
 ```js
 import { initJsPsych } from "jspsych";
@@ -181,7 +181,7 @@ Each `jsPsychCallFunction` node is invisible to participants; it is the ADO engi
 
 ## The Controller Interface
 
-A controller is a simple object with two async methods. This is the entire contract between the timeline and the adaptive inference backend:
+A controller is a simple object with two async methods. This is for the timeline and the adaptive inference backend:
 
 ```js
 const controller = {
