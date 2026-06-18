@@ -4,9 +4,9 @@ This folder contains a reusable experiment-level parameter recovery audit.
 
 The notebook drives a real jsPsych experiment page in `simulate=data-only` mode,
 reads the displayed jsPsych JSON, and normalizes posterior summaries into a long
-parameter table. It is currently configured for the delay-discounting experiment,
-but the experiment path, task-row label, parameter metadata, simulation profiles,
-and selected design fields are all set in the notebook parameter cell.
+parameter table. It is configured for delay discounting by default, but the
+experiment path, task-row label, parameter metadata, simulation profiles, and
+selected design fields can be supplied through a settings JSON file.
 
 The helper uses the experiment's public URL API. The delay-discounting template
 currently compares:
@@ -21,7 +21,9 @@ controller, so its posterior summaries are useful comparator evidence but are no
 identical to Stan posterior draws.
 
 This is an explainer/audit workflow, not a normal CI test. The quick helper mode
-is useful as a smoke check.
+is useful as a smoke check. Settings files may also define optional directional
+checks so the notebook can report whether recovered posterior means preserve
+expected profile orderings.
 
 Install the Playwright browser once:
 
@@ -35,7 +37,15 @@ Then run the quick browser check:
 uv run --with playwright python examples/parameter_recovery/parameter_recovery_browser.py --quick
 ```
 
-Run the notebook without overwriting the unexecuted template:
+Run the 3IFC line-length categorical audit:
+
+```bash
+uv run --with playwright python examples/parameter_recovery/parameter_recovery_browser.py \
+  --settings-json "$(cat examples/parameter_recovery/line_length_discrimination_settings.json)"
+```
+
+Run the default delay-discounting notebook without overwriting the unexecuted
+template:
 
 ```bash
 uv run \
@@ -47,6 +57,22 @@ uv run \
   examples/parameter_recovery/parameter_recovery.ipynb \
   --output-dir=/tmp \
   --output=parameter_recovery.executed.ipynb
+```
+
+Run the same notebook template for the 3IFC line-length experiment with
+papermill:
+
+```bash
+uv run \
+  --with papermill \
+  --with ipykernel \
+  --with pandas \
+  --with matplotlib \
+  --with playwright \
+  papermill \
+  examples/parameter_recovery/parameter_recovery.ipynb \
+  /tmp/line_length_discrimination_parameter_recovery.executed.ipynb \
+  -p SETTINGS_PATH examples/parameter_recovery/line_length_discrimination_settings.json
 ```
 
 These commands do not require committed Python dependency metadata. `uv` resolves

@@ -2,7 +2,12 @@
 // It does not choose adaptive designs or update the posterior; the Stan controller
 // does that. The simulated participant is MODEL-AGNOSTIC: it draws responses from
 // the same likelihood the ADO engine and Stan use, via the model adapter's
-// responseProb. Adding a new model requires no changes here.
+// responseProb/responseProbs. Adding a new model requires no changes here.
+
+import {
+  getResponseProbsFunction,
+  validateResponseProbs,
+} from "./mi_engine.js";
 
 /**
  * @typedef {Object} DelayDiscountingDesign
@@ -14,9 +19,12 @@
 
 /**
  * @typedef {Object} ModelAdapter
- * @property {Function} responseProb - (design, params) => P(response = 1 = LL).
+ * @property {Function} [responseProb] - (design, params) => P(response = 1).
+ * @property {Function} [responseProbs] - (design, params) => [p0, p1, ...].
  * @property {Function} [subjectiveValues] - Optional (design, params) => model-specific
  *   diagnostics, e.g. {v_ss, v_ll}, recorded as sim_* audit fields.
+ * @property {Function} [simulationData] - Optional (design, params, probs, response)
+ *   => extra sim_* audit fields.
  */
 
 const SS_RESPONSE = 0;
@@ -40,6 +48,64 @@ function createSeededRng(seed) {
   };
 }
 
+function sampleResponse(probs, rng) {
+  const draw = rng();
+  let response = probs.length - 1;
+  let cumulative = 0;
+  for (let i = 0; i < probs.length; i++) {
+    cumulative += probs[i];
+    if (draw < cumulative) {
+      response = i;
+      break;
+    }
+  }
+  return { response, draw };
+}
+
+function responseLabelSlug(label, index) {
+  if (label == null) {
+    return String(index);
+  }
+  const slug = String(label).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return slug || String(index);
+}
+
+/**
+ * Generate jsPsych simulation data for one categorical choice trial.
+ *
+ * @param {Object} design - Current design shown on screen.
+ * @param {Object} simulation_config - Simulation settings with params and rt.
+ * @param {Function} rng - Seeded random number generator.
+ * @param {ModelAdapter} model - Active model adapter.
+ * @param {Object} [opts]
+ * @param {Object} [opts.response_labels] - Response labels keyed by choice index.
+ * @returns {Object} jsPsych response/RT plus sim_* audit fields.
+ */
+function simulateCategoricalChoice(design, simulation_config, rng, model, opts = {}) {
+  const params = simulation_config.params;
+  const responseProbs = getResponseProbsFunction(model);
+  const probs = validateResponseProbs(responseProbs(design, params), "simulateCategoricalChoice");
+  const { response, draw } = sampleResponse(probs, rng);
+
+  const data = {
+    response,
+    rt: simulation_config.rt.choice,
+    sim_draw: draw,
+  };
+
+  for (let i = 0; i < probs.length; i++) {
+    const label = opts.response_labels ? opts.response_labels[i] : null;
+    data["sim_p_" + responseLabelSlug(label, i)] = probs[i];
+  }
+  for (const [name, value] of Object.entries(params)) {
+    data["sim_" + name] = Number(value);
+  }
+  if (typeof model.simulationData === "function") {
+    Object.assign(data, model.simulationData(design, params, probs, response));
+  }
+  return data;
+}
+
 /**
  * Generate jsPsych simulation data for one choice trial under a model adapter.
  *
@@ -57,24 +123,18 @@ function createSeededRng(seed) {
  * @returns {Object} jsPsych response/RT plus sim_* audit fields.
  */
 function simulateDelayDiscountingChoice(design, simulation_config, rng, model) {
+  const data = simulateCategoricalChoice(design, simulation_config, rng, model, {
+    response_labels: { 0: "SS", 1: "LL" },
+  });
   const params = simulation_config.params;
-  const p_ll = model.responseProb(design, params);
-  const draw = rng();
-  const response = draw < p_ll ? LL_RESPONSE : SS_RESPONSE;
+  const p_ll = data.sim_p_ll;
+  const draw = data.sim_draw;
+  const response = data.response;
 
-  const data = {
-    // jsPsych simulation fields. response is the button index to click.
-    response,
-    rt: simulation_config.rt.choice,
+  data.response = draw < p_ll ? LL_RESPONSE : SS_RESPONSE;
 
-    // Audit fields saved into the jsPsych data row for validation/recovery.
-    sim_p_ll: p_ll,
-    sim_draw: draw,
-  };
-
-  // Record the data-generating parameters generically (sim_k, sim_tau, ...).
-  for (const [name, value] of Object.entries(params)) {
-    data["sim_" + name] = Number(value);
+  if (response !== data.response) {
+    data.sim_draw = draw;
   }
 
   // Optional model-specific diagnostics (e.g. subjective values for DD models),
@@ -90,5 +150,6 @@ function simulateDelayDiscountingChoice(design, simulation_config, rng, model) {
 
 export {
   createSeededRng,
+  simulateCategoricalChoice,
   simulateDelayDiscountingChoice,
 };

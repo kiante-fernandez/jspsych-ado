@@ -26,10 +26,11 @@ an adaptive jsPsych timeline.
 
 ## Status
 
-🚧 **In active development.** The in-browser engine and the delay-discounting example
-work and are covered by CI (unit tests + a real headless Worker/WASM smoke). Two
-things are still settling: the experiment API around future task/model/controller
-extensions and an npm/bundler-friendly package build (see
+🚧 **In active development.** The in-browser engine, the binary delay-discounting
+example, and the 3IFC categorical line-length example work and are covered by CI
+(unit tests + real headless Worker/WASM smokes). Two things are still settling:
+the experiment API around future task/model/controller extensions and an
+npm/bundler-friendly package build (see
 [#57](https://github.com/githubpsyche/jspsych-ado/issues/57)). For now, use it by
 serving the repo (below) — it is not yet published to npm.
 
@@ -40,6 +41,7 @@ open the example:
 
 ```text
 experiments/delay_discounting/index.html?controller=stan&strategy=ado&debug=1
+experiments/line_length_discrimination/index.html?controller=stan&strategy=ado&debug=1
 ```
 
 - `controller=stan` (default) — live in-browser Stan inference; `controller=mock` — a
@@ -93,6 +95,7 @@ controller is the entire abstraction; the timeline never sees Stan or WASM.
 - **`jspsych-ado/ado/mi_engine.js`** — model-agnostic mutual-information design selection.
 - **`jspsych-ado/ado/stan_worker.js`** — one generic Web Worker that runs NUTS off the main thread.
 - **`jspsych-ado/ado/ado_timeline.js`** — the generic, stimulus-agnostic timeline.
+- **`jspsych-ado/ado/experiment_shell.js`** — shared experiment-page run-mode and simulation wiring.
 - **`jspsych-ado/controllers/`** — the in-browser Stan controller and the mock controller.
 - **`jspsych-ado/index.js`** — the `jsPsychADO` façade.
 
@@ -103,10 +106,10 @@ controller is the entire abstraction; the timeline never sees Stan or WASM.
 - **`jspsych-ado/tasks/<name>/`** — a pluggable task package: design grid,
   presentation, choices, response labels, and response mapping.
 - **`jspsych-ado/models/<name>/`** — a pluggable model package: a `model.js` adapter
-  (`params`, `prior`, `responseProb`, `buildData`, …) plus its compiled `.stan`
-  artifacts.
-- **`experiments/<name>/`** — thin consumers; `experiments/delay_discounting/` is the
-  first example (the hyperbolic model).
+  (`params`, `prior`, `responseProb` or `responseProbs`, `buildData`, …) plus its
+  compiled `.stan` artifacts.
+- **`experiments/<name>/`** — thin consumers; current examples are
+  `experiments/delay_discounting/` and `experiments/line_length_discrimination/`.
 
 ## Adding tasks and models
 
@@ -114,6 +117,9 @@ Drop task packages under `jspsych-ado/tasks/<name>/` and model packages under
 `jspsych-ado/models/<name>/`. The engine, controller, and timeline stay generic.
 Model compilation steps are in [jspsych-ado/models/README.md](jspsych-ado/models/README.md);
 the task package contract is in [jspsych-ado/tasks/README.md](jspsych-ado/tasks/README.md).
+Binary models expose `responseProb(design, params) -> P(response = 1)`.
+Finite categorical models expose `responseProbs(design, params) -> [p0, p1, ...]`.
+Continuous responses are not supported yet.
 
 ## Development
 
@@ -127,9 +133,11 @@ CI runs the unit tests, the recovery smoke, and the headless browser smoke on ev
 
 ## Deploying (JATOS)
 
-Point a JATOS component at `experiments/delay_discounting/index.html`. The experiment,
-the WASM model, and the vendored sampler are all static assets, so the build runs with
-no backend.
+Point a JATOS component at an experiment page such as
+`experiments/delay_discounting/index.html` or
+`experiments/line_length_discrimination/index.html`. The experiment, the WASM
+model, and the vendored sampler are all static assets, so the build runs with no
+backend.
 
 ## Compatibility
 

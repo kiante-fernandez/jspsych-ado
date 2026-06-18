@@ -19,19 +19,22 @@ A package contains:
 {
   id,             // string id, saved into the data
   params,         // parameter names to summarize, e.g. ["k", "tau"]
-  designKeys,     // design fields consumed by responseProb/buildData
-  responseSpace,  // currently { type: "binary" }
+  designKeys,     // design fields consumed by responseProb/responseProbs/buildData
+  responseSpace,  // {type:"binary"} or {type:"categorical", n_categories}
   prior,          // { param: {dist:"lognormal"|"normal"|"halfnormal", ...} }
   posterior_display, // optional per-param chart labels/ranges for debug charts
   moduleUrl,      // new URL("./main.js", import.meta.url).href
   buildData,      // (trials) => Stan data block
-  responseProb,   // (design, paramDraw) => P(outcome = 1)
+  responseProb,   // binary: (design, paramDraw) => P(outcome = 1)
+  responseProbs,  // categorical: (design, paramDraw) => [p0, p1, ...]
 }
 ```
 
-`responseProb` is the JS mirror of the `.stan` likelihood used for fast
-mutual-information design selection. Keep it and the `.stan` model in agreement;
-the adapter unit test (`tests/js/<name>.test.mjs`) guards the formula.
+The JS likelihood is the mirror of the `.stan` likelihood used for fast
+mutual-information design selection. Binary models may expose `responseProb`;
+finite categorical models expose `responseProbs`. Probability vectors must be
+finite, nonnegative, in response-index order, and sum to 1. Continuous-response
+models are out of scope for the current engine.
 
 `designKeys` and `responseSpace` let `createTimeline({ task, model })` reject
 incompatible combinations before a participant sees the task.
@@ -64,7 +67,9 @@ browser and Web Worker, not in plain Node.
 1. Write `jspsych-ado/models/<name>/<name>.stan`.
 2. Compile it and drop `main.js` + `main.wasm` in the folder.
 3. Write `jspsych-ado/models/<name>/model.js` with `params`, `designKeys`,
-   `responseSpace`, priors matching the `.stan`, `buildData`, and `responseProb`.
+   `responseSpace`, priors matching the `.stan`, `buildData`, and the matching
+   likelihood function: `responseProb` for binary or `responseProbs` for finite
+   categorical responses.
 4. Add `tests/js/<name>.test.mjs`.
 5. Register it from an experiment page with `jsPsychADO.registerModelPackage(model)`.
 

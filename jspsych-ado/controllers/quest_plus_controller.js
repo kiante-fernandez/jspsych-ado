@@ -1,7 +1,11 @@
-import { enumerateDesigns } from "../ado/mi_engine.js";
+import {
+  enumerateDesigns,
+  getResponseProbsFunction,
+  validateResponseProbs,
+} from "../ado/mi_engine.js";
 
 // jsQuestPlus alerts on exactly-zero expected outcomes during entropy updates.
-// Clip binary likelihoods just inside (0, 1) while leaving the model unchanged.
+// Clip likelihoods just inside (0, 1) while leaving the model unchanged.
 const QUEST_PROB_EPSILON = 1e-9;
 
 /**
@@ -69,19 +73,26 @@ function makeQuestPlusPriorWeights(model, parameter_samples) {
 }
 
 /**
- * Keep a binary response probability inside the open interval jsQuestPlus needs.
+ * Keep response probabilities inside the open interval jsQuestPlus needs.
  *
- * @param {number} value - Raw model probability.
- * @returns {number} Probability clipped to [epsilon, 1 - epsilon].
+ * @param {number|Array<number>} value - Raw model probability/probabilities.
+ * @returns {Array<number>} Clipped categorical probabilities summing to 1.
  */
-function clipProbability(value) {
-  if (value <= QUEST_PROB_EPSILON) {
-    return QUEST_PROB_EPSILON;
+function clipResponseProbs(value) {
+  const probs = validateResponseProbs(value, "createQuestPlusController");
+  const clipped = probs.map(p => Math.min(1 - QUEST_PROB_EPSILON, Math.max(QUEST_PROB_EPSILON, p)));
+  const total = clipped.reduce((sum, p) => sum + p, 0);
+  return clipped.map(p => p / total);
+}
+
+function getResponseCount(model, responseProbs, sample_design, sample_params) {
+  if (model.responseSpace && model.responseSpace.type === "binary") {
+    return 2;
   }
-  if (value >= 1 - QUEST_PROB_EPSILON) {
-    return 1 - QUEST_PROB_EPSILON;
+  if (model.responseSpace && model.responseSpace.type === "categorical") {
+    return model.responseSpace.n_categories;
   }
-  return value;
+  return clipResponseProbs(responseProbs(sample_design, sample_params)).length;
 }
 
 /**
@@ -90,11 +101,12 @@ function clipProbability(value) {
  *
  * Quest+ uses a discrete stimulus domain and a discrete parameter grid. For the
  * current jsPsych-ADO design-grid shape, the stimulus domain is the index of one
- * enumerated design; the likelihood still comes from model.responseProb.
+ * enumerated design; the likelihood comes from model.responseProbs, or from
+ * binary model.responseProb through the standard compatibility wrapper.
  *
  * @param {Object} options
  * @param {Function} options.QuestPlus - jsQuestPlus class.
- * @param {Object} options.model - Model adapter (params, prior, responseProb).
+ * @param {Object} options.model - Model adapter (params, prior, responseProb/responseProbs).
  * @param {Object|Array} options.grid_design - Candidate design grid.
  * @param {Object} options.quest_plus - Quest+ settings.
  * @param {Object} options.quest_plus.parameter_samples - {param: [sample, ...]}.
@@ -113,8 +125,9 @@ function createQuestPlusController({
   if (typeof QuestPlus !== "function") {
     throw new Error("createQuestPlusController: QuestPlus class is required");
   }
-  if (!model || !Array.isArray(model.params) || typeof model.responseProb !== "function") {
-    throw new Error("createQuestPlusController: model must define params and responseProb");
+  if (!model || !Array.isArray(model.params) ||
+      (typeof model.responseProbs !== "function" && typeof model.responseProb !== "function")) {
+    throw new Error("createQuestPlusController: model must define params and responseProbs or responseProb");
   }
   if (!quest_plus || !quest_plus.parameter_samples) {
     throw new Error("createQuestPlusController: quest_plus.parameter_samples is required");
@@ -124,6 +137,7 @@ function createQuestPlusController({
   if (designs.length === 0) {
     throw new Error("createQuestPlusController: grid_design produced no candidate designs");
   }
+  const responseProbs = getResponseProbsFunction(model);
 
   const stim_samples = [designs.map((_design, index) => index)];
   const psych_samples = model.params.map(param => {
@@ -133,6 +147,11 @@ function createQuestPlusController({
     }
     return samples;
   });
+  const sample_params = {};
+  model.params.forEach((param, index) => {
+    sample_params[param] = psych_samples[index][0];
+  });
+  const response_count = getResponseCount(model, responseProbs, designs[0], sample_params);
   const prior_weights = makeQuestPlusPriorWeights(model, quest_plus.parameter_samples);
 
   let quest = null;
@@ -156,8 +175,12 @@ function createQuestPlusController({
     return params;
   }
 
-  function probResponseOne(design_index, ...values) {
-    return clipProbability(model.responseProb(designs[design_index], paramsFromValues(values)));
+  function probResponse(response_index, design_index, ...values) {
+    const probs = clipResponseProbs(responseProbs(designs[design_index], paramsFromValues(values)));
+    if (probs.length !== response_count) {
+      throw new Error("createQuestPlusController: response probability vector length changed.");
+    }
+    return probs[response_index];
   }
 
   function makePostSummary() {
@@ -186,10 +209,10 @@ function createQuestPlusController({
     start: async function() {
       trial_index = 0;
       quest = new QuestPlus({
-        psych_func: [
-          (design_index, ...values) => 1 - probResponseOne(design_index, ...values),
-          (design_index, ...values) => probResponseOne(design_index, ...values),
-        ],
+        psych_func: Array.from(
+          { length: response_count },
+          (_value, response_index) => (design_index, ...values) => probResponse(response_index, design_index, ...values)
+        ),
         stim_samples,
         psych_samples,
         priors: QuestPlus.set_prior(prior_weights),
@@ -206,7 +229,7 @@ function createQuestPlusController({
     },
 
     /**
-     * Update the Quest+ posterior with the latest binary response and select the
+     * Update the Quest+ posterior with the latest response and select the
      * next design unless this was the final trial.
      *
      * @param {Object} trial_data - jsPsych choice row with choice.
@@ -237,6 +260,7 @@ function createQuestPlusController({
 
 export {
   createQuestPlusController,
+  clipResponseProbs,
   makeQuestPlusPriorWeights,
   priorDensity,
 };

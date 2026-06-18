@@ -392,7 +392,9 @@ test("createTimeline rejects incompatible task/model design keys and response sp
   );
 
   registerTestTask("categorical-task", {
-    responseSpace: { type: "categorical" },
+    responseSpace: { type: "categorical", n_categories: 3 },
+    choices: ["A", "B", "C"],
+    response_labels: ["A", "B", "C"],
   });
   registerModel("binary-model-for-mismatch", {
     moduleUrl: "/compiled/main.js",
@@ -411,6 +413,21 @@ test("createTimeline rejects incompatible task/model design keys and response sp
   assert.throws(
     () => createTimeline({}, { task: "categorical-task", model: "binary-model-for-mismatch" }),
     /responseSpace mismatch/
+  );
+
+  registerModel("categorical-count-mismatch-model", {
+    moduleUrl: "/compiled/main.js",
+    params: ["k"],
+    designKeys: DESIGN_KEYS,
+    responseSpace: { type: "categorical", n_categories: 2 },
+    prior: { k: { dist: "lognormal", meanlog: -4, sdlog: 2 } },
+    responseProbs: () => [0.5, 0.5],
+    buildData: (trials) => ({ N: trials.length, y: trials.map((t) => t.choice) }),
+  });
+
+  assert.throws(
+    () => createTimeline({}, { task: "categorical-task", model: "categorical-count-mismatch-model" }),
+    /responseSpace category count mismatch/
   );
 });
 
@@ -460,7 +477,7 @@ test("createTimeline rejects bad responseProb and buildData probes", () => {
 
   assert.throws(
     () => createTimeline({}, { task: "probe-task", model: "bad-response-prob-model" }),
-    /responseProb\(sampleDesign, sampleDraw\) returned NaN/
+    /response likelihood probe failed/
   );
   assert.throws(
     () => createTimeline({}, { task: "probe-task", model: "bad-build-data-model" }),
@@ -795,6 +812,23 @@ test("compileStanModel imports from the documented path", () => {
   assert.equal(typeof compileStanModel, "function");
 });
 
+test("compileStanModel rejects categorical responseProb-only adapters before compiling", async () => {
+  await assert.rejects(
+    () => compileStanModel({
+      id: "bad-categorical",
+      stan: STAN_CODE,
+      params: ["k"],
+      designKeys: DESIGN_KEYS,
+      responseSpace: { type: "categorical", n_categories: 3 },
+      prior: { k: { dist: "lognormal", meanlog: -4, sdlog: 2 } },
+      buildData: (trials) => ({ N: trials.length, y: trials.map((t) => t.choice) }),
+      responseProb: () => 0.5,
+      server: "http://compile.test",
+    }),
+    /categorical models must provide responseProbs/
+  );
+});
+
 test("labelsToConfig maps arrays to response-index objects", () => {
   assert.deepEqual(labelsToConfig(["SS", "LL"]), { 0: "SS", 1: "LL" });
   const labels = { 0: "short", 1: "long" };
@@ -865,6 +899,34 @@ test("validateModel flags missing pieces, missing priors, and unsampleable prior
   const missingPrior = validateModel(makePackage({ prior: { k: { dist: "normal", mean: 0, sd: 1 } } }));
   assert.equal(missingPrior.valid, false);
   assert.ok(missingPrior.problems.some((p) => p.level === "error" && /tau/.test(p.message)));
+});
+
+test("validateModel rejects malformed categorical responseProbs", () => {
+  const categorical = (responseProbs) => makePackage({
+    responseSpace: { type: "categorical", n_categories: 3 },
+    responseProb: undefined,
+    responseProbs,
+  });
+  const sampleDesign = { t_ss: 0, t_ll: 1, r_ss: 100, r_ll: 200 };
+
+  assert.equal(validateModel(categorical(() => [0.5, 0.25, 0.25]), {
+    sampleDesign,
+    sampleDraw: { k: 0.01, tau: 1 },
+  }).valid, true);
+
+  for (const probs of [
+    [0.5, 0.5],
+    [2, 1, 1],
+    [0.5, Number.NaN, 0.5],
+    [0.5, -0.1, 0.6],
+  ]) {
+    const result = validateModel(categorical(() => probs), {
+      sampleDesign,
+      sampleDraw: { k: 0.01, tau: 1 },
+    });
+    assert.equal(result.valid, false, `expected invalid model for ${JSON.stringify(probs)}`);
+    assert.ok(result.problems.some((p) => p.level === "error" && /response likelihood/.test(p.message)));
+  }
 });
 
 test("registerModelPackage rejects invalid packages and design_grid overrides", () => {

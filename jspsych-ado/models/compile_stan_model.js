@@ -4,7 +4,7 @@
 // setup and return a ready-to-use model adapter — the same shape the committed
 // models/<name>/model.js files export:
 //
-//     { id, params, designKeys, responseSpace, prior, moduleUrl, buildData, responseProb }
+//     { id, params, designKeys, responseSpace, prior, moduleUrl, buildData, responseProb/responseProbs }
 //
 // It does NOT touch the engine, the worker (ado/stan_worker.js), or the
 // controller (controllers/stan_ado_controller.js). It only produces the adapter
@@ -28,8 +28,8 @@ const _moduleUrlCache = new Map(); // stanSource -> moduleUrl
 /**
  * Compile a .stan source string and return a model adapter for
  * createStanAdoController. Resolves once the compile server has produced the
- * module; the adapter's responseProb / buildData / prior are supplied by you and
- * must match the .stan likelihood and priors (same rule as a hand-written
+ * module; the adapter's responseProb or responseProbs / buildData / prior are
+ * supplied by you and must match the .stan likelihood and priors (same rule as a hand-written
  * models/<name>/model.js).
  *
  * @param {Object} opts
@@ -37,12 +37,14 @@ const _moduleUrlCache = new Map(); // stanSource -> moduleUrl
  * @param {string}   opts.stan          - Full .stan source as a string.
  * @param {string[]} opts.params        - Parameter names to summarize, e.g. ["r","tau"].
  * @param {string[]} opts.designKeys    - Design fields consumed by the model.
- * @param {Object}   opts.responseSpace - Currently {type:"binary"}.
+ * @param {Object}   opts.responseSpace - {type:"binary"} or {type:"categorical", n_categories}.
  * @param {Object}   opts.prior         - { param: { dist, ... } }, MUST match the .stan priors.
  * @param {Function} opts.buildData     - (trials) => Stan data block. trials are
  *                                        {t_ss,t_ll,r_ss,r_ll,choice} rows.
  * @param {Function} opts.responseProb  - (design, paramDraw) => P(response = 1 = LL),
  *                                        MUST match the .stan likelihood. Design first.
+ * @param {Function} opts.responseProbs - (design, paramDraw) => [p0, p1, ...],
+ *                                        required for categorical models.
  * @param {string}  [opts.server]       - Compile server base URL. Default: Flatiron public
  *                                        server. Local server: "http://localhost:8083".
  * @param {string}  [opts.authToken]    - Bearer token for the compile endpoint.
@@ -57,14 +59,21 @@ async function compileStanModel({
   prior,
   buildData,
   responseProb,
+  responseProbs,
   server = DEFAULT_SERVER,
   authToken = DEFAULT_TOKEN,
 } = {}) {
   // Validate the adapter pieces up front so a typo fails here, not deep in the worker.
-  for (const [key, value] of Object.entries({ id, stan, params, designKeys, responseSpace, prior, buildData, responseProb })) {
+  for (const [key, value] of Object.entries({ id, stan, params, designKeys, responseSpace, prior, buildData })) {
     if (value == null) {
       throw new Error(`compileStanModel: missing required option "${key}".`);
     }
+  }
+  if (typeof responseProb !== "function" && typeof responseProbs !== "function") {
+    throw new Error("compileStanModel: provide responseProb or responseProbs.");
+  }
+  if (responseSpace.type === "categorical" && typeof responseProbs !== "function") {
+    throw new Error("compileStanModel: categorical models must provide responseProbs.");
   }
 
   // Normalize a trailing slash so `${server}/compile` is always well-formed.
@@ -112,7 +121,7 @@ async function compileStanModel({
   }
 
   // Identical shape to models/<name>/model.js default export.
-  return { id, params, designKeys, responseSpace, prior, moduleUrl, buildData, responseProb };
+  return { id, params, designKeys, responseSpace, prior, moduleUrl, buildData, responseProb, responseProbs };
 }
 
 export { compileStanModel };

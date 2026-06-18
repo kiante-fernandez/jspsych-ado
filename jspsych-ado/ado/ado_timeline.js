@@ -6,7 +6,7 @@
 //   - a task "presentation" spec that supplies the per-trial stimulus,
 // into the standard ADO loop: pick a design -> show it -> record the choice ->
 // re-infer + pick the next design. Everything task-specific (how a design is
-// rendered, which raw response maps to which binary outcome) is provided by the
+// rendered, which raw response maps to which model outcome) is provided by the
 // registered task, so adding a model never requires editing this file.
 //
 // The presentation contract (supplied by the task, threaded through config):
@@ -26,8 +26,7 @@
 //
 // config: { n_trials, testlet_size?, response_labels, presentation, choices,
 //           responseToOutcome?, task? }. responseToOutcome(design, choiceIndex)
-// -> 0|1 defaults to identity (raw button index IS the binary outcome), which is
-// correct for tasks like delay discounting where button 1 == outcome 1.
+// -> outcome index defaults to identity (raw button index IS the model outcome).
 
 // ---------------------------------------------------------------------------
 // Data boundary helpers (model-agnostic)
@@ -223,9 +222,24 @@ function makeChoiceSimulationOptions(run_context, design) {
     return {};
   }
 
+  const simulation_data = run_context.simulate_choice(design);
+  run_context.pending_simulation_data = simulation_data;
   return {
-    data: run_context.simulate_choice(design),
+    data: simulation_data,
   };
+}
+
+function copySimulationAuditFields(data, run_context) {
+  const simulation_data = run_context.pending_simulation_data;
+  if (!simulation_data) {
+    return;
+  }
+  for (const [key, value] of Object.entries(simulation_data)) {
+    if ((key === "sim_draw" || key.startsWith("sim_")) && data[key] === undefined) {
+      data[key] = value;
+    }
+  }
+  run_context.pending_simulation_data = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -676,9 +690,8 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
   if (!presentation || (typeof presentation.getChoiceTrials !== "function" && typeof presentation.makeStimulus !== "function")) {
     throw new Error("createAdoTimeline: config.presentation must provide getChoiceTrials or makeStimulus.");
   }
-  // Default: the raw button/key index IS the binary outcome (correct for tasks
-  // like delay discounting). Tasks where the outcome depends on the design
-  // (e.g. "chose the more numerous side") override this.
+  // Default: the raw button/key index IS the model outcome. Tasks where the
+  // outcome depends on the design (e.g. "chose the more numerous side") override this.
   const responseToOutcome = config.responseToOutcome || ((_design, index) => index);
   const task = config.task || run_context.model_id || "ado";
   const testlet_size = normalizeTestletSize(config.testlet_size);
@@ -794,7 +807,7 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
     };
 
     // Compose the ADO finalize step onto the response trial's own on_finish:
-    // map the raw response to a binary outcome, record the full design + labels,
+    // map the raw response to a model outcome, record the full design + labels,
     // and copy the posterior summaries so downstream code reads them from data.
     const response_trial = response_trials[0];
     delete response_trial.__ado_is_response;
@@ -803,6 +816,7 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
       if (inner_on_finish) {
         inner_on_finish.call(this, data);
       }
+      copySimulationAuditFields(data, run_context);
       const design = current_design;
       const choice_raw = data.__ado_response;
       const choice = responseToOutcome(design, choice_raw);
