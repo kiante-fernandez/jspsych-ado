@@ -22,4 +22,4 @@ The current engine estimates parameters. A second objective — choosing designs
 
 ## 5. Methods paper
 
-The target venue is *Behavior Research Methods*, where both ADOpy (Yang et al., 2020) and jsQuestPlus (Kuroki & Pronk, 2022) were published. The empirical core will be the parity results, the simulated-participant recovery curves, and cross-browser timing benchmarks — demonstrating that the browser-native implementation is both correct and fast enough for real online use.
+The target venue is *JOSS*. We will demonstrate the simulated-participant recovery curves, and cross-browser timing benchmarks — showing that the browser implementation is both correct and fast enough for real online use.
