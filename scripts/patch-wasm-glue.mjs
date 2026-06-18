@@ -17,7 +17,7 @@
 // This is idempotent and verified by tests/js/wasm_glue_patch.test.mjs (CI fails
 // if any committed main.js is unpatched, e.g. after a fresh recompile). Re-run
 // this after recompiling a model:  node scripts/patch-wasm-glue.mjs
-import { readFile, writeFile, readdir } from "node:fs/promises";
+import { readFile, writeFile, readdir, access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 
@@ -34,18 +34,30 @@ export function patchSource(source) {
   return { changed: false, source, missing: true };
 }
 
-async function main() {
-  const names = await readdir(MODELS_DIR, { withFileTypes: true });
-  let patched = 0, already = 0, missing = [];
-  for (const entry of names) {
+/** Every committed model package that has a compiled `main.js`: [{ name, dir, file }].
+ *  Shared with the guard test (tests/js/wasm_glue_patch.test.mjs) so both agree on
+ *  what to check. */
+export async function listModelMains() {
+  const entries = await readdir(MODELS_DIR, { withFileTypes: true });
+  const mains = [];
+  for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const file = join(MODELS_DIR, entry.name, "main.js");
+    const dir = join(MODELS_DIR, entry.name);
+    const file = join(dir, "main.js");
+    try { await access(file); mains.push({ name: entry.name, dir, file }); } catch { /* no compiled wasm in this package */ }
+  }
+  return mains;
+}
+
+async function main() {
+  let patched = 0, already = 0, missing = [];
+  for (const { name, file } of await listModelMains()) {
     let src;
     try { src = await readFile(file, "utf8"); } catch { continue; }
-    const { changed, source, missing: notFound } = patchSource(src);
-    if (changed) { await writeFile(file, source); console.log(`  patched ${entry.name}/main.js`); patched++; }
-    else if (notFound) { console.log(`  WARNING: ${entry.name}/main.js has neither the patched nor the known unpatched form`); missing.push(entry.name); }
-    else { console.log(`  already patched ${entry.name}/main.js`); already++; }
+    const { changed, source, missing: unrecognized } = patchSource(src);
+    if (changed) { await writeFile(file, source); console.log(`  patched ${name}/main.js`); patched++; }
+    else if (unrecognized) { console.log(`  WARNING: ${name}/main.js has neither the patched nor the known unpatched form`); missing.push(name); }
+    else { console.log(`  already patched ${name}/main.js`); already++; }
   }
   console.log(`\n${patched} patched, ${already} already patched${missing.length ? `, ${missing.length} unrecognized: ${missing.join(", ")}` : ""}`);
   if (missing.length) process.exitCode = 1;

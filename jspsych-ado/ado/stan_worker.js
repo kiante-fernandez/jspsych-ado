@@ -29,14 +29,12 @@ self.onmessage = async function(event) {
       // bundling — a bundled main.js would otherwise fetch a same-name sibling the
       // bundler has renamed/hashed. With no wasmUrl (static-served, no bundler),
       // main.js resolves its sibling main.wasm as before.
-      const wasmUrl = message.wasmUrl;
-      modelPromise = import(/* @vite-ignore */ /* webpackIgnore: true */ message.moduleUrl).then(module => {
-        const createModule = module.default;
-        const factory = wasmUrl
-          ? (options) => createModule({ ...options, locateFile: (path) => (path.endsWith(".wasm") ? wasmUrl : path) })
-          : createModule;
-        return StanModel.load(factory, () => {});
-      });
+      const overrides = message.wasmUrl
+        ? { locateFile: (path) => (path.endsWith(".wasm") ? message.wasmUrl : path) }
+        : {};
+      modelPromise = import(/* @vite-ignore */ /* webpackIgnore: true */ message.moduleUrl).then(module =>
+        StanModel.load((options) => module.default({ ...options, ...overrides }), () => {})
+      );
       await modelPromise;
       self.postMessage({ type: "ready" });
       return;

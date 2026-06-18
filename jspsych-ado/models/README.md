@@ -24,6 +24,7 @@ A package contains:
   prior,          // { param: {dist:"lognormal"|"normal"|"halfnormal", ...} }
   posterior_display, // optional per-param chart labels/ranges for debug charts
   moduleUrl,      // new URL("./main.js", import.meta.url).href
+  wasmUrl,        // new URL("./main.wasm", import.meta.url).href (so bundlers emit the wasm; see #57 below)
   buildData,      // (trials) => Stan data block
   responseProb,   // binary: (design, paramDraw) => P(outcome = 1)
   responseProbs,  // categorical: (design, paramDraw) => [p0, p1, ...]
