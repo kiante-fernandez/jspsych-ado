@@ -27,9 +27,6 @@ import {
  *   => extra sim_* audit fields.
  */
 
-const SS_RESPONSE = 0;
-const LL_RESPONSE = 1;
-
 /**
  * Create a deterministic random number generator for reproducible simulations.
  *
@@ -127,15 +124,6 @@ function simulateDelayDiscountingChoice(design, simulation_config, rng, model) {
     response_labels: { 0: "SS", 1: "LL" },
   });
   const params = simulation_config.params;
-  const p_ll = data.sim_p_ll;
-  const draw = data.sim_draw;
-  const response = data.response;
-
-  data.response = draw < p_ll ? LL_RESPONSE : SS_RESPONSE;
-
-  if (response !== data.response) {
-    data.sim_draw = draw;
-  }
 
   // Optional model-specific diagnostics (e.g. subjective values for DD models),
   // recorded generically as sim_<name> for whatever fields the model returns.
