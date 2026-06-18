@@ -1,0 +1,10 @@
+# Build outputs (the JOSS PDF is produced by CI or a local Inara run).
+*.pdf
+# Local LaTeX aux, if you build a quick preview.
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.fls
+*.fdb_latexmk

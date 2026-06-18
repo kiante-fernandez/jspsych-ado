@@ -1,0 +1,67 @@
+% jspsych-ado JOSS paper — LaTeX draft for editing on Overleaf.
+% Uses the local joss.cls (an UNOFFICIAL JOSS-style approximation; see README).
+% Compile with pdfLaTeX, or LuaLaTeX/XeLaTeX for the Hack mono font + best match.
+% The official JOSS submission is paper.md (this .tex is the drafting surface).
+\documentclass{joss}
+
+% Footer citation line (shown bottom-left on every page).
+\renewcommand{\jossfooter}{Cai et al. (Year). jspsych-ado: In-browser adaptive
+design optimization for jsPsych experiments. \emph{Journal of Open Source Software}.}
+
+\title{jspsych-ado: In-browser adaptive design optimization for jsPsych experiments}
+
+% Co-authors alphabetical by surname; Kianté Fernandez last & corresponding (Names from
+% ORCID). TODO: per-author affiliations.
+\author[1]{Xiaohong Cai\,\orcidlink{0000-0002-8210-8386}}
+\author[1]{Jordan Gunn\,\orcidlink{0009-0005-1024-6113}}
+\author[1]{Brendan Lam\,\orcidlink{0000-0001-9309-8497}}
+\author[1]{Ludan Yuan\,\orcidlink{0009-0006-3578-8020}}
+\author[1]{Ying Zeng\,\orcidlink{0009-0008-3743-372X}}
+\author[1,$\mathparagraph$]{Kianté Fernandez\,\orcidlink{0000-0002-8493-880X}}
+\affil[1]{TODO Institution, City, Country}
+\affil[$\mathparagraph$]{Corresponding author}
+\date{\vspace{-2.5ex}}
+
+\begin{document}
+\maketitle
+
+% --- Metadata sidebar (edit values; mirrors the JOSS left column) -------------
+\josssidebar{%
+  {\bfseries DOI:} \href{https://doi.org/N/A}{\color{linky}N/A}
+
+  \vspace{2mm}
+  {\bfseries Software}
+  \begin{itemize}
+    \setlength\itemsep{0em}
+    \item \href{https://github.com/githubpsyche/jspsych-ado}{\color{linky}Review} \ExternalLink
+    \item \href{https://github.com/githubpsyche/jspsych-ado}{\color{linky}Repository} \ExternalLink
+    \item \href{https://doi.org/10.5281}{\color{linky}Archive} \ExternalLink
+  \end{itemize}
+
+  \vspace{2mm}\par\noindent\hrulefill\par\vspace{2mm}
+
+  {\bfseries Editor:} \href{https://joss.theoj.org}{Open Journals} \ExternalLink \\
+  \vspace{1mm}
+  {\bfseries Reviewers:}
+  \begin{itemize}\setlength\itemsep{0em}
+    \item \href{https://github.com/openjournals}{@openjournals}
+  \end{itemize}
+
+  \vspace{2mm}
+  {\bfseries Submitted:} TODO\\
+  {\bfseries Published:} TODO
+
+  \vspace{2mm}
+  {\bfseries License}\\
+  Authors of papers retain copyright and release the work under a Creative Commons
+  Attribution 4.0 International License
+  (\href{https://creativecommons.org/licenses/by/4.0/}{\color{linky}CC BY 4.0}).
+}
+
+% Prose lives in body.tex (shared with the paper.md generation). Edit body.tex.
+\input{body}
+
+\bibliographystyle{plainnat}
+\bibliography{paper}
+
+\end{document}

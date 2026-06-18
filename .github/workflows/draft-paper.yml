@@ -1,0 +1,59 @@
+name: Build paper (LaTeX -> PDF + Markdown)
+
+# On any push that touches the paper LaTeX, this:
+#   1. compiles paper.tex -> paper.pdf (uploaded as a preview artifact), and
+#   2. regenerates paper.md from body.tex + frontmatter.yaml (pandoc) and commits it
+#      back, so the JOSS Markdown always tracks the .tex source.
+#
+# The regenerated-paper.md commit uses [skip ci] so it does not retrigger this workflow.
+
+on:
+  push:
+    paths:
+      - 'paper/**'
+      - '.github/workflows/draft-paper.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: paper-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile paper.tex -> PDF
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: paper
+          root_file: paper.tex
+
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - name: Regenerate paper.md from LaTeX
+        run: bash paper/build-md.sh
+
+      - name: Commit paper.md if it changed
+        run: |
+          git add paper/paper.md
+          if git diff --cached --quiet -- paper/paper.md; then
+            echo "paper.md unchanged"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Regenerate paper.md from paper.tex [skip ci]"
+            git push
+          fi
+
+      - name: Upload PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper
+          path: paper/paper.pdf

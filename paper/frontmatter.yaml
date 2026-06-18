@@ -1,0 +1,39 @@
+# JOSS metadata for the generated paper.md. build-md.sh wraps this in --- delimiters
+# and prepends it to the pandoc-converted body.tex. (The LaTeX PDF gets author info
+# from paper.tex; keep the two author lists in sync.)
+# Author order: co-authors alphabetical by surname; Kianté Fernandez last & corresponding.
+# Names resolved from ORCID records. TODO: per-author affiliations.
+title: 'jspsych-ado: In-browser adaptive design optimization for jsPsych experiments'
+tags:
+  - JavaScript
+  - jsPsych
+  - Stan
+  - WebAssembly
+  - adaptive design optimization
+  - Bayesian inference
+  - psychophysics
+authors:
+  - name: Xiaohong Cai
+    orcid: 0000-0002-8210-8386
+    affiliation: 1
+  - name: Jordan Gunn
+    orcid: 0009-0005-1024-6113
+    affiliation: 1
+  - name: Brendan Lam
+    orcid: 0000-0001-9309-8497
+    affiliation: 1
+  - name: Ludan Yuan
+    orcid: 0009-0006-3578-8020
+    affiliation: 1
+  - name: Ying Zeng
+    orcid: 0009-0008-3743-372X
+    affiliation: 1
+  - name: Kianté Fernandez
+    orcid: 0000-0002-8493-880X
+    corresponding: true
+    affiliation: 1
+affiliations:
+  - name: TODO Institution, City, Country
+    index: 1
+date: 17 June 2026
+bibliography: paper.bib
