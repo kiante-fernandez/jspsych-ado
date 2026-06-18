@@ -21,6 +21,46 @@ experiments/delay_discounting/index.html?ado=stan&debug=1
 Worker. `?ado=mock` swaps in a deterministic, no-WASM controller for fast timeline/UI
 work.
 
+The Stan path uses a dynamic stopping rule configured in
+`experiments/delay_discounting/dd_config.js`:
+
+```js
+stopping: {
+  min_trials: 8,
+  max_trials: 42,
+  eig_tolerance: 0.05,
+}
+```
+
+After each choice/update, the controller scores the best next offer by expected
+information gain (`eig`, in nats). If `completed >= min_trials` and
+`eig < eig_tolerance`, the jsPsych loop stops early; `max_trials` is the hard cap.
+The default tolerance is a starting point for simulation tuning.
+
+How `eig` is computed:
+
+1. The controller keeps the current posterior draws after each Stan update. Before
+   the first response, it uses prior draws instead.
+2. The design grid is expanded once into every candidate SS/LL offer.
+3. For each candidate design `d` and each posterior draw `s`, the model adapter
+   computes `p_s = choiceProbLL(d, draw_s)`, the probability of choosing LL.
+4. The ADO engine computes the design's mutual information:
+
+   ```text
+   EIG(d) = H(mean_s p_s) - mean_s H(p_s)
+   ```
+
+   where `H(p) = -(p ln p + (1-p) ln(1-p))` is binary entropy in nats.
+5. `selectOptimalDesign(...)` chooses the design with the largest EIG. The Stan
+   controller returns that selected design's `mutual_info` as `ado_state.eig`.
+6. The stopping rule uses that best remaining offer: after an update, if
+   `trial_index >= min_trials` and `eig < eig_tolerance`, there is no candidate
+   offer whose expected learning clears the tolerance, so the loop stops.
+
+`eig`/mutual information is the expected learning before the next response.
+`realized_information_gain` is the actual learning after the observed response, so
+it can be higher or lower than `eig` on any single trial.
+
 ## Debug trace logs
 
 `debug=1` prints a readable console summary after each adaptive update — the design

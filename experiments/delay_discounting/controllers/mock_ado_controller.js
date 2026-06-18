@@ -50,10 +50,28 @@ function selectMockDesign(config, trial_index) {
   const started_at = nowMs();
   const next_design = makeMockDesign(config, trial_index);
   const elapsed_ms = nowMs() - started_at;
+  const eig = makeMockMaxMutualInfo(next_design, trial_index);
   return {
     next_design,
     selection_time_ms: elapsed_ms || estimateMockSelectionTime(config, trial_index),
-    max_mutual_info: makeMockMaxMutualInfo(next_design, trial_index),
+    eig,
+    max_mutual_info: eig,
+  };
+}
+
+function normalizeMockStopping(config) {
+  const stopping = config.stopping || {};
+  const max_trials = Number.isFinite(Number(stopping.max_trials))
+    ? Math.max(0, Math.floor(Number(stopping.max_trials)))
+    : Math.max(0, Math.floor(Number(config.n_trials || 0)));
+  return {
+    min_trials: Number.isFinite(Number(stopping.min_trials))
+      ? Math.max(0, Math.floor(Number(stopping.min_trials)))
+      : 0,
+    max_trials,
+    eig_tolerance: Number.isFinite(Number(stopping.eig_tolerance))
+      ? Math.max(0, Number(stopping.eig_tolerance))
+      : null,
   };
 }
 
@@ -100,6 +118,21 @@ function makeMockPosteriorDraws(post_mean, post_sd, trial_index, n = 160) {
 function createMockAdoController(config) {
   let session_id = "mock-session";
   let trial_index = 0;
+  let latest_state = null;
+  const stopping = normalizeMockStopping(config);
+
+  function withMockStoppingState(state, selection) {
+    const hit_max_trials = state.trial_index >= stopping.max_trials;
+    latest_state = {
+      ...state,
+      eig: selection.eig,
+      max_mutual_info: selection.max_mutual_info,
+      should_stop: hit_max_trials,
+      stop_reason: hit_max_trials ? "max_trials" : null,
+      stopping,
+    };
+    return latest_state;
+  }
 
   return {
     /**
@@ -112,7 +145,7 @@ function createMockAdoController(config) {
       session_id = context.session_id || "mock-session";
       trial_index = 0;
       const selection = selectMockDesign(config, trial_index);
-      return {
+      return withMockStoppingState({
         session_id,
         trial_index,
         next_design: selection.next_design,
@@ -121,9 +154,8 @@ function createMockAdoController(config) {
         posterior_draws: null,
         realized_information_gain: null,
         selection_time_ms: selection.selection_time_ms,
-        max_mutual_info: selection.max_mutual_info,
         api_latency_ms: null,
-      };
+      }, selection);
     },
 
     /**
@@ -136,7 +168,7 @@ function createMockAdoController(config) {
       trial_index = trial_data.ado_trial_index + 1;
       const posterior = makeMockPosterior(trial_index);
       const selection = selectMockDesign(config, trial_index);
-      return {
+      return withMockStoppingState({
         session_id,
         trial_index,
         next_design: selection.next_design,
@@ -145,10 +177,13 @@ function createMockAdoController(config) {
         posterior_draws: makeMockPosteriorDraws(posterior.post_mean, posterior.post_sd, trial_index),
         realized_information_gain: null,
         selection_time_ms: selection.selection_time_ms,
-        max_mutual_info: selection.max_mutual_info,
         api_latency_ms: null,
-      };
-    }
+      }, selection);
+    },
+
+    getState: function() {
+      return latest_state;
+    },
   };
 }
 

@@ -13,11 +13,18 @@ function range(start, stop, step) {
  * by mutual information. stan holds the NUTS sampler settings used by the
  * in-browser Stan controller. The parameter prior now lives in the model adapter
  * (models/<name>/model.js), co-located with the priors in its .stan file.
+ * stopping controls the dynamic trial loop. eig_tolerance is in nats; the
+ * maximum EIG for a binary response is ln(2), about 0.693.
  * response_labels must match the jsPsych button indices used in the timeline:
  * 0 = SS, 1 = LL.
  */
 const default_dd_config = {
   n_trials: 42,
+  stopping: {
+    min_trials: 8,
+    max_trials: 42,
+    eig_tolerance: 0.08,
+  },
   grid_design: {
     t_ss: [0],
     t_ll: [

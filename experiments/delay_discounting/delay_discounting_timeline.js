@@ -25,7 +25,11 @@ import { updateInfoGainDebugPanel } from "./ado/debug_trace_charts.js";
  * @property {?Array<Object>} posterior_draws - Raw posterior draws for debug-only charting.
  * @property {?number} realized_information_gain - Information gained from the observed response.
  * @property {?number} selection_time_ms - Time spent selecting next_design.
+ * @property {?number} eig - Expected information gain for next_design.
  * @property {?number} max_mutual_info - Mutual information value for next_design.
+ * @property {boolean} should_stop - Whether the dynamic loop should terminate.
+ * @property {?string} stop_reason - Stopping reason, if should_stop is true.
+ * @property {?Object} stopping - Normalized stopping config from the controller.
  * @property {?number} api_latency_ms - API round-trip time when available.
  */
 
@@ -105,6 +109,18 @@ function copyPosteriorFields(data, ado_state) {
   }
 }
 
+function makeAdoStateDataFields(ado_state) {
+  const stopping = ado_state && ado_state.stopping ? ado_state.stopping : {};
+  return {
+    ado_eig: ado_state ? ado_state.eig : null,
+    ado_min_trials: stopping.min_trials ?? null,
+    ado_max_trials: stopping.max_trials ?? null,
+    ado_eig_tolerance: stopping.eig_tolerance ?? null,
+    ado_should_stop: ado_state ? Boolean(ado_state.should_stop) : false,
+    ado_stop_reason: ado_state ? ado_state.stop_reason : null,
+  };
+}
+
 function formatDebugNumber(value, digits = 4) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
     return "NA";
@@ -168,8 +184,12 @@ function logAdoTrial(run_context, trial_data, ado_result, config) {
     const posterior_charts = formatPosteriorDrawCharts(ado_result.posterior_draws, posterior_chart_params);
     const presented_selection_time = trial_data.ado_selection_time_ms;
     const presented_max_mutual_info = trial_data.ado_max_mutual_info;
-    const total_trials = config && config.n_trials ? config.n_trials : "?";
+    const stopping = ado_result.stopping || {};
+    const total_trials = stopping.max_trials ?? ((config && config.n_trials) || "?");
     const label = `ADO update ${trial_data.trial_number}/${total_trials} | ${run_context.ado_mode} | response: ${trial_data.choice_label}`;
+    const stop_summary = ado_result.stop_reason
+      ? `  stop reason: ${ado_result.stop_reason}`
+      : "  stop reason: none";
     const summary = [
       `${label} | latency: ${formatDebugLatency(ado_result.api_latency_ms)}`,
       "",
@@ -184,18 +204,23 @@ function logAdoTrial(run_context, trial_data, ado_result, config) {
       ...Object.keys(post_mean).map(param =>
         `  ${param}: mean ${formatDebugNumber(post_mean[param])}, sd ${formatDebugNumber(post_sd[param])}`
       ),
+      "",
+      "Stopping:",
+      `  min/max trials: ${stopping.min_trials ?? "NA"}/${stopping.max_trials ?? "NA"}`,
+      `  eig tolerance: ${formatDebugNumber(stopping.eig_tolerance, 6)}`,
+      `  next-trial eig: ${formatDebugNumber(ado_result.eig, 6)}`,
+      stop_summary,
       posterior_charts ? "\n" + posterior_charts : "",
       "",
-      // next_design is null on the final update (no further trial to show it on).
       next_design
         ? [
-            "Next ADO design:",
+            ado_result.should_stop ? "Next ADO design (not shown; stopping):" : "Next ADO design:",
             `  ${formatDebugOffer("SS", next_design.r_ss, next_design.t_ss)}`,
             `  ${formatDebugOffer("LL", next_design.r_ll, next_design.t_ll)}`,
             `  selection time: ${formatDebugLatency(ado_result.selection_time_ms)}`,
-            `  max mutual information: ${formatDebugNumber(ado_result.max_mutual_info, 6)}`,
+            `  eig: ${formatDebugNumber(ado_result.eig, 6)}`,
           ].join("\n")
-        : "Next ADO design: (final trial; none)",
+        : "Next ADO design: (none)",
     ].join("\n");
 
     console.log(summary);
@@ -309,6 +334,13 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
     );
   }
 
+  function shouldContinueLoop() {
+    const latest_state = typeof adaptive_controller.getState === "function"
+      ? adaptive_controller.getState()
+      : ado_state;
+    return !(latest_state && latest_state.should_stop);
+  }
+
   const initialize_ado = {
     type: jsPsychCallFunction,
     async: true,
@@ -321,108 +353,113 @@ function createDelayDiscountingTimeline(jsPsych, adaptive_controller, config, ru
           ado_session_id: result.session_id,
           ado_trial_index: result.trial_index,
           ado_mode: run_context.ado_mode,
+          ...makeAdoStateDataFields(result),
         });
       }).catch(error => failExperiment(error, done));
     }
   };
 
-  const trials = [initialize_ado];
-
-  for (let i = 0; i < config.n_trials; i++) {
-    trials.push({
-      type: jsPsychHtmlButtonResponse,
-      stimulus: function() {
-        return makeChoiceStimulus(current_design);
-      },
-      choices: ["SS", "LL"],
-      button_html: function() {
-        return [
-          makeOptionCardHtml(current_design, 0),
-          makeOptionCardHtml(current_design, 1),
-        ];
-      },
-      margin_vertical: "0px",
-      margin_horizontal: "12px",
-      prompt: "<p style=\"margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;\">Press <strong>S</strong> for Smaller-sooner &nbsp;·&nbsp; Press <strong>L</strong> for Larger-later</p>",
-      simulation_options: function() {
-        return makeChoiceSimulationOptions(run_context, current_design);
-      },
-      data: function() {
-        return {
-          task: "delay_discounting",
-          ado_session_id: ado_state.session_id,
-          ado_trial_index: ado_state.trial_index,
-          trial_number: i + 1,
-          t_ss: current_design.t_ss,
-          t_ll: current_design.t_ll,
-          r_ss: current_design.r_ss,
-          r_ll: current_design.r_ll,
-          ado_selection_time_ms: ado_state.selection_time_ms,
-          ado_max_mutual_info: ado_state.max_mutual_info,
-        };
-      },
-      on_load: function() {
-        active_key_handler = function(e) {
-          var key = e.key.toUpperCase();
-          if (key === "S") {
-            var btn = document.querySelector("#jspsych-html-button-response-button-0");
-            if (btn) { btn.click(); }
-          } else if (key === "L") {
-            var btn = document.querySelector("#jspsych-html-button-response-button-1");
-            if (btn) { btn.click(); }
-          }
-        };
-        document.addEventListener("keydown", active_key_handler);
-      },
-      on_finish: function(data) {
-        if (active_key_handler) {
-          document.removeEventListener("keydown", active_key_handler);
-          active_key_handler = null;
+  const choice_trial = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: function() {
+      return makeChoiceStimulus(current_design);
+    },
+    choices: ["SS", "LL"],
+    button_html: function() {
+      return [
+        makeOptionCardHtml(current_design, 0),
+        makeOptionCardHtml(current_design, 1),
+      ];
+    },
+    margin_vertical: "0px",
+    margin_horizontal: "12px",
+    prompt: "<p style=\"margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;\">Press <strong>S</strong> for Smaller-sooner &nbsp;·&nbsp; Press <strong>L</strong> for Larger-later</p>",
+    simulation_options: function() {
+      return makeChoiceSimulationOptions(run_context, current_design);
+    },
+    data: function() {
+      return {
+        task: "delay_discounting",
+        ado_session_id: ado_state.session_id,
+        ado_trial_index: ado_state.trial_index,
+        trial_number: ado_state.trial_index + 1,
+        t_ss: current_design.t_ss,
+        t_ll: current_design.t_ll,
+        r_ss: current_design.r_ss,
+        r_ll: current_design.r_ll,
+        ado_selection_time_ms: ado_state.selection_time_ms,
+        ado_max_mutual_info: ado_state.max_mutual_info,
+        ...makeAdoStateDataFields(ado_state),
+      };
+    },
+    on_load: function() {
+      active_key_handler = function(e) {
+        var key = e.key.toUpperCase();
+        if (key === "S") {
+          var btn = document.querySelector("#jspsych-html-button-response-button-0");
+          if (btn) { btn.click(); }
+        } else if (key === "L") {
+          var btn = document.querySelector("#jspsych-html-button-response-button-1");
+          if (btn) { btn.click(); }
         }
-        data.choice = data.response;
-        data.choice_label = config.response_labels[data.choice];
-        data.ado_design = {
-          t_ss: data.t_ss,
-          t_ll: data.t_ll,
-          r_ss: data.r_ss,
-          r_ll: data.r_ll,
-        };
-        copyPosteriorFields(data, ado_state);
-        last_choice_data = data;
+      };
+      document.addEventListener("keydown", active_key_handler);
+    },
+    on_finish: function(data) {
+      if (active_key_handler) {
+        document.removeEventListener("keydown", active_key_handler);
+        active_key_handler = null;
       }
-    });
+      data.choice = data.response;
+      data.choice_label = config.response_labels[data.choice];
+      data.ado_design = {
+        t_ss: data.t_ss,
+        t_ll: data.t_ll,
+        r_ss: data.r_ss,
+        r_ll: data.r_ll,
+      };
+      copyPosteriorFields(data, ado_state);
+      last_choice_data = data;
+    }
+  };
 
-    trials.push({
-      type: jsPsychCallFunction,
-      async: true,
-      func: function(done) {
-        adaptive_controller.update(last_choice_data).then(result => {
-          ado_state = result;
-          current_design = result.next_design;
-          max_mutual_info_history.push(last_choice_data.ado_max_mutual_info);
-          realized_information_gain_history.push(result.realized_information_gain);
-          if (run_context.debug) {
-            updateInfoGainDebugPanel(max_mutual_info_history, realized_information_gain_history);
-          }
-          logAdoTrial(run_context, last_choice_data, result, config);
-          done({
-            ado_event: "update",
-            ado_session_id: result.session_id,
-            ado_trial_index: result.trial_index,
-            ado_next_design: result.next_design,
-            ado_post_mean: result.post_mean,
-            ado_post_sd: result.post_sd,
-            ado_realized_information_gain: result.realized_information_gain,
-            ado_selection_time_ms: result.selection_time_ms,
-            ado_max_mutual_info: result.max_mutual_info,
-            ado_api_latency_ms: result.api_latency_ms,
-          });
-        }).catch(error => failExperiment(error, done));
-      }
-    });
-  }
+  const update_ado = {
+    type: jsPsychCallFunction,
+    async: true,
+    func: function(done) {
+      adaptive_controller.update(last_choice_data).then(result => {
+        ado_state = result;
+        current_design = result.next_design;
+        max_mutual_info_history.push(last_choice_data.ado_max_mutual_info);
+        realized_information_gain_history.push(result.realized_information_gain);
+        if (run_context.debug) {
+          updateInfoGainDebugPanel(max_mutual_info_history, realized_information_gain_history);
+        }
+        logAdoTrial(run_context, last_choice_data, result, config);
+        done({
+          ado_event: "update",
+          ado_session_id: result.session_id,
+          ado_trial_index: result.trial_index,
+          ado_next_design: result.next_design,
+          ado_post_mean: result.post_mean,
+          ado_post_sd: result.post_sd,
+          ado_realized_information_gain: result.realized_information_gain,
+          ado_selection_time_ms: result.selection_time_ms,
+          ado_max_mutual_info: result.max_mutual_info,
+          ado_api_latency_ms: result.api_latency_ms,
+          ...makeAdoStateDataFields(result),
+        });
+      }).catch(error => failExperiment(error, done));
+    }
+  };
 
-  return trials;
+  const adaptive_loop = {
+    timeline: [choice_trial, update_ado],
+    conditional_function: shouldContinueLoop,
+    loop_function: shouldContinueLoop,
+  };
+
+  return [initialize_ado, adaptive_loop];
 }
 
 export { createDelayDiscountingTimeline, makeChoiceStimulus };

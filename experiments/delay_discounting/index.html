@@ -129,6 +129,7 @@
                 model: hyperbolicModel,
                 grid_design: default_dd_config.grid_design,
                 stan: default_dd_config.stan,
+                stopping: default_dd_config.stopping,
                 n_trials: default_dd_config.n_trials,
                 session_id: using_jatos ? jatos.studyResultId : "local-" + Date.now(),
             });
@@ -196,6 +197,9 @@
             debug: debug,
             simulate: simulation_mode,
             simulation_seed: default_dd_simulation_config.seed,
+            ado_min_trials: default_dd_config.stopping.min_trials,
+            ado_max_trials: default_dd_config.stopping.max_trials,
+            ado_eig_tolerance: default_dd_config.stopping.eig_tolerance,
             // Record the data-generating parameters generically (sim_k, sim_tau, ...).
             ...Object.fromEntries(
                 Object.entries(default_dd_simulation_config.params).map(([name, value]) => ["sim_" + name, value])

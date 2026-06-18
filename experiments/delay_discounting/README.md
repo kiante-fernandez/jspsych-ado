@@ -50,6 +50,42 @@ be under the current posterior. A stimulus has high mutual information when plau
 posterior draws predict meaningfully different choices, especially when those draws are
 confident. The chosen stimulus is the candidate with the largest score.
 
+Adaptive stopping:
+
+The Stan controller returns `eig`, the expected information gain of the chosen next
+design. This is the same value as the selected design's mutual information, so no
+separate scoring machinery is needed for stopping. The jsPsych task is a looping
+`[choice, update]` timeline and stops when the controller's latest state has
+`should_stop: true`.
+
+The computation path is:
+
+1. `stan_ado_controller.js` stores prior draws at startup and posterior draws after
+   each Stan sample.
+2. `enumerateDesigns(...)` turns `grid_design` into every candidate offer.
+3. `selectOptimalDesign(...)` scores each candidate with `mutualInfo(...)`.
+4. For a candidate design `d`, `mutualInfo(...)` calls the model's
+   `choiceProbLL(d, draw_s)` for every draw `s`.
+5. The score is `H(mean_s p_s) - mean_s H(p_s)`, where `p_s` is the predicted LL
+   choice probability under draw `s` and `H` is binary entropy in nats.
+6. The selected design's `mutual_info` is copied to the controller state as `eig`.
+7. `evaluateStoppingState(...)` compares that best-design `eig` with
+   `stopping.eig_tolerance` after the min-trial gate.
+
+`eig`/mutual information is the expected learning before the next response.
+`realized_information_gain` is the actual learning after the observed response, so
+it can be higher or lower than `eig` on any single trial.
+
+Configure the rule in `dd_config.js`:
+
+- `stopping.min_trials`: the EIG criterion may not fire before this many choices.
+- `stopping.max_trials`: hard safety cap.
+- `stopping.eig_tolerance`: stop when `eig < eig_tolerance`.
+
+EIG is measured in nats; the maximum for a binary response is `ln(2)`, about `0.693`.
+The default `eig_tolerance: 0.08` is a reasonable starting point and should be tuned
+with simulation.
+
 As trials proceed, the posterior distributions should usually narrow around the
 participant's likely parameters. When that happens, fewer candidate stimuli can separate
 the remaining plausible parameter values, so the max-information-gain trace typically
