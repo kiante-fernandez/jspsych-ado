@@ -12,7 +12,7 @@ WebAssembly and run client-side in a Web Worker --- updates the posterior over t
 model parameters, and the next stimulus is chosen to maximize the expected information
 it provides about those parameters. The whole adaptive loop runs in the participant's
 browser: there is no analysis server and no Python dependency, so an experiment remains
-a set of static files that can be hosted on a platform such as JATOS or GitHub Pages.
+a set of static files that can be hosted by any ordinary static web server.
 The design is model- and stimulus-agnostic: a researcher supplies a Stan model, a link
 function, and a stimulus renderer, and the same inference-and-design engine drives the
 experiment.

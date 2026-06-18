@@ -17,8 +17,7 @@ import { startStaticServer } from "./static_server.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PAGE = "/experiments/delay_discounting/index.html";
-// Requests that 404 by design when not running inside JATOS — not failures.
-const BENIGN = [/jatos\.js$/, /favicon\.ico$/];
+const BENIGN = [/favicon\.ico$/];
 const isBenign = (url) => BENIGN.some((re) => re.test(url));
 
 async function runMode(browser, baseUrl, spec) {
