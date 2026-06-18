@@ -1,13 +1,47 @@
 {
   "name": "jspsych-ado",
   "version": "0.1.0",
-  "private": true,
   "description": "In-browser adaptive design optimization (ADO) for jsPsych experiments — Stan/WASM, no server, no Python.",
   "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "jspsych",
+    "adaptive-design-optimization",
+    "ado",
+    "stan",
+    "webassembly",
+    "bayesian",
+    "psychophysics"
+  ],
+  "homepage": "https://github.com/githubpsyche/jspsych-ado#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/githubpsyche/jspsych-ado.git"
+  },
+  "bugs": {
+    "url": "https://github.com/githubpsyche/jspsych-ado/issues"
+  },
+  "main": "./jspsych-ado/index.js",
+  "exports": {
+    ".": "./jspsych-ado/index.js",
+    "./ado/*": "./jspsych-ado/ado/*",
+    "./controllers/*": "./jspsych-ado/controllers/*",
+    "./models/*": "./jspsych-ado/models/*",
+    "./tasks/*": "./jspsych-ado/tasks/*"
+  },
+  "files": [
+    "jspsych-ado",
+    "core/tinystan",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test tests/js/*.test.mjs",
     "test:smoke": "node tests/js/stan_recovery.smoke.mjs",
     "test:browser": "node tests/browser/dd_smoke.mjs && node tests/browser/line_length_discrimination_smoke.mjs"
+  },
+  "peerDependencies": {
+    "jspsych": ">=7"
   },
   "devDependencies": {
     "puppeteer": "^24.15.0"

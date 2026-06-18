@@ -812,6 +812,7 @@ export {
   registerModelPackage,
   validateTask,
   validateModel,
+  validateTaskModelPair,
   prepareModels,
   createTimeline,
   parseStanPriors,

@@ -154,4 +154,4 @@ cite this repository.
 
 ## License
 
-To be finalized.
+[MIT](LICENSE) © The jspsych-ado contributors.

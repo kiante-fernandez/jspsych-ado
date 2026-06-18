@@ -32,5 +32,5 @@ jobs:
           node-version: '22'
       - name: Install dev deps (puppeteer + Chromium)
         run: npm install --no-audit --no-fund
-      - name: Delay-discounting browser smoke (mock + stan)
-        run: node tests/browser/dd_smoke.mjs
+      - name: Headless browser smokes (delay discounting + line length)
+        run: npm run test:browser
