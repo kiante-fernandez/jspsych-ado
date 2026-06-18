@@ -15,18 +15,25 @@ hyperbolic model) is the first example.
 Open with Live Server — there is no build step:
 
 ```
-experiments/delay_discounting/index.html?ado=stan&debug=1
+experiments/delay_discounting/index.html?controller=stan&strategy=ado&debug=1
 ```
 
 URL parameters:
 
-- `ado=stan` (default) — live in-browser Stan inference + ADO in a Web Worker.
-- `ado=mock` — deterministic, no-WASM controller for fast timeline/UI work.
+- `controller=stan` (default) — live in-browser Stan inference in a Web Worker.
+- `controller=mock` — deterministic, no-WASM controller for fast timeline/UI work.
+- `strategy=ado` (default) — select designs by mutual information.
+- `strategy=random` — keep the Stan posterior updates but sample designs randomly
+  from the same grid for recovery/dev baselines.
 - `debug=1` — per-trial console summary (design shown, response, posterior
   mean/sd for each parameter, next design, local sampling time) plus live
   posterior trajectory charts.
 - `simulate=data-only` / `simulate=visual` — run a simulated participant
   (generate data with no clicks / watch jsPsych click through the run).
+
+Legacy `ado=stan|mock|ado|random` URLs are still accepted as aliases, but new
+examples should use `controller=` and `strategy=` so backend choice and design
+policy stay distinct.
 
 ### Wiring it yourself (the façade)
 
@@ -92,6 +99,8 @@ const controller = createMockAdoController({
 });
 const run_context = {
   ado_mode:          "mock",
+  controller_mode:   "mock",
+  design_strategy:   null,
   model_id:          hyperbolicModel.id,
   debug:             true,
   posterior_display: hyperbolicModel.posterior_display,
@@ -238,5 +247,6 @@ Each choice trial records the design shown (its design keys, e.g. `t_ss`, `t_ll`
 `r_ss`, `r_ll`), the response (`choice`, `choice_raw`, `choice_label`, and the full
 `ado_design` object), the per-trial posterior summaries named from the model's
 parameters (`post_mean_<param>`, `post_sd_<param>`, e.g. `post_mean_k`), and timing.
-Run-level properties include `ado_mode` and `model_id`; under `simulate`, the
-data-generating `sim_<param>` values are saved too.
+Run-level properties include `controller_mode`, `design_strategy`, `ado_mode`
+(legacy/debug summary), and `model_id`; under `simulate`, the data-generating
+`sim_<param>` values are saved too.

@@ -92,7 +92,7 @@ function describeDesign(design, config) {
 /**
  * Print a readable summary of the just-finished ADO update (debug only).
  *
- * @param {Object} run_context - Current run settings (debug, ado_mode).
+ * @param {Object} run_context - Current run settings (debug, ado_mode, controller_mode, design_strategy).
  * @param {Object} trial_data - Completed jsPsych choice row.
  * @param {Object} ado_result - Updated controller state.
  * @param {Object} config - Timeline config.
@@ -111,7 +111,10 @@ function logAdoTrial(run_context, trial_data, ado_result, config) {
     const post_mean = ado_result.post_mean || {};
     const post_sd = ado_result.post_sd || {};
     const total_trials = config && config.n_trials ? config.n_trials : "?";
-    const label = `ADO update ${trial_data.trial_number}/${total_trials} | ${run_context.ado_mode} | response: ${trial_data.choice_label}`;
+    const mode_label = run_context.controller_mode === "stan" && run_context.design_strategy
+      ? `${run_context.controller_mode}/${run_context.design_strategy}`
+      : (run_context.controller_mode || run_context.ado_mode);
+    const label = `ADO update ${trial_data.trial_number}/${total_trials} | ${mode_label} | response: ${trial_data.choice_label}`;
     const summary = [
       `${label} | latency: ${formatDebugLatency(ado_result.api_latency_ms)}`,
       "",
@@ -651,6 +654,8 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
           ado_session_id: result.session_id,
           ado_trial_index: result.trial_index,
           ado_mode: run_context.ado_mode,
+          controller_mode: run_context.controller_mode,
+          design_strategy: run_context.design_strategy,
         });
       }).catch(error => failExperiment(error, done));
     }
@@ -719,6 +724,9 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
             ado_event: "update",
             ado_session_id: result.session_id,
             ado_trial_index: result.trial_index,
+            ado_mode: run_context.ado_mode,
+            controller_mode: run_context.controller_mode,
+            design_strategy: run_context.design_strategy,
             ado_next_design: result.next_design,
             ado_post_mean: result.post_mean,
             ado_post_sd: result.post_sd,

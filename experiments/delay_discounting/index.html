@@ -87,17 +87,17 @@
         import { createMockAdoController } from "./jspsych-ado/controllers/mock_ado_controller.js";
         import { createSeededRng, simulateDelayDiscountingChoice } from "./jspsych-ado/ado/ado_simulation.js";
         import { default_dd_config, default_dd_simulation_config } from "./experiments/delay_discounting/dd_config.js";
+        import { getRunSelection } from "./experiments/delay_discounting/dd_url.js";
 
         const using_jatos = typeof jatos !== 'undefined';
         const url_params = new URLSearchParams(window.location.search);
         const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
         const session_id = using_jatos ? jatos.studyResultId : "local-" + Date.now();
-        const requested_ado_mode = url_params.get("ado");
-        const valid_ado_modes = ["mock", "stan", "ado", "random"];
-        const ado_mode = valid_ado_modes.includes(requested_ado_mode) ? requested_ado_mode : "stan";
-        if (requested_ado_mode && !valid_ado_modes.includes(requested_ado_mode)) {
-            console.warn(`Unknown ado mode "${requested_ado_mode}"; running Stan ADO.`);
-        }
+
+        const run_selection = getRunSelection(url_params);
+        const controller_mode = run_selection.controller_mode;
+        const design_strategy = run_selection.design_strategy;
+        const ado_mode = run_selection.ado_mode;
         const debug = url_params.get("debug") === "1";
         const requested_simulation_mode = url_params.get("simulate");
         const simulation_mode = ["data-only", "visual"].includes(requested_simulation_mode) ? requested_simulation_mode : null;
@@ -173,6 +173,8 @@
 
         const run_context = {
             ado_mode: ado_mode,
+            controller_mode: controller_mode,
+            design_strategy: design_strategy,
             model_id: hyperbolicModel.id,
             debug: debug,
             param_history: param_history,
@@ -249,6 +251,8 @@
         jsPsych = initializeExperiment();
         jsPsych.data.addProperties({
             ado_mode: ado_mode,
+            controller_mode: controller_mode,
+            design_strategy: design_strategy,
             model_id: hyperbolicModel.id,
             debug: debug,
             simulate: simulation_mode,
@@ -260,7 +264,7 @@
         });
 
         let timeline = [instructions];
-        if (ado_mode === "mock") {
+        if (controller_mode === "mock") {
             // Dev path: drive the SAME generic timeline directly with the
             // deterministic mock controller (no WASM, no façade compile step).
             const mock_controller = createMockAdoController({
@@ -280,7 +284,7 @@
                 model: hyperbolicModel.id,
                 session_id: session_id,
                 task: "delay_discounting",
-                design_strategy: ado_mode === "random" ? "random" : "ado",
+                design_strategy: design_strategy,
                 design_seed: run_config.controller ? run_config.controller.design_seed : null,
             }, run_context));
         }

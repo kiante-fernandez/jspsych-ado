@@ -8,6 +8,10 @@ parameter table. It is currently configured for the delay-discounting experiment
 but the experiment path, task-row label, parameter metadata, simulation profiles,
 and selected design fields are all set in the notebook parameter cell.
 
+The helper uses the experiment's public URL API:
+`controller=stan&strategy=ado|random&simulate=data-only`. Both strategies run the
+same Stan/WASM posterior update path; only the design-selection policy changes.
+
 This is an explainer/audit workflow, not a normal CI test. The quick helper mode
 is useful as a smoke check.
 

@@ -26,8 +26,9 @@ What lives where:
   SS/LL option cards, the S/L keymap, the prompt).
 - **This folder** holds only experiment-level config and the page:
   - `dd_config.js` — `grid_design`, the `stan` sampler settings, and simulation config.
-  - `index.html` — registers the model and runs the timeline (`?ado=stan` live path,
-    `?ado=mock` deterministic dev path, `?simulate=…` simulated participants).
+  - `index.html` — registers the model and runs the timeline (`?controller=stan`
+    live inference, `?strategy=ado|random` design policy,
+    `?controller=mock` deterministic dev path, `?simulate=…` simulated participants).
 
 Response coding:
 

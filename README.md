@@ -25,12 +25,14 @@ client-side via [tinystan](https://github.com/WardBrian/tinystan) + WASM.
 Open with Live Server (no build step):
 
 ```text
-experiments/delay_discounting/index.html?ado=stan&debug=1
+experiments/delay_discounting/index.html?controller=stan&strategy=ado&debug=1
 ```
 
-`?ado=stan` (default) loads the WASM model and does live inference + ADO in a Web
-Worker. `?ado=mock` swaps in a deterministic, no-WASM controller for fast timeline/UI
-work.
+`?controller=stan&strategy=ado` (default) loads the WASM model and does live
+inference + ADO-selected designs in a Web Worker. `?controller=stan&strategy=random`
+uses the same inference path but samples designs randomly from the same grid.
+`?controller=mock` swaps in a deterministic, no-WASM controller for fast timeline/UI
+work. Legacy `?ado=stan|mock|ado|random` URLs are still accepted as aliases.
 
 ## Debug trace logs
 
@@ -45,8 +47,8 @@ group with tables.
 jsPsych click through the same simulated run:
 
 ```text
-experiments/delay_discounting/index.html?ado=stan&simulate=data-only&debug=1
-experiments/delay_discounting/index.html?ado=stan&simulate=visual
+experiments/delay_discounting/index.html?controller=stan&strategy=ado&simulate=data-only&debug=1
+experiments/delay_discounting/index.html?controller=stan&strategy=ado&simulate=visual
 ```
 
 The simulated participant parameters live in `experiments/delay_discounting/dd_config.js`
