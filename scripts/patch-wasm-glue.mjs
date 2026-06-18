@@ -18,7 +18,7 @@
 // if any committed main.js is unpatched, e.g. after a fresh recompile). Re-run
 // this after recompiling a model:  node scripts/patch-wasm-glue.mjs
 import { readFile, writeFile, readdir, access } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, resolve } from "node:path";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -63,4 +63,7 @@ async function main() {
   if (missing.length) process.exitCode = 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+// Run main() only when invoked directly (not when imported by the guard test).
+// pathToFileURL handles paths needing URL-encoding (spaces, etc.), which a raw
+// `file://${process.argv[1]}` would mismatch.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

@@ -677,7 +677,13 @@ test("buildAdapter reshapes flat {...design, choice} rows to {design, response} 
     paramNames: ["k"],
     prior: { k: { dist: "lognormal", meanlog: 0, sdlog: 1 } },
     moduleUrl: "/x/main.js",
+    wasmUrl: "/x/main.hash.wasm",
   });
+
+  // The bundler-emitted wasm URL (#57) must survive into the adapter so the
+  // controller can forward it to the worker's locateFile.
+  assert.equal(adapter.moduleUrl, "/x/main.js");
+  assert.equal(adapter.wasmUrl, "/x/main.hash.wasm");
 
   // Arbitrary design keys (not DD-shaped) survive the reshape.
   adapter.buildData([
@@ -692,6 +698,61 @@ test("buildAdapter reshapes flat {...design, choice} rows to {design, response} 
   const design = { r_ss: 100, r_ll: 200, t_ll: 1 };
   const draw = { k: 0.01, tau: 1 };
   assert.equal(adapter.responseProb(design, draw), responseProb(design, draw));
+});
+
+test("registerModelPackage -> createTimeline forwards wasmUrl to the worker init (bundler-safe, #57)", async () => {
+  // End-to-end guard over the whole public path (registerModelPackage -> registry
+  // -> buildAdapter -> controller -> worker), because each link previously dropped
+  // wasmUrl, silently disabling the #57 fix for anyone using createTimeline.
+  const init_messages = [];
+  const originalWorker = globalThis.Worker;
+  globalThis.Worker = class CapturingWorker {
+    postMessage(message) {
+      init_messages.push(message);
+      queueMicrotask(() => this.onmessage({ data: { type: "ready" } }));
+    }
+  };
+  globalThis.jsPsychCallFunction = "call-function";
+  globalThis.jsPsychHtmlButtonResponse = "html-button-response";
+
+  try {
+    registerTestTask("wasmurl-task");
+    registerModelPackage({
+      id: "wasmurl-model",
+      params: ["k", "tau"],
+      designKeys: DESIGN_KEYS,
+      responseSpace: RESPONSE_SPACE,
+      prior: {
+        k: { dist: "lognormal", meanlog: -4, sdlog: 2 },
+        tau: { dist: "normal", mean: 1, sd: 3 },
+      },
+      moduleUrl: "/pkg/main.js",
+      wasmUrl: "/pkg/main.deadbeef.wasm",
+      buildData: (trials) => ({ N: trials.length, y: trials.map((t) => t.choice) }),
+      responseProb,
+    });
+
+    const timeline = createTimeline({}, {
+      task: "wasmurl-task",
+      model: "wasmurl-model",
+      n_trials: 1,
+      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 7 },
+    });
+
+    await new Promise((resolve, reject) => {
+      timeline[0].func(resolve);
+      setTimeout(() => reject(new Error("timed out waiting for fake worker")), 100);
+    });
+
+    const init = init_messages.find((m) => m.type === "init");
+    assert.ok(init, "controller never sent a worker init message");
+    assert.equal(init.moduleUrl, "/pkg/main.js");
+    assert.equal(init.wasmUrl, "/pkg/main.deadbeef.wasm");
+  } finally {
+    globalThis.Worker = originalWorker;
+    delete globalThis.jsPsychCallFunction;
+    delete globalThis.jsPsychHtmlButtonResponse;
+  }
 });
 
 test("registerTask validates presentation while registerModel stays stats-only", () => {

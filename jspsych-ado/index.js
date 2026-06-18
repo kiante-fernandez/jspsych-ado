@@ -172,6 +172,9 @@ function registerModel(name, spec) {
     paramNames,
     prior,
     moduleUrl: spec.moduleUrl ?? null, // filled by prepareModels when compiling from source
+    // Bundler-emitted .wasm URL (#57). Present for committed model packages; null
+    // for source-compiled models, whose remote main.js fetches its own sibling wasm.
+    wasmUrl: spec.wasmUrl ?? null,
   });
 }
 
@@ -320,7 +323,7 @@ function normalizeTestletSize(value) {
 // Turn a registry entry into the engine's model adapter shape, bridging the
 // trial-shape mismatch between inline source models and the engine.
 function buildAdapter(entry) {
-  const { spec, name, paramNames, prior, moduleUrl } = entry;
+  const { spec, name, paramNames, prior, moduleUrl, wasmUrl } = entry;
   const { responseProb, responseProbs, toStanData, buildData } = spec;
 
   // The engine pushes flat rows {...design, choice} (any design keys). A model
@@ -335,6 +338,7 @@ function buildAdapter(entry) {
     params: paramNames,
     prior,
     moduleUrl,
+    wasmUrl, // forwarded to the worker's locateFile so the wasm resolves under a bundler (#57)
     designKeys: spec.designKeys,
     responseSpace: spec.responseSpace,
     buildData: adaptedBuildData,
@@ -780,6 +784,7 @@ function registerModelPackage(model, overrides = {}) {
 
   registerModel(name, {
     moduleUrl: model.moduleUrl,
+    wasmUrl: model.wasmUrl,
     prior: model.prior,
     params: model.params,
     designKeys: model.designKeys,
