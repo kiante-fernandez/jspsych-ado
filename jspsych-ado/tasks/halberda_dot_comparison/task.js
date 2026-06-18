@@ -5,6 +5,7 @@ import {
 
 const CANVAS_W = 800;
 const CANVAS_H = 600;
+const CANVAS_SIZE = [CANVAS_H, CANVAS_W];
 const FIXATION_MS = 250;
 const STIM_MS = 200;
 const RESPONSE_KEYS = ["b", "y"];
@@ -188,15 +189,22 @@ function describeDesign(design) {
   ];
 }
 
+function withCanvasSize(trial) {
+  return {
+    ...trial,
+    canvas_size: CANVAS_SIZE,
+  };
+}
+
 const design_grid = makeDotComparisonDesigns();
 
 const presentation = {
   getChoiceTrials(ctx) {
     const getDesign = ctx.getDesign;
     return [
-      canvasFrame({ draw: drawFixation, getDesign, duration: FIXATION_MS }),
-      canvasFrame({ draw: drawDots, getDesign, duration: STIM_MS }),
-      canvasResponse({ draw: drawResponsePrompt, getDesign, choices: RESPONSE_KEYS }, ctx),
+      withCanvasSize(canvasFrame({ draw: drawFixation, getDesign, duration: FIXATION_MS })),
+      withCanvasSize(canvasFrame({ draw: drawDots, getDesign, duration: STIM_MS })),
+      withCanvasSize(canvasResponse({ draw: drawResponsePrompt, getDesign, choices: RESPONSE_KEYS }, ctx)),
     ];
   },
   describeDesign,
@@ -228,6 +236,7 @@ export default halberdaDotComparisonTask;
 export {
   BASE_LARGE_COUNTS,
   CANVAS_H,
+  CANVAS_SIZE,
   CANVAS_W,
   CONTROL_MODES,
   FIXATION_MS,
@@ -245,4 +254,5 @@ export {
   presentation,
   responseToOutcome,
   response_labels,
+  withCanvasSize,
 };

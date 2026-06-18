@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import task, {
+  CANVAS_SIZE,
   correctChoiceIndex,
   makeDotComparisonDesigns,
   responseToOutcome,
@@ -15,6 +16,24 @@ test("Halberda task package exposes an adaptive dot-comparison design list", () 
   assert.deepEqual(task.responseSpace, { type: "binary" });
   assert.deepEqual(task.response_labels, { 0: "incorrect", 1: "correct" });
   assert.equal(typeof task.presentation.getChoiceTrials, "function");
+});
+
+test("Halberda canvas trials use the full drawing coordinate system", () => {
+  globalThis.jsPsychCanvasKeyboardResponse = globalThis.jsPsychCanvasKeyboardResponse || function jsPsychCanvasKeyboardResponse() {};
+  const design = task.design_grid[0];
+  const ctx = {
+    getDesign: () => design,
+    getState: () => ({ session_id: "s", trial_index: 0 }),
+    run_context: {},
+    trial_number: 1,
+    task: task.id,
+  };
+  const trials = task.presentation.getChoiceTrials(ctx);
+  assert.equal(trials.length, 3);
+  assert.deepEqual(CANVAS_SIZE, [600, 800]);
+  for (const trial of trials) {
+    assert.deepEqual(trial.canvas_size, CANVAS_SIZE);
+  }
 });
 
 test("design generation includes both color orders and visual-control modes", () => {

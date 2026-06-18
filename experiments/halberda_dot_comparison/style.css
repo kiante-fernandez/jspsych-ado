@@ -12,6 +12,13 @@ body {
 canvas {
   background: #ffffff;
   border: 1px solid #ddd;
+  box-sizing: border-box;
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-height: min(600px, calc(100vh - 220px));
+  max-width: calc(100vw - 32px);
+  width: min(800px, calc(100vw - 32px));
 }
 
 .results-page {
