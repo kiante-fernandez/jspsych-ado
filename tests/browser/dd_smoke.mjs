@@ -24,10 +24,12 @@ const isBenign = (url) => BENIGN.some((re) => re.test(url));
 async function runMode(browser, baseUrl, spec) {
   const page = await browser.newPage();
   const consoleErrors = [];
+  const consoleMessages = [];
   const pageErrors = [];
   const failedReqs = [];
 
   page.on("console", (msg) => {
+    consoleMessages.push(msg.text());
     if (msg.type() !== "error") return;
     // "Failed to load resource: 404" carries no URL; covered by the response check.
     if (/Failed to load resource/i.test(msg.text())) return;
@@ -77,7 +79,7 @@ async function runMode(browser, baseUrl, spec) {
   }, { timeout: spec.timeout, polling: 500 }).then((h) => h.jsonValue());
 
   await page.close();
-  return { mode: spec.label, result, consoleErrors, pageErrors, failedReqs };
+  return { mode: spec.label, result, consoleMessages, consoleErrors, pageErrors, failedReqs };
 }
 
 let failures = 0;
@@ -133,6 +135,12 @@ try {
 	          typeof r.postMeanTau === "number" && typeof r.postSdTau === "number",
 	          `${mode}: posterior populated (k mean=${r.postMeanK}, sd=${r.postSdK}; tau mean=${r.postMeanTau}, sd=${r.postSdTau})`);
       }
+    }
+    const questLogs = out.consoleMessages.filter((message) => /jsQuestPlus Version/.test(message));
+    if (mode === "quest_plus") {
+      note(questLogs.length > 0, `${mode}: Quest+ module loaded`);
+    } else {
+      note(questLogs.length === 0, `${mode}: Quest+ module not loaded`);
     }
     note(out.consoleErrors.length === 0, `${mode}: no console errors` + (out.consoleErrors.length ? ` -> ${out.consoleErrors.slice(0, 3).join(" | ")}` : ""));
     note(out.pageErrors.length === 0, `${mode}: no uncaught page errors` + (out.pageErrors.length ? ` -> ${out.pageErrors.slice(0, 3).join(" | ")}` : ""));

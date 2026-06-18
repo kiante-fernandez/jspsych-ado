@@ -90,7 +90,6 @@
     </head>
     <body></body>
     <script type="module">
-        import QuestPlus from "./core/jsquest-plus/jsQuestPlus.module.js";
         import { makeDebriefStimulus } from "./jspsych-ado/ado/ado_timeline.js";
         import { createSeededRng, simulateCategoricalChoice } from "./jspsych-ado/ado/ado_simulation.js";
         import {
@@ -115,7 +114,10 @@
         const url_params = new URLSearchParams(window.location.search);
         const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
         const session_id = using_jatos ? jatos.studyResultId : "local-" + Date.now();
-        const run_settings = getExperimentRunSettings(url_params);
+        const available_controllers = ["mock", "stan", "quest_plus"];
+        const run_settings = getExperimentRunSettings(url_params, {
+            controllers: available_controllers,
+        });
         const simulation_config = resolveSimulationConfig(
             default_line_length_simulation_config,
             run_config,
@@ -141,6 +143,33 @@
             model: lineLengthModel,
             config: default_line_length_config,
         });
+
+        async function makeOptionalControllerFactories(run_settings) {
+            if (run_settings.controller_mode !== "quest_plus") {
+                return {};
+            }
+            const [{ createQuestPlusController }, { default: QuestPlus }] = await Promise.all([
+                import("./jspsych-ado/controllers/quest_plus_controller.js"),
+                import("./core/jsquest-plus/jsQuestPlus.module.js"),
+            ]);
+            return {
+                quest_plus: {
+                    max_testlet_size: 1,
+                    create: function({ task, model, config, session_id }) {
+                        return createQuestPlusController({
+                            QuestPlus: QuestPlus,
+                            model: model,
+                            grid_design: task.design_grid,
+                            quest_plus: config.quest_plus,
+                            session_id: session_id,
+                            n_trials: config.n_trials,
+                        });
+                    },
+                },
+            };
+        }
+
+        const controller_factories = await makeOptionalControllerFactories(run_settings);
 
         const instructions = {
             type: jsPsychInstructions,
@@ -185,13 +214,13 @@
 
         let timeline = [instructions];
         timeline = timeline.concat(createExperimentAdoTimeline(jsPsych, {
-            QuestPlus: QuestPlus,
             task: lineLengthTask,
             model: lineLengthModel,
             config: default_line_length_config,
             run_context: run_context,
             session_id: session_id,
             design_seed: run_config.controller ? run_config.controller.design_seed : null,
+            controller_factories: controller_factories,
         }));
         timeline.push(end_screen);
 

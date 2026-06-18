@@ -9,7 +9,8 @@ The package separates three concepts:
 
 - **task**: design grid, stimulus presentation, choices, response labels
 - **model**: parameters, priors, likelihood, Stan data builder, compiled WASM
-- **controller**: how designs/posteriors are updated (`stan`, `mock`, `quest_plus`)
+- **controller**: how designs/posteriors are updated (`stan`, `mock`, and
+  optional comparators such as `quest_plus`)
 
 ### Quick start
 
@@ -35,6 +36,11 @@ URL parameters:
 
 Legacy `ado=stan|mock|ado|random|quest_plus` URLs are still accepted as aliases,
 but new examples should use `controller=` and `strategy=`.
+
+Quest+ is optional. Experiment pages opt into it with a controller factory and
+load the vendored Quest+ module only for `controller=quest_plus`; Stan, random,
+and mock runs do not need Quest+. The current Quest+ adapter is sequential-only,
+so it supports `testlet_size: 1` and fails clearly for larger testlets.
 
 ### Wiring the facade
 

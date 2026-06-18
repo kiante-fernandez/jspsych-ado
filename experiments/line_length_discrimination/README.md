@@ -91,6 +91,10 @@ Quest+ categorical comparator:
 experiments/line_length_discrimination/index.html?controller=quest_plus&simulate=data-only&debug=1
 ```
 
+Quest+ is an optional comparator controller. The page loads it only when
+`controller=quest_plus` is selected. The current adapter is sequential-only and
+does not support `testlet_size > 1`.
+
 Visual simulation:
 
 ```text

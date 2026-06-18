@@ -18,11 +18,11 @@ import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js"
 registerAdoExperiment({ task: delayDiscountingTask, model: hyperbolicModel, config });
 
 const timeline = createExperimentAdoTimeline(jsPsych, {
-  QuestPlus,
   task: delayDiscountingTask,
   model: hyperbolicModel,
   config,
   run_context,
+  controller_factories,
 });
 ```
 
@@ -34,8 +34,8 @@ What lives where:
   S/L keymap, response labels, and task id.
 - **The hyperbolic model package** owns the likelihood (`responseProb`/`.stan`),
   priors, posterior display metadata, and Stan data builder.
-- **This folder** holds the page and run settings: sampler config, Quest+
-  parameter samples, trial count, testlet size, and simulation config.
+- **This folder** holds the page and run settings: sampler config, optional
+  Quest+ parameter samples, trial count, testlet size, and simulation config.
 
 Response coding:
 

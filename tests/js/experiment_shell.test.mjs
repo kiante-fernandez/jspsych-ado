@@ -2,7 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  createExperimentAdoTimeline,
   DEFAULT_VISUAL_SIMULATION_RT,
+  getRunSelection,
   getSimulationModeDefaults,
   makeEndSimulationData,
   makeInstructionSimulationData,
@@ -20,6 +22,27 @@ const DEFAULT_SIMULATION_CONFIG = {
     end: 300,
   },
 };
+
+function selection(query, opts = {}) {
+  return getRunSelection(new URLSearchParams(query), opts);
+}
+
+function selectionWithWarnings(query, opts = {}) {
+  const original_warn = console.warn;
+  const warnings = [];
+  console.warn = function(message) {
+    warnings.push(message);
+  };
+
+  try {
+    return {
+      result: selection(query, opts),
+      warnings,
+    };
+  } finally {
+    console.warn = original_warn;
+  }
+}
 
 test("resolveSimulationConfig keeps data-only simulation fast", () => {
   const config = resolveSimulationConfig(DEFAULT_SIMULATION_CONFIG, {}, "data-only");
@@ -62,4 +85,72 @@ test("getSimulationModeDefaults only changes visual mode", () => {
   assert.deepEqual(getSimulationModeDefaults("visual"), {
     rt: DEFAULT_VISUAL_SIMULATION_RT,
   });
+});
+
+test("getRunSelection only enables optional controllers when experiments opt in", () => {
+  const default_run = selectionWithWarnings("controller=quest_plus");
+  assert.deepEqual(default_run.result, {
+    controller_mode: "stan",
+    design_strategy: "ado",
+    ado_mode: "stan",
+  });
+  assert.equal(default_run.warnings.length, 1);
+  assert.match(default_run.warnings[0], /Unknown controller/);
+
+  assert.deepEqual(selection("controller=quest_plus", { controllers: ["mock", "stan", "quest_plus"] }), {
+    controller_mode: "quest_plus",
+    design_strategy: null,
+    ado_mode: "quest_plus",
+  });
+});
+
+test("optional controller factories declare supported testlet size", () => {
+  const task = {
+    id: "demo-task",
+    response_labels: { 0: "A", 1: "B" },
+    presentation: { makeStimulus: () => "" },
+    choices: ["A", "B"],
+  };
+  const model = {
+    id: "demo-model",
+    params: ["theta"],
+    posterior_display: {},
+  };
+  const run_context = {
+    controller_mode: "quest_plus",
+    ado_mode: "quest_plus",
+    design_strategy: null,
+  };
+
+  assert.throws(
+    () => createExperimentAdoTimeline({}, {
+      task,
+      model,
+      config: { n_trials: 4, testlet_size: 2 },
+      run_context,
+      session_id: "demo",
+      controller_factories: {
+        quest_plus: {
+          max_testlet_size: 1,
+          create: () => {
+            throw new Error("factory should not be called");
+          },
+        },
+      },
+    }),
+    /controller "quest_plus" supports testlet_size up to 1; got 2/
+  );
+});
+
+test("optional controller modes require an experiment-supplied factory", () => {
+  assert.throws(
+    () => createExperimentAdoTimeline({}, {
+      task: { id: "demo-task", response_labels: {}, presentation: { makeStimulus: () => "" } },
+      model: { id: "demo-model", params: [], posterior_display: {} },
+      config: { n_trials: 1, testlet_size: 1 },
+      run_context: { controller_mode: "quest_plus", ado_mode: "quest_plus", design_strategy: null },
+      session_id: "demo",
+    }),
+    /controller "quest_plus" is not available/
+  );
 });

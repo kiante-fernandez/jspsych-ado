@@ -7,7 +7,10 @@ import { getRunSelection as getSharedRunSelection } from "../../jspsych-ado/ado/
  * @returns {Object} Resolved controller_mode, design_strategy, and legacy ado_mode.
  */
 function getRunSelection(params) {
-  return getSharedRunSelection(params, { allow_legacy_ado: true });
+  return getSharedRunSelection(params, {
+    allow_legacy_ado: true,
+    controllers: ["mock", "stan", "quest_plus"],
+  });
 }
 
 export {

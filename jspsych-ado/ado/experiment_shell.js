@@ -1,9 +1,8 @@
 import { jsPsychADO } from "../index.js";
 import { createAdoTimeline } from "./ado_timeline.js";
 import { createMockAdoController } from "../controllers/mock_ado_controller.js";
-import { createQuestPlusController } from "../controllers/quest_plus_controller.js";
 
-const VALID_CONTROLLERS = ["mock", "stan", "quest_plus"];
+const DEFAULT_CONTROLLERS = ["mock", "stan"];
 const VALID_STRATEGIES = ["ado", "random"];
 const VALID_SIMULATION_MODES = ["data-only", "visual"];
 const DEFAULT_VISUAL_SIMULATION_RT = {
@@ -12,11 +11,17 @@ const DEFAULT_VISUAL_SIMULATION_RT = {
   end: 600,
 };
 
+function getAvailableControllers(opts = {}) {
+  const controllers = opts.controllers || opts.valid_controllers || DEFAULT_CONTROLLERS;
+  return Array.isArray(controllers) && controllers.length ? controllers : DEFAULT_CONTROLLERS;
+}
+
 function getRunSelection(params, opts = {}) {
   const requested_ado_mode = params.get("ado");
   const requested_controller = params.get("controller");
   const requested_strategy = params.get("strategy");
   const allow_legacy_ado = opts.allow_legacy_ado === true;
+  const available_controllers = getAvailableControllers(opts);
 
   let controller_mode = "stan";
   let design_strategy = "ado";
@@ -31,7 +36,7 @@ function getRunSelection(params, opts = {}) {
     } else if (requested_ado_mode === "random") {
       controller_mode = "stan";
       design_strategy = "random";
-    } else if (requested_ado_mode === "quest_plus") {
+    } else if (requested_ado_mode === "quest_plus" && available_controllers.includes("quest_plus")) {
       controller_mode = "quest_plus";
       design_strategy = null;
     } else {
@@ -46,7 +51,7 @@ function getRunSelection(params, opts = {}) {
   }
 
   if (requested_controller) {
-    if (VALID_CONTROLLERS.includes(requested_controller)) {
+    if (available_controllers.includes(requested_controller)) {
       controller_mode = requested_controller;
     } else {
       console.warn(`Unknown controller "${requested_controller}"; using controller=${controller_mode}.`);
@@ -61,15 +66,9 @@ function getRunSelection(params, opts = {}) {
     }
   }
 
-  if (controller_mode === "mock") {
+  if (controller_mode !== "stan") {
     if (requested_strategy) {
-      console.warn("strategy= is ignored when controller=mock.");
-    }
-    design_strategy = null;
-  }
-  if (controller_mode === "quest_plus") {
-    if (requested_strategy) {
-      console.warn("strategy= is ignored when controller=quest_plus.");
+      console.warn(`strategy= is ignored when controller=${controller_mode}.`);
     }
     design_strategy = null;
   }
@@ -77,9 +76,9 @@ function getRunSelection(params, opts = {}) {
   return {
     controller_mode,
     design_strategy,
-    ado_mode: controller_mode === "mock" || controller_mode === "quest_plus"
-      ? controller_mode
-      : (design_strategy === "random" ? "random" : "stan"),
+    ado_mode: controller_mode === "stan"
+      ? (design_strategy === "random" ? "random" : "stan")
+      : controller_mode,
   };
 }
 
@@ -223,16 +222,38 @@ function makeTimelineConfig(task, config) {
   };
 }
 
+function getTestletSize(config) {
+  return config.testlet_size == null ? 1 : config.testlet_size;
+}
+
+function normalizeControllerFactory(name, factory) {
+  if (typeof factory === "function") {
+    return { create: factory };
+  }
+  if (factory && typeof factory.create === "function") {
+    return factory;
+  }
+  throw new Error(`controller "${name}" is not available in this experiment.`);
+}
+
+function assertControllerSupportsTestlet(name, factory, testlet_size) {
+  const max_testlet_size = factory.max_testlet_size == null ? Infinity : factory.max_testlet_size;
+  if (testlet_size > max_testlet_size) {
+    throw new Error(`controller "${name}" supports testlet_size up to ${max_testlet_size}; got ${testlet_size}`);
+  }
+}
+
 function createExperimentAdoTimeline(jsPsych, {
-  QuestPlus,
   task,
   model,
   config,
   run_context,
   session_id,
   design_seed = null,
+  controller_factories = {},
 }) {
   const timeline_config = makeTimelineConfig(task, config);
+  const testlet_size = getTestletSize(config);
 
   if (run_context.controller_mode === "mock") {
     const mock_controller = createMockAdoController({
@@ -244,16 +265,21 @@ function createExperimentAdoTimeline(jsPsych, {
     return createAdoTimeline(jsPsych, mock_controller, timeline_config, run_context);
   }
 
-  if (run_context.controller_mode === "quest_plus") {
-    const quest_plus_controller = createQuestPlusController({
-      QuestPlus,
+  if (run_context.controller_mode !== "stan") {
+    const factory = normalizeControllerFactory(
+      run_context.controller_mode,
+      controller_factories[run_context.controller_mode]
+    );
+    assertControllerSupportsTestlet(run_context.controller_mode, factory, testlet_size);
+    const controller = factory.create({
       model,
-      grid_design: task.design_grid,
-      quest_plus: config.quest_plus,
+      task,
+      config,
+      run_context,
       session_id,
-      n_trials: config.n_trials,
+      design_seed,
     });
-    return createAdoTimeline(jsPsych, quest_plus_controller, timeline_config, run_context);
+    return createAdoTimeline(jsPsych, controller, timeline_config, run_context);
   }
 
   return jsPsychADO.createTimeline(jsPsych, {
@@ -271,6 +297,7 @@ export {
   addAdoDataProperties,
   createExperimentAdoTimeline,
   DEFAULT_VISUAL_SIMULATION_RT,
+  DEFAULT_CONTROLLERS,
   getExperimentRunSettings,
   getSimulationModeDefaults,
   getRunSelection,
