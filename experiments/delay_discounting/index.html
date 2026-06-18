@@ -208,6 +208,7 @@
             design_grid: default_dd_config.grid_design,
             stan: default_dd_config.stan,
             n_trials: default_dd_config.n_trials,
+            testlet_size: default_dd_config.testlet_size,
         });
 
         const plain_finish_stimulus = '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
@@ -270,9 +271,12 @@
             const mock_controller = createMockAdoController({
                 grid_design: default_dd_config.grid_design,
                 params: hyperbolicModel.params,
+                n_trials: default_dd_config.n_trials,
+                testlet_size: default_dd_config.testlet_size,
             });
             timeline = timeline.concat(createAdoTimeline(jsPsych, mock_controller, {
                 n_trials: default_dd_config.n_trials,
+                testlet_size: default_dd_config.testlet_size,
                 response_labels: default_dd_config.response_labels,
                 presentation: hyperbolicModel.presentation,
                 choices: hyperbolicModel.choices,
@@ -286,6 +290,7 @@
                 task: "delay_discounting",
                 design_strategy: design_strategy,
                 design_seed: run_config.controller ? run_config.controller.design_seed : null,
+                testlet_size: default_dd_config.testlet_size,
             }, run_context));
         }
         timeline.push(end_screen);

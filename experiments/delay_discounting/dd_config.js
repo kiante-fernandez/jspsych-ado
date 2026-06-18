@@ -18,6 +18,7 @@ function range(start, stop, step) {
  */
 const default_dd_config = {
   n_trials: 42,
+  testlet_size: 1,
   grid_design: {
     t_ss: [0],
     t_ll: [
