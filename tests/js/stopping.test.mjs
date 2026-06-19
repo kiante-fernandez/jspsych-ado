@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeStoppingConfig, evaluateStopping, maxPossibleEig } from "../../jspsych-ado/ado/stopping.js";
+import { normalizeStoppingConfig, evaluateStopping, maxPossibleEig, makeStoppingEvaluator } from "../../jspsych-ado/ado/stopping.js";
 
 const LN2 = Math.log(2);
 const LN3 = Math.log(3);
@@ -95,6 +95,27 @@ test("de-bounce: consecutive=2 needs two sub-threshold refits in a row; a reboun
   assert.equal(r3.should_stop, false);
   assert.equal(r4.should_stop, true);
   assert.equal(r4.stop_reason, "eig_fraction");
+});
+
+test("makeStoppingEvaluator threads the consecutive-below streak and reset() clears it", () => {
+  const stopper = makeStoppingEvaluator({
+    stopping: { min_trials: 1, max_trials: 50, eig_fraction: 0.1, consecutive: 2 },
+    default_max_trials: 50,
+    max_possible_eig: LN2, // threshold = 0.0693
+  });
+  assert.equal(stopper.config.max_trials, 50);
+  // first sub-threshold refit: streak 1, no stop; second in a row: stop.
+  assert.deepEqual(stopper.evaluate(5, 0.04), { should_stop: false, stop_reason: null });
+  assert.deepEqual(stopper.evaluate(6, 0.03), { should_stop: true, stop_reason: "eig_fraction" });
+  // reset clears the streak, so a single sub-threshold refit no longer stops.
+  stopper.reset();
+  assert.deepEqual(stopper.evaluate(7, 0.03), { should_stop: false, stop_reason: null });
+});
+
+test("makeStoppingEvaluator with no max_possible_eig (mock) only ever max_trials-stops", () => {
+  const stopper = makeStoppingEvaluator({ stopping: { eig_fraction: 0.1, max_trials: 3 }, default_max_trials: 3 });
+  assert.deepEqual(stopper.evaluate(2, null), { should_stop: false, stop_reason: null });
+  assert.deepEqual(stopper.evaluate(3, null), { should_stop: true, stop_reason: "max_trials" });
 });
 
 test("a higher eig_fraction stops earlier on the same decreasing EIG trajectory", () => {

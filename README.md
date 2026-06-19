@@ -156,8 +156,9 @@ stopping: {
 ```
 
 Omit `stopping` (or `eig_fraction`) for a fixed-length run of `n_trials`. Each row
-records `ado_eig`, `ado_should_stop`, and `ado_stop_reason` (`"eig_fraction"` or
-`"max_trials"`). A complementary precision-target rule is tracked in
+records `ado_should_stop` and `ado_stop_reason` (`"eig_fraction"` or `"max_trials"`);
+the EIG that drove the decision is the grid-max MI in `ado_max_mutual_info`. A
+complementary precision-target rule is tracked in
 [#101](https://github.com/githubpsyche/jspsych-ado/issues/101).
 
 ### Debug traces

@@ -45,7 +45,7 @@ function toFiniteNumberOrNull(value) {
  * @returns {{min_trials:number, max_trials:?number, eig_fraction:?number, consecutive:number}}
  *   eig_fraction null => EIG stopping is OFF (only the max_trials cap applies).
  */
-function normalizeStoppingConfig(stopping = {}, default_max_trials = null) {
+function normalizeStoppingConfig(stopping, default_max_trials = null) {
   const source = stopping || {};
   return {
     min_trials: toNonNegativeInteger(source.min_trials, 0),
@@ -85,9 +85,9 @@ function maxPossibleEig(responseSpace) {
  * @param {?number} args.max_possible_eig - ln(K) for the response space.
  * @param {number}  [args.consecutive_below=0] - Running count of consecutive sub-threshold refits.
  * @param {Object}  args.stopping - A NORMALIZED stopping config (from normalizeStoppingConfig).
- * @returns {{should_stop:boolean, stop_reason:?string, consecutive_below:number, threshold:?number}}
- *   stop_reason is "max_trials" or "eig_fraction"; threshold is the absolute EIG
- *   cutoff (eig_fraction * max_possible_eig) for logging, or null when off.
+ * @returns {{should_stop:boolean, stop_reason:?string, consecutive_below:number}}
+ *   stop_reason is "max_trials" or "eig_fraction"; consecutive_below is the updated
+ *   sub-threshold streak to feed back in on the next call.
  */
 function evaluateStopping({ completed_trials, eig, max_possible_eig, consecutive_below = 0, stopping }) {
   const cfg = stopping || normalizeStoppingConfig();
@@ -96,19 +96,49 @@ function evaluateStopping({ completed_trials, eig, max_possible_eig, consecutive
   const max_eig = toFiniteNumberOrNull(max_possible_eig);
 
   const threshold = cfg.eig_fraction != null && max_eig != null ? cfg.eig_fraction * max_eig : null;
-
   // A trial counts as "below" only once past min_trials (early EIG estimates from a
   // prior-dominated posterior are unreliable). A non-below trial resets the streak.
   const below = threshold != null && eig_value != null && completed >= cfg.min_trials && eig_value < threshold;
   const next_consecutive = below ? consecutive_below + 1 : 0;
 
   if (cfg.max_trials != null && completed >= cfg.max_trials) {
-    return { should_stop: true, stop_reason: "max_trials", consecutive_below: next_consecutive, threshold };
+    return { should_stop: true, stop_reason: "max_trials", consecutive_below: next_consecutive };
   }
-  if (below && next_consecutive >= cfg.consecutive) {
-    return { should_stop: true, stop_reason: "eig_fraction", consecutive_below: next_consecutive, threshold };
+  // next_consecutive is only >= 1 when `below`, so this already implies the
+  // threshold + min_trials gates passed.
+  if (next_consecutive >= cfg.consecutive) {
+    return { should_stop: true, stop_reason: "eig_fraction", consecutive_below: next_consecutive };
   }
-  return { should_stop: false, stop_reason: null, consecutive_below: next_consecutive, threshold };
+  return { should_stop: false, stop_reason: null, consecutive_below: next_consecutive };
 }
 
-export { normalizeStoppingConfig, evaluateStopping, maxPossibleEig };
+/**
+ * A small stateful stopping evaluator: owns the normalized config and the
+ * consecutive-below streak so a controller doesn't hand-roll either. Both the Stan
+ * and mock controllers use this; the mock passes no max_possible_eig, so its EIG
+ * stopping is inert (only the max_trials cap applies).
+ *
+ * @param {Object} args
+ * @param {Object} [args.stopping] - Raw stopping config.
+ * @param {?number} [args.default_max_trials] - max_trials fallback (n_trials).
+ * @param {?number} [args.max_possible_eig] - ln(K); omit to disable EIG stopping.
+ * @returns {{config:Object, reset:Function, evaluate:Function}} `evaluate(completed_trials, eig)`
+ *   returns {should_stop, stop_reason}; `reset()` clears the streak for a new run.
+ */
+function makeStoppingEvaluator({ stopping, default_max_trials = null, max_possible_eig = null } = {}) {
+  const config = normalizeStoppingConfig(stopping, default_max_trials);
+  let consecutive_below = 0;
+  return {
+    config,
+    reset() {
+      consecutive_below = 0;
+    },
+    evaluate(completed_trials, eig) {
+      const result = evaluateStopping({ completed_trials, eig, max_possible_eig, consecutive_below, stopping: config });
+      consecutive_below = result.consecutive_below;
+      return { should_stop: result.should_stop, stop_reason: result.stop_reason };
+    },
+  };
+}
+
+export { normalizeStoppingConfig, evaluateStopping, maxPossibleEig, makeStoppingEvaluator };

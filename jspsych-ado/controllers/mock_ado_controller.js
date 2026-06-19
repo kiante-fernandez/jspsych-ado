@@ -6,7 +6,7 @@
 // reported as null so mock runs never imply real information-gain estimates.
 
 import { enumerateDesigns } from "../ado/mi_engine.js";
-import { normalizeStoppingConfig, evaluateStopping } from "../ado/stopping.js";
+import { makeStoppingEvaluator } from "../ado/stopping.js";
 
 /**
  * Create a deterministic local controller for any registered model.
@@ -29,26 +29,10 @@ function createMockAdoController({ grid_design, params = [], n_trials = null, te
     throw new Error("createMockAdoController: testlet_size must be a positive integer");
   }
 
-  // Mock has no real EIG, so EIG stopping never fires (eig is null); only the
-  // max_trials cap applies. Fields are present for contract parity with the Stan
-  // controller so the timeline's stopping loop behaves identically.
-  const stopping_config = normalizeStoppingConfig(stopping, n_trials);
-  function stoppingFields(completed_trials) {
-    const result = evaluateStopping({
-      completed_trials,
-      eig: null,
-      max_possible_eig: null,
-      consecutive_below: 0,
-      stopping: stopping_config,
-    });
-    return {
-      eig: null,
-      max_possible_eig: null,
-      should_stop: result.should_stop,
-      stop_reason: result.stop_reason,
-      stopping: stopping_config,
-    };
-  }
+  // Mock has no real EIG, so EIG stopping is inert (no max_possible_eig); only the
+  // max_trials cap applies. should_stop/stop_reason are still emitted for contract
+  // parity, so the timeline's stopping loop behaves identically.
+  const stopper = makeStoppingEvaluator({ stopping, default_max_trials: n_trials });
 
   let session_id = "mock-session";
   let trial_index = 0;
@@ -61,7 +45,7 @@ function createMockAdoController({ grid_design, params = [], n_trials = null, te
   function nextBlockSize(from_index) {
     // Effective trial cap = stopping max_trials (falls back to n_trials), so the
     // mock supplies designs for every node the timeline can run.
-    const cap = stopping_config.max_trials;
+    const cap = stopper.config.max_trials;
     const remaining = cap == null ? testlet_size : Math.max(0, cap - from_index);
     return Math.min(testlet_size, remaining);
   }
@@ -114,7 +98,7 @@ function createMockAdoController({ grid_design, params = [], n_trials = null, te
         next_design_metrics: nullDesignMetrics(next_designs.length),
         selection_time_ms: null,
         max_mutual_info: null,
-        ...stoppingFields(trial_index),
+        ...stopper.evaluate(trial_index, null),
         post_mean: null,
         post_sd: null,
         api_latency_ms: null,
@@ -140,7 +124,7 @@ function createMockAdoController({ grid_design, params = [], n_trials = null, te
         next_design_metrics: nullDesignMetrics(next_designs.length),
         selection_time_ms: null,
         max_mutual_info: null,
-        ...stoppingFields(trial_index),
+        ...stopper.evaluate(trial_index, null),
         post_mean,
         post_sd,
         api_latency_ms: null,

@@ -955,8 +955,10 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
   // node that is skipped once the controller signals should_stop (set in the update
   // below). With no stopping config, max_trials = config.n_trials and nothing is
   // ever skipped, so the run is fixed-length and behaves exactly as before.
+  // normalizeStoppingConfig already resolves max_trials to config.n_trials when no
+  // stopping config is given, so this is the single effective trial cap.
   const stopping_resolved = normalizeStoppingConfig(config.stopping, config.n_trials);
-  const max_trials = stopping_resolved.max_trials ?? config.n_trials;
+  const max_trials = stopping_resolved.max_trials;
   let stopped = false;
 
   const trials = [initialize_ado];
@@ -1071,7 +1073,8 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
               ado_max_mutual_info: result.max_mutual_info ?? null,
               ado_realized_information_gain: result.realized_information_gain ?? null,
               ado_realized_information_gains: result.realized_information_gains ?? null,
-              ado_eig: result.eig ?? null,
+              // The EIG used for the stop decision is the grid-max MI already
+              // recorded as ado_max_mutual_info; no separate ado_eig column.
               ado_should_stop: Boolean(result.should_stop),
               ado_stop_reason: result.stop_reason ?? null,
             });
