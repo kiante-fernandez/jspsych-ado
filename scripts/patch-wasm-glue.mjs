@@ -23,6 +23,9 @@ import { dirname, join, resolve } from "node:path";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MODELS_DIR = join(ROOT, "jspsych-ado", "models");
+// Demos may author their own model (e.g. demos/byo_model_exponential/), so its
+// compiled main.js must be patched + guarded too.
+const DEMOS_DIR = join(ROOT, "demos");
 
 // Exact unpatched form emitted by the stan-playground toolchain, and its fix.
 export const UNPATCHED = 'if(Module["locateFile"]){return locateFile("main.wasm")}';
@@ -36,17 +39,20 @@ export function patchSource(source) {
   return { changed: false, source, missing: true };
 }
 
-/** Every committed model package that has a compiled `main.js`: [{ name, dir, file }].
- *  Shared with the guard test (tests/js/wasm_glue_patch.test.mjs) so both agree on
- *  what to check. */
+/** Every committed model with a compiled `main.js` — packaged (jspsych-ado/models/)
+ *  or authored in a demo folder (demos/): [{ name, dir, file }]. Shared with the
+ *  guard test (tests/js/wasm_glue_patch.test.mjs) so both agree on what to check. */
 export async function listModelMains() {
-  const entries = await readdir(MODELS_DIR, { withFileTypes: true });
   const mains = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const dir = join(MODELS_DIR, entry.name);
-    const file = join(dir, "main.js");
-    try { await access(file); mains.push({ name: entry.name, dir, file }); } catch { /* no compiled wasm in this package */ }
+  for (const base of [MODELS_DIR, DEMOS_DIR]) {
+    let entries;
+    try { entries = await readdir(base, { withFileTypes: true }); } catch { continue; }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const dir = join(base, entry.name);
+      const file = join(dir, "main.js");
+      try { await access(file); mains.push({ name: entry.name, dir, file }); } catch { /* no compiled wasm here */ }
+    }
   }
   return mains;
 }

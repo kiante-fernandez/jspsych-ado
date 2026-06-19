@@ -37,7 +37,7 @@ const { makeStanDataBuilder } = await import("../../jspsych-ado/ado/stan_data.js
 const hyp = (await import("../../jspsych-ado/models/hyperbolic/model.js")).default;
 const weber = (await import("../../jspsych-ado/models/weber_dots/model.js")).default;
 const lll = (await import("../../jspsych-ado/models/line_length_discrimination_3ifc/model.js")).default;
-const exp = (await import("../../jspsych-ado/models/exponential/model.js")).default;
+const exp = (await import("../../demos/byo_model_exponential/model.js")).default;
 
 let failures = 0;
 const fail = (msg) => { console.log("  FAIL: " + msg); failures++; };

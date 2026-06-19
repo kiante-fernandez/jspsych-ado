@@ -10,75 +10,42 @@
         <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css"></link>
         <style>
           /* Reused from the delay-discounting task presentation (this demo uses the
-             same packaged task; only the MODEL differs). */
+             same packaged task; only the MODEL is yours). */
           .dd-option-card {
-            all: unset;
-            box-sizing: border-box;
-            cursor: pointer;
-            display: inline-flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            width: 220px;
-            min-height: 140px;
-            padding: 1.75rem 1.25rem;
-            background: #ffffff;
-            border: 2px solid #d1d5db;
-            border-radius: 10px;
-            position: relative;
-            vertical-align: middle;
+            all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex;
+            flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem;
+            width: 220px; min-height: 140px; padding: 1.75rem 1.25rem; background: #ffffff;
+            border: 2px solid #d1d5db; border-radius: 10px; position: relative; vertical-align: middle;
             transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
           }
-          .dd-option-card:hover {
-            border-color: #4f46e5;
-            box-shadow: 0 6px 20px -6px rgba(0, 0, 0, 0.22);
-            transform: translateY(-2px);
-          }
+          .dd-option-card:hover { border-color: #4f46e5; box-shadow: 0 6px 20px -6px rgba(0,0,0,0.22); transform: translateY(-2px); }
           .dd-option-card:focus-visible { outline: 3px solid #818cf8; outline-offset: 2px; }
           .dd-option-card[disabled] { opacity: 0.5; cursor: default; pointer-events: none; }
-          .dd-amount {
-            font-family: ui-monospace, "Courier New", monospace;
-            font-size: 2rem;
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            color: #111827;
-          }
+          .dd-amount { font-family: ui-monospace, "Courier New", monospace; font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #111827; }
           .dd-when { font-size: 0.9rem; color: #6b7280; }
-          .dd-key-hint {
-            position: absolute;
-            top: 6px;
-            right: 9px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: #9ca3af;
-            letter-spacing: 0.05em;
-          }
-          @media (prefers-reduced-motion: reduce) {
-            .dd-option-card { transition: none; }
-            .dd-option-card:hover { transform: none; }
-          }
+          .dd-key-hint { position: absolute; top: 6px; right: 9px; font-size: 0.7rem; font-weight: 600; color: #9ca3af; letter-spacing: 0.05em; }
+          @media (prefers-reduced-motion: reduce) { .dd-option-card { transition: none; } .dd-option-card:hover { transform: none; } }
         </style>
     </head>
     <body></body>
     <script type="module">
         // BRING YOUR OWN MODEL (pattern 3 — see demos/README.md).
         //
-        // This page is the delay-discounting demo with ONE change: it fits the
-        // exponential-discounting model instead of the hyperbolic one. A task and a
-        // model are independent, so swapping the likelihood is a single import —
-        // everything else (the task, the timeline, the controller) is unchanged.
-        //
-        // How the exponential model was authored (see this folder's README and
-        // jspsych-ado/models/exponential/): write exponential.stan (V = R*exp(-k*t)),
-        // compile it to main.js/main.wasm, run `npm run patch:wasm`, and write a small
-        // adapter (prior + responseProb + stanData) that mirrors the .stan. In your
-        // own project that folder would live under your own models/ directory.
+        // The model in this demo is AUTHORED IN THIS FOLDER, not imported from the
+        // packaged library:
+        //   - exponential.stan  — the model you wrote (V = R*exp(-k*t))
+        //   - model.js          — the adapter (prior + responseProb + stanData)
+        //   - main.js/main.wasm — exponential.stan compiled to WASM (offline, committed)
+        // That is the real "bring your own model" workflow: write the .stan + adapter,
+        // compile ONCE (the public compile server only accepts browser requests from
+        // its own origin, so you compile offline — see PROVENANCE.md — then commit the
+        // wasm so the live page is pure static assets). The TASK is the packaged
+        // delay-discounting task, reused unchanged.
 
-        import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
-        // ↓↓↓ the ONLY change from the delay_discounting demo ↓↓↓
-        import exponentialModel from "./jspsych-ado/models/exponential/model.js";
-        // ↑↑↑ (was: import hyperbolicModel from ".../models/hyperbolic/model.js") ↑↑↑
+        import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js"; // packaged task
+        // ↓↓↓ your model, authored in THIS demo folder (vs jspsych-ado/models/) ↓↓↓
+        import exponentialModel from "./demos/byo_model_exponential/model.js";
+        // ↑↑↑                                                                  ↑↑↑
 
         import { makeDebriefStimulus, removeAdoDebugPanels } from "./jspsych-ado/ado/ado_timeline.js";
         import { createSeededRng, simulateDelayDiscountingChoice } from "./jspsych-ado/ado/ado_simulation.js";
@@ -94,7 +61,7 @@
         } from "./jspsych-ado/ado/experiment_shell.js";
         import { default_exp_config, default_exp_simulation_config } from "./demos/byo_model_exponential/exp_config.js";
 
-        const model = exponentialModel; // the model under study
+        const model = exponentialModel; // the model you authored in this folder
 
         // ── DEMO SCAFFOLDING — URL switches + simulated participant (runnable/testable). ──
         const url_params = new URLSearchParams(window.location.search);
@@ -102,37 +69,26 @@
         const session_id = "local-" + Date.now();
 
         const run_settings = getExperimentRunSettings(url_params, { allow_legacy_ado: true });
-        const simulation_config = resolveSimulationConfig(
-            default_exp_simulation_config,
-            run_config,
-            run_settings.simulation_mode
-        );
+        const simulation_config = resolveSimulationConfig(default_exp_simulation_config, run_config, run_settings.simulation_mode);
         const simulation_rng = createSeededRng(simulation_config.seed);
 
         const run_context = makeAdoRunContext({
             run_settings: run_settings,
             model: model,
             session_id: session_id,
-            simulate_choice: function(design) {
-                return simulateDelayDiscountingChoice(design, simulation_config, simulation_rng, model);
-            },
+            simulate_choice: (design) => simulateDelayDiscountingChoice(design, simulation_config, simulation_rng, model),
         });
 
-        // ── THE ADO INTERFACE (1/2) — register the packaged task + the exponential model. ──
-        registerAdoExperiment({
-            task: delayDiscountingTask,
-            model: model,
-            config: default_exp_config,
-        });
+        // ── THE ADO INTERFACE (1/2) — register the packaged task + your model. ──
+        registerAdoExperiment({ task: delayDiscountingTask, model: model, config: default_exp_config });
 
         // ── STANDARD jsPsych — ordinary instructions + end screen. ──
         const plain_finish_stimulus = '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
-
         const instructions = {
             type: jsPsychInstructions,
             pages: [
                 '<p>Welcome. On each trial, choose between a smaller reward available sooner and a larger reward available later.</p>',
-                '<p>This run fits an <strong>exponential</strong> discounting model. The task adapts after each response.</p>',
+                '<p>This run fits an <strong>exponential</strong> discounting model authored in this demo folder.</p>',
                 '<p>Press Next when you are ready to begin.</p>',
             ],
             show_clickable_nav: true,
@@ -140,11 +96,8 @@
             key_backward: 'z',
             button_label_previous: 'Previous (<strong>Z</strong>)',
             button_label_next: 'Next (<strong>M</strong>)',
-            simulation_options: {
-                data: makeInstructionSimulationData(3, simulation_config),
-            },
+            simulation_options: { data: makeInstructionSimulationData(3, simulation_config) },
         };
-
         const end_screen = {
             type: jsPsychHtmlButtonResponse,
             stimulus: plain_finish_stimulus,
@@ -155,19 +108,11 @@
                     : plain_finish_stimulus;
             },
             choices: ["SUBMIT"],
-            simulation_options: {
-                data: makeEndSimulationData(simulation_config),
-            },
+            simulation_options: { data: makeEndSimulationData(simulation_config) },
         };
 
-        jsPsych = initJsPsych({
-            on_finish: () => jsPsych.data.displayData()
-        });
-        addAdoDataProperties(jsPsych, {
-            run_settings: run_settings,
-            model: model,
-            simulation_config: simulation_config,
-        });
+        jsPsych = initJsPsych({ on_finish: () => jsPsych.data.displayData() });
+        addAdoDataProperties(jsPsych, { run_settings: run_settings, model: model, simulation_config: simulation_config });
 
         // ── THE ADO INTERFACE (2/2) — build the adaptive timeline and run it. ──
         let timeline = [instructions];

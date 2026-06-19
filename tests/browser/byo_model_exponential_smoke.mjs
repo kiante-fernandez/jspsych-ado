@@ -1,8 +1,8 @@
 // Headless end-to-end smoke for the "bring your own model" demo: the packaged
-// delay-discounting task fit with the exponential model, driven through the real
-// Web Worker + WASM. Confirms the demo page wires up and the exponential model
-// runs end-to-end in the browser (the node recovery/parity smokes cover the model
-// itself; this covers the demo PAGE). mock = generic wiring; stan = the WASM path.
+// delay-discounting task fit with the demo's own authored-and-committed exponential
+// model (demos/byo_model_exponential/), driven through the real Web Worker + WASM.
+// Confirms a demo-authored model registers and runs end-to-end (the node recovery +
+// parity smokes cover the model's correctness; this covers the demo PAGE).
 //
 // Run:  node tests/browser/byo_model_exponential_smoke.mjs   (needs puppeteer)
 import { fileURLToPath } from "node:url";

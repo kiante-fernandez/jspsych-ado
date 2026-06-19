@@ -206,12 +206,12 @@ controller is the entire abstraction; the timeline never sees Stan or WASM.
   presentation, choices, response labels, and response mapping.
 - **`jspsych-ado/models/<name>/`** — a pluggable model package: a `model.js` adapter
   (`params`, `prior`, `responseProb` or `responseProbs`, `stanData`, …) plus its
-  compiled `.stan` artifacts. Shipped models: `hyperbolic` and `exponential`
-  (delay discounting), `weber_dots` (ANS acuity), `line_length_discrimination_3ifc`
-  (3-way categorical).
+  compiled `.stan` artifacts. Shipped models: `hyperbolic` (delay discounting),
+  `weber_dots` (ANS acuity), `line_length_discrimination_3ifc` (3-way categorical).
 - **`demos/<name>/`** — example pages that consume (or author) those packages; see
-  [`demos/README.md`](demos/README.md). These are how-to examples, not part of the
-  published library.
+  [`demos/README.md`](demos/README.md). The `demos/byo_model_exponential/` demo even
+  authors its own model (exponential discounting) in-folder. These are how-to
+  examples, not part of the published library.
 
 ## Adding tasks and models
 

@@ -16,7 +16,7 @@ the experiment runs as **pure static assets** — there is no compile step at ru
 ## Regenerate
 
 ```bash
-cd jspsych-ado/models/exponential
+cd demos/byo_model_exponential
 ID=$(curl -s -X POST https://stan-wasm.flatironinstitute.org/compile \
   -H "Content-Type: text/plain" -H "Authorization: Bearer 1234" \
   --data-binary @exponential.stan | sed -E 's/.*"model_id":"([^"]+)".*/\1/')

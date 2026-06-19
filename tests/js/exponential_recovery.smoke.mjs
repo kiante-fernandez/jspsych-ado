@@ -29,7 +29,7 @@ globalThis.fetch = async (url, opts) => {
 };
 
 const StanModel = (await import("../../core/tinystan/index.mjs")).default;
-const exp = (await import("../../jspsych-ado/models/exponential/model.js")).default;
+const exp = (await import("../../demos/byo_model_exponential/model.js")).default;
 const ddTask = (await import("../../jspsych-ado/tasks/delay_discounting/task.js")).default;
 const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws } = await import(
   "../../jspsych-ado/ado/mi_engine.js"
