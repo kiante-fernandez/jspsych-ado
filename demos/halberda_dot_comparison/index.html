@@ -35,6 +35,11 @@
             default_halberda_simulation_config,
         } from "./demos/halberda_dot_comparison/halberda_config.js";
 
+        // Drop-in demo (pattern 1 — see demos/README.md): a PACKAGED task + PACKAGED
+        // model. Three layers below: THE ADO INTERFACE (register + build), STANDARD
+        // jsPsych, and DEMO SCAFFOLDING (URL switches + simulation, not needed in your
+        // own experiment).
+        // ── DEMO SCAFFOLDING ──
         const url_params = new URLSearchParams(window.location.search);
         const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
         const session_id = "local-" + Date.now();
@@ -81,6 +86,7 @@
             simulate_choice: simulateDotComparisonChoice,
         });
 
+        // ── THE ADO INTERFACE (1/2) — register the packaged task + model. ──
         registerAdoExperiment({
             task: halberdaTask,
             model: weberDotsModel,
@@ -131,6 +137,7 @@
             simulation_config: simulation_config,
         });
 
+        // ── THE ADO INTERFACE (2/2) — build the adaptive timeline and run it. ──
         let timeline = [instructions];
         timeline = timeline.concat(createExperimentAdoTimeline(jsPsych, {
             task: halberdaTask,

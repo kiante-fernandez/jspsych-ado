@@ -56,6 +56,13 @@ demos/line_length_discrimination/index.html?controller=stan&strategy=ado&debug=1
 demos/halberda_dot_comparison/index.html?controller=stan&strategy=ado&debug=1
 ```
 
+See **[`demos/README.md`](demos/README.md)** for a guided tour: the three demos
+above are "drop-in" examples (packaged task + packaged model), and two more show how
+to **bring your own task** (`demos/byo_task_money_choice/`) or **bring your own model**
+(`demos/byo_model_exponential/`). It also explains the **`tasks/` (packaged, shipped)
+vs `demos/` (example pages)** distinction and contrasts a plain jsPsych timeline with
+an ADO one.
+
 - `controller=stan` (default) — live in-browser Stan inference; `controller=mock` — a
   deterministic, no-WASM controller for fast UI work.
 - `strategy=ado` (default) — MI-optimal designs; `strategy=random` — a random baseline
@@ -199,10 +206,12 @@ controller is the entire abstraction; the timeline never sees Stan or WASM.
   presentation, choices, response labels, and response mapping.
 - **`jspsych-ado/models/<name>/`** — a pluggable model package: a `model.js` adapter
   (`params`, `prior`, `responseProb` or `responseProbs`, `stanData`, …) plus its
-  compiled `.stan` artifacts.
-- **`demos/<name>/`** — thin consumers; current examples are
-  `demos/delay_discounting/`, `demos/line_length_discrimination/`,
-  and `demos/halberda_dot_comparison/`.
+  compiled `.stan` artifacts. Shipped models: `hyperbolic` and `exponential`
+  (delay discounting), `weber_dots` (ANS acuity), `line_length_discrimination_3ifc`
+  (3-way categorical).
+- **`demos/<name>/`** — example pages that consume (or author) those packages; see
+  [`demos/README.md`](demos/README.md). These are how-to examples, not part of the
+  published library.
 
 ## Adding tasks and models
 
@@ -210,6 +219,8 @@ Drop task packages under `jspsych-ado/tasks/<name>/` and model packages under
 `jspsych-ado/models/<name>/`. The engine, controller, and timeline stay generic.
 Model compilation steps are in [jspsych-ado/models/README.md](jspsych-ado/models/README.md);
 the task package contract is in [jspsych-ado/tasks/README.md](jspsych-ado/tasks/README.md).
+For runnable end-to-end walkthroughs, see the **bring-your-own-task** and
+**bring-your-own-model** demos in [`demos/README.md`](demos/README.md).
 Binary models expose `responseProb(design, params) -> P(response = 1)`.
 Finite categorical models expose `responseProbs(design, params) -> [p0, p1, ...]`.
 Continuous responses are not supported yet.
