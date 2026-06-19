@@ -217,14 +217,23 @@ Continuous responses are not supported yet.
 ## Development
 
 ```bash
-node --test tests/js/*.test.mjs        # unit tests: MI engine, model adapter, façade
-node tests/js/stan_recovery.smoke.mjs  # real-WASM smoke: ADO recovers parameters
+node --test tests/js/*.test.mjs        # unit tests: MI engine, model adapter, façade, controller + timeline failure paths
+node tests/js/stan_recovery.smoke.mjs  # real-WASM smoke: ADO recovers parameters (hyperbolic)
+node tests/js/line_length_3ifc_recovery.smoke.mjs # real-WASM smoke: recovers a 3-param categorical model
+node tests/js/likelihood_parity.smoke.mjs # real-WASM smoke: JS responseProb == compiled Stan, + fixed-seed determinism
 node tests/js/stopping_recovery.smoke.mjs # real-WASM smoke: EIG-fraction adaptive stopping
 node tests/js/locate_file.smoke.mjs    # real-WASM smoke: emscripten honors the wasm locateFile patch
 npm install && npm run test:browser    # headless Worker/WASM browser smoke (puppeteer)
 npm run test:bundler                   # npm pack -> Vite build -> headless: hashed WASM loads
 npm run patch:wasm                     # re-apply the bundler-safety glue patch after recompiling a model
 ```
+
+The `likelihood_parity` smoke is a correctness guard: every `.stan` exposes its
+per-trial choice probability as a transformed/generated quantity, so it checks the
+JS `responseProb`/`responseProbs` (used by the MI engine **and** the simulator)
+against the compiled Stan likelihood draw-for-draw — if the two ever diverge, ADO
+would optimize designs against the wrong model. (The Weber model's JS `Phi` is an
+erf approximation, so its parity bound is `2e-6`, not machine epsilon.)
 
 CI runs the unit tests, the recovery + locateFile smokes, the headless browser
 smoke, and the bundler smoke on every PR. After recompiling any model's `main.js`,

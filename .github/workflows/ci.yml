@@ -27,6 +27,10 @@ jobs:
         run: node tests/js/locate_file.smoke.mjs
       - name: Adaptive-stopping recovery smoke (real WASM EIG stopping, #21)
         run: node tests/js/stopping_recovery.smoke.mjs
+      - name: Recovery smoke - 3-param categorical line-length (real WASM, #87)
+        run: node tests/js/line_length_3ifc_recovery.smoke.mjs
+      - name: Likelihood parity smoke (JS responseProb == compiled Stan, all models)
+        run: node tests/js/likelihood_parity.smoke.mjs
 
   browser:
     name: Headless Worker/WASM smoke
