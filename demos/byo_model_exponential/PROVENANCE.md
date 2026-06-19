@@ -6,7 +6,7 @@ the experiment runs as **pure static assets** — there is no compile step at ru
 - **Source:** `exponential.stan`
 - **Compiler:** stan-playground compile server, <https://stan-wasm.flatironinstitute.org>
 - **Stan version:** 2.39.0 (as reported by `StanModel.stanVersion()` in the recovery smoke)
-- **Target:** emscripten `-sENVIRONMENT=web` — runs in the browser / Web Worker only,
+- **Target:** emscripten `-sENVIRONMENT=web,worker` — runs in the browser / Web Worker only,
   **not** in plain Node (the recovery smoke shims `fetch` to load it under Node)
 - **Artifact names:** kept as `main.js` + `main.wasm` — `main.js` hardcodes loading
   its sibling `main.wasm`, so do not rename them

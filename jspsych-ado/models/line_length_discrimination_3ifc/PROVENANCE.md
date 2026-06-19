@@ -6,7 +6,7 @@ folder and committed so the adaptive demo runs as pure static assets.
 - **Source:** `line_length_discrimination_3ifc.stan`
 - **Compiler:** stan-playground compile server, <https://stan-wasm.flatironinstitute.org>
 - **Compiled model id:** `6a70a5912ce409d4d1967459fb4d20bbf2b8e500`
-- **Target:** emscripten `-sENVIRONMENT=web` -- runs in the browser / Web Worker
+- **Target:** emscripten `-sENVIRONMENT=web,worker` -- runs in the browser / Web Worker
 - **Artifact names:** kept as `main.js` + `main.wasm` because `main.js` loads its
   sibling `main.wasm`
 

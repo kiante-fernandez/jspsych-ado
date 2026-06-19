@@ -230,11 +230,13 @@ Continuous responses are not supported yet.
 ```bash
 node --test tests/js/*.test.mjs        # unit tests: MI engine, model adapter, façade, controller + timeline failure paths
 node tests/js/stan_recovery.smoke.mjs  # real-WASM smoke: ADO recovers parameters (hyperbolic)
+node tests/js/weber_recovery.smoke.mjs # real-WASM smoke: recovers the Weber/ANS model
 node tests/js/line_length_3ifc_recovery.smoke.mjs # real-WASM smoke: recovers a 3-param categorical model
+node tests/js/exponential_recovery.smoke.mjs # real-WASM smoke: recovers the BYO-model demo's authored model
 node tests/js/likelihood_parity.smoke.mjs # real-WASM smoke: JS responseProb == compiled Stan, + fixed-seed determinism
 node tests/js/stopping_recovery.smoke.mjs # real-WASM smoke: EIG-fraction adaptive stopping
 node tests/js/locate_file.smoke.mjs    # real-WASM smoke: emscripten honors the wasm locateFile patch
-npm install && npm run test:browser    # headless Worker/WASM browser smoke (puppeteer)
+npm install && npm run test:browser    # headless Worker/WASM browser smokes (puppeteer)
 npm run test:bundler                   # npm pack -> Vite build -> headless: hashed WASM loads
 npm run patch:wasm                     # re-apply the bundler-safety glue patch after recompiling a model
 ```
@@ -247,9 +249,14 @@ would optimize designs against the wrong model. (The Weber model's JS `Phi` is a
 erf approximation, so its parity bound is `2e-6`, not machine epsilon.)
 
 CI runs the unit tests, the recovery + locateFile smokes, the headless browser
-smoke, and the bundler smoke on every PR. After recompiling any model's `main.js`,
-run `npm run patch:wasm` (CI's unit job fails if a committed `main.js` is left
-unpatched).
+smoke, and the bundler smoke on every PR and push to `main`. After recompiling any
+model's `main.js`, run `npm run patch:wasm` (CI's unit job fails if a committed
+`main.js` is left unpatched).
+
+Releases publish to npm by pushing a `vX.Y.Z` tag, which triggers
+[`.github/workflows/release.yml`](.github/workflows/release.yml) to re-run the full
+gates and `npm publish --provenance`. See [RELEASING.md](RELEASING.md) and the
+[CHANGELOG](CHANGELOG.md).
 
 ## Deploying
 
