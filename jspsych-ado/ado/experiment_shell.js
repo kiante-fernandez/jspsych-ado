@@ -193,6 +193,7 @@ function registerAdoExperiment({ task, model, config }) {
     stan: config.stan,
     n_trials: config.n_trials,
     testlet_size: config.testlet_size,
+    stopping: config.stopping,
   });
 }
 
@@ -200,6 +201,7 @@ function makeTimelineConfig(task, config) {
   return {
     n_trials: config.n_trials,
     testlet_size: config.testlet_size,
+    stopping: config.stopping,
     response_labels: task.response_labels,
     presentation: task.presentation,
     choices: task.choices,
@@ -228,6 +230,7 @@ function createExperimentAdoTimeline(jsPsych, {
       params: model.params,
       n_trials: config.n_trials,
       testlet_size: config.testlet_size,
+      stopping: config.stopping,
     });
     return createAdoTimeline(jsPsych, mock_controller, timeline_config, run_context);
   }
@@ -252,6 +255,7 @@ function createExperimentAdoTimeline(jsPsych, {
     design_strategy: run_context.design_strategy,
     design_seed,
     testlet_size: config.testlet_size,
+    stopping: config.stopping,
     plugins: config.plugins,
   }, run_context);
 }

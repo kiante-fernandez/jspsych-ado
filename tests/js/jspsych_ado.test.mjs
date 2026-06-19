@@ -5,6 +5,7 @@ import { samplePriorDraws } from "../../jspsych-ado/ado/mi_engine.js";
 import { createAdoTimeline } from "../../jspsych-ado/ado/ado_timeline.js";
 import { createSeededRng } from "../../jspsych-ado/ado/ado_simulation.js";
 import { createStanAdoController } from "../../jspsych-ado/controllers/stan_ado_controller.js";
+import { createMockAdoController } from "../../jspsych-ado/controllers/mock_ado_controller.js";
 import { compileStanModel } from "../../jspsych-ado/models/compile_stan_model.js";
 import {
   buildAdapter,
@@ -18,6 +19,22 @@ import {
   validateModel,
   validateTask,
 } from "../../jspsych-ado/index.js";
+
+// The ADO timeline wraps each testlet (its choices + the update) in a node with a
+// conditional_function so it can be skipped for early stopping (#21). These
+// structure tests inspect the leaf-trial sequence, which flattening recovers in the
+// same order as the pre-stopping flat timeline.
+function flattenTimeline(timeline) {
+  const out = [];
+  for (const node of timeline) {
+    if (node && Array.isArray(node.timeline)) {
+      out.push(...flattenTimeline(node.timeline));
+    } else {
+      out.push(node);
+    }
+  }
+  return out;
+}
 
 const STAN_CODE = `
 data {
@@ -179,12 +196,12 @@ test("stanUrl registration derives priors after prepareModels fetches the source
 
     await prepareModels({ compileServer: "http://compile.test" });
 
-    const timeline = createTimeline({}, {
+    const timeline = flattenTimeline(createTimeline({}, {
       task: "stan-url-task",
       model: "stan-url-model",
       n_trials: 1,
       stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 17 },
-    });
+    }));
 
     const start_data = await new Promise((resolve, reject) => {
       timeline[0].func((data) => resolve(data));
@@ -221,12 +238,12 @@ test("createTimeline composes on_finish: raw response -> outcome, full design, l
 
     await prepareModels({ compileServer: "http://compile.test" });
 
-    const timeline = createTimeline({}, {
+    const timeline = flattenTimeline(createTimeline({}, {
       task: "data-flow-task",
       model: "data-flow-model",
       n_trials: 1,
       stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 5 },
-    });
+    }));
 
     // Drive start so current_design is the (single) grid design.
     await new Promise((resolve, reject) => {
@@ -312,13 +329,13 @@ test("createTimeline schedules updates at testlet boundaries", async () => {
     registerTestModel("testlet-structure-model");
     await prepareModels({ compileServer: "http://compile.test" });
 
-    const timeline = createTimeline({}, {
+    const timeline = flattenTimeline(createTimeline({}, {
       task: "testlet-structure-task",
       model: "testlet-structure-model",
       n_trials: 5,
       testlet_size: 2,
       stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 5 },
-    });
+    }));
 
     const choices = timeline.filter((t) => t.type === "html-button-response");
     const calls = timeline.filter((t) => t.type === "call-function");
@@ -533,14 +550,14 @@ test("createAdoTimeline passes completed testlets as batches and refills designs
   };
 
   try {
-    const timeline = createAdoTimeline(jsPsych, controller, {
+    const timeline = flattenTimeline(createAdoTimeline(jsPsych, controller, {
       n_trials: 3,
       testlet_size: 2,
       response_labels: { 0: "SS", 1: "LL" },
       presentation: TEST_PRESENTATION,
       choices: ["SS", "LL"],
       task: "demo",
-    }, {});
+    }, {}));
 
     await new Promise((resolve, reject) => {
       timeline[0].func(resolve);
@@ -590,6 +607,98 @@ test("createAdoTimeline passes completed testlets as batches and refills designs
     assert.deepEqual(second_update.ado_next_design_metrics, []);
     assert.equal(second_update.ado_selection_time_ms, null);
     assert.equal(second_update.ado_max_mutual_info, null);
+  } finally {
+    delete globalThis.jsPsychCallFunction;
+    delete globalThis.jsPsychHtmlButtonResponse;
+  }
+});
+
+test("controllers supply designs up to stopping.max_trials, not just n_trials (#102 review)", async () => {
+  // n_trials: 2 with max_trials: 4 must not underflow the design queue: the timeline
+  // builds 4 testlet nodes, so the controller must keep supplying designs through 4.
+  const c = createMockAdoController({ grid_design: { a: [1, 2, 3, 4, 5] }, n_trials: 2, stopping: { max_trials: 4 } });
+  let r = await c.start();
+  assert.ok(r.next_design != null, "start should supply a design");
+  for (let t = 1; t <= 4; t++) {
+    r = await c.update({ ado_design: r.next_design, choice: 0 });
+    if (t < 4) {
+      assert.ok(r.next_design != null, `a design must be supplied through trial ${t} (max_trials=4)`);
+    } else {
+      assert.equal(r.next_design, null, "no design beyond the max_trials cap");
+    }
+  }
+});
+
+test("stan controller warns that eig_fraction stopping is ignored under design_strategy=random (#102 review)", () => {
+  const warnings = [];
+  const original = console.warn;
+  console.warn = (m) => warnings.push(String(m));
+  try {
+    createStanAdoController({
+      model: { responseProb: () => 0.5, responseSpace: { type: "binary" } },
+      grid_design: { a: [1, 2] },
+      design_strategy: "random",
+      stopping: { eig_fraction: 0.1 },
+      n_trials: 5,
+    });
+  } finally {
+    console.warn = original;
+  }
+  assert.ok(
+    warnings.some((w) => /eig_fraction stopping is ignored under design_strategy="random"/.test(w)),
+    "expected a warning that EIG stopping is ADO-only"
+  );
+});
+
+test("createAdoTimeline skips remaining testlets once the controller signals should_stop (#21)", async () => {
+  globalThis.jsPsychCallFunction = "call-function";
+  globalThis.jsPsychHtmlButtonResponse = "html-button-response";
+  try {
+    const design = { t_ss: 0, t_ll: 1, r_ss: 100, r_ll: 200 };
+    const jsPsych = { endExperiment: (m) => { throw new Error(m); } };
+    let update_count = 0;
+    const base = {
+      session_id: "s", next_design: design, next_designs: [design],
+      next_design_metrics: [{ mutual_info: 0.5 }], max_mutual_info: 0.5, eig: 0.5,
+      post_mean: { k: 1 }, post_sd: { k: 0.1 },
+    };
+    const controller = {
+      start: async () => ({ ...base, trial_index: 0, should_stop: false, stop_reason: null, post_mean: null, post_sd: null }),
+      update: async () => {
+        update_count += 1;
+        const should_stop = update_count >= 2;   // stop after the 2nd testlet
+        return { ...base, trial_index: update_count, should_stop, stop_reason: should_stop ? "eig_fraction" : null };
+      },
+    };
+
+    const tl = createAdoTimeline(jsPsych, controller, {
+      n_trials: 4, testlet_size: 1, stopping: { max_trials: 4 },
+      response_labels: { 0: "SS", 1: "LL" }, presentation: TEST_PRESENTATION, choices: ["SS", "LL"], task: "stop-demo",
+    }, {});
+
+    // [init, node1, node2, node3, node4]; each node_k wraps [choice, update] with a
+    // conditional_function that gates whether the testlet runs.
+    assert.equal(tl.length, 5);
+    for (let k = 1; k <= 4; k++) {
+      assert.equal(typeof tl[k].conditional_function, "function", `node ${k} should be a conditional testlet node`);
+      assert.equal(tl[k].timeline.length, 2);
+    }
+
+    await new Promise((res, rej) => { tl[0].func(res); setTimeout(() => rej(new Error("start timeout")), 100); });
+
+    async function runTestlet(node) {
+      const choice = node.timeline[0];
+      choice.on_start({});
+      choice.on_finish({ ...choice.data(), response: 1 });
+      await new Promise((res, rej) => { node.timeline[1].func(res); setTimeout(() => rej(new Error("update timeout")), 100); });
+    }
+
+    assert.equal(tl[2].conditional_function(), true);     // nothing stopped yet
+    await runTestlet(tl[1]);                               // update 1 -> should_stop false
+    assert.equal(tl[2].conditional_function(), true, "node 2 should still run after a non-stopping update");
+    await runTestlet(tl[2]);                               // update 2 -> should_stop true
+    assert.equal(tl[3].conditional_function(), false, "node 3 should be skipped after the stop");
+    assert.equal(tl[4].conditional_function(), false, "node 4 should be skipped after the stop");
   } finally {
     delete globalThis.jsPsychCallFunction;
     delete globalThis.jsPsychHtmlButtonResponse;
@@ -1032,7 +1141,7 @@ test("registerModelPackage forwards testlet_size as a timeline default", async (
       stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 3 },
     });
 
-    const timeline = createTimeline({}, { task: "pkg-testlet-task", model: name });
+    const timeline = flattenTimeline(createTimeline({}, { task: "pkg-testlet-task", model: name }));
     const choices = timeline.filter((t) => t.type === "html-button-response");
     const calls = timeline.filter((t) => t.type === "call-function");
     assert.equal(choices.length, 5);
@@ -1066,7 +1175,7 @@ test("registerModelPackage registers a package and wires responseProb(design, dr
     });
     assert.equal(name, "pkg-order");
 
-    const timeline = createTimeline({}, { task: "pkg-order-task", model: "pkg-order" });
+    const timeline = flattenTimeline(createTimeline({}, { task: "pkg-order-task", model: "pkg-order" }));
     await new Promise((resolve, reject) => {
       timeline[0].func((d) => resolve(d));
       setTimeout(() => reject(new Error("timed out waiting for fake worker")), 100);

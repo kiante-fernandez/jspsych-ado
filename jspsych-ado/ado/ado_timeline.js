@@ -1,5 +1,6 @@
 import { updateInfoGainDebugPanel, removeInfoGainDebugPanel } from "./debug/debug_trace_charts.js";
 import { formatPosteriorDrawCharts } from "./debug/posterior_debug_charts.js";
+import { normalizeStoppingConfig } from "./stopping.js";
 
 // Generic adaptive-design-optimization (ADO) jsPsych timeline.
 //
@@ -950,9 +951,20 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
     }
   };
 
-  const trials = [initialize_ado];
+  // Adaptive stopping (#21): build up to max_trials testlets, each wrapped in a
+  // node that is skipped once the controller signals should_stop (set in the update
+  // below). With no stopping config, max_trials = config.n_trials and nothing is
+  // ever skipped, so the run is fixed-length and behaves exactly as before.
+  // normalizeStoppingConfig already resolves max_trials to config.n_trials when no
+  // stopping config is given, so this is the single effective trial cap.
+  const stopping_resolved = normalizeStoppingConfig(config.stopping, config.n_trials);
+  const max_trials = stopping_resolved.max_trials;
+  let stopped = false;
 
-  for (let i = 0; i < config.n_trials; i++) {
+  const trials = [initialize_ado];
+  let testlet_trials = [];
+
+  for (let i = 0; i < max_trials; i++) {
     // ctx is read lazily by the trial property functions, so the live design and
     // controller state are picked up when the trial actually runs.
     const ctx = {
@@ -1020,11 +1032,11 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
       testlet_rows.push(data);
     };
 
-    trials.push(...choice_trials);
+    testlet_trials.push(...choice_trials);
 
-    const at_boundary = ((i + 1) % testlet_size === 0) || (i + 1 === config.n_trials);
+    const at_boundary = ((i + 1) % testlet_size === 0) || (i + 1 === max_trials);
     if (at_boundary) {
-      trials.push({
+      testlet_trials.push({
         type: callFunctionPlugin,
         async: true,
         func: function(done) {
@@ -1033,6 +1045,9 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
           const payload = testlet_size === 1 ? batch[0] : batch;
           adaptive_controller.update(payload).then(result => {
             ado_state = result;
+            // Once the controller signals a stop, the remaining testlet nodes skip
+            // via their conditional_function below, ending the run early.
+            stopped = Boolean(result.should_stop);
             current_designs = designsFromResult(result);
             current_design_metrics = metricsFromResult(result, current_designs.length);
             current_design = current_designs[0] ?? null;
@@ -1058,6 +1073,10 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
               ado_max_mutual_info: result.max_mutual_info ?? null,
               ado_realized_information_gain: result.realized_information_gain ?? null,
               ado_realized_information_gains: result.realized_information_gains ?? null,
+              // The EIG used for the stop decision is the grid-max MI already
+              // recorded as ado_max_mutual_info; no separate ado_eig column.
+              ado_should_stop: Boolean(result.should_stop),
+              ado_stop_reason: result.stop_reason ?? null,
             });
           }).catch(error => failExperiment(error, done));
         },
@@ -1066,6 +1085,10 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
           updateInformationGainPanel(run_context);
         }
       });
+      // Skip this whole testlet (its choices + update) once a prior testlet's update
+      // set `stopped`. The first testlet always runs (stopped starts false).
+      trials.push({ timeline: testlet_trials, conditional_function: () => !stopped });
+      testlet_trials = [];
     }
   }
 

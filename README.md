@@ -134,6 +134,33 @@ the Stan WASM). It is tested against Vite and webpack 5.
 - `prepareModels({ compileServer })` — compile any models registered from Stan source.
 - `createTimeline(jsPsych, { task, model, ... }, run_context)` — validate and build the adaptive timeline fragment.
 
+### Adaptive stopping
+
+Beyond choosing each design, the loop can decide **when to stop**. The criterion uses
+the same currency as design selection — the expected information gain (EIG = the
+mutual information `I(θ; y | d)` between the parameters and the response under a
+design). It stops once the **best available next design's EIG** falls below a
+**fraction of the maximum achievable EIG** (`ln(K)` nats for a `K`-category response):
+i.e. no remaining stimulus is expected to teach much more. Using a fraction keeps one
+threshold meaningful across binary and categorical tasks.
+
+Pass a `stopping` config to `createTimeline` (or as a `registerModelPackage` override):
+
+```js
+stopping: {
+  eig_fraction: 0.1,   // stop when best next-design EIG < 0.1 * ln(K); omit to disable
+  min_trials: 8,       // never stop before this many trials
+  max_trials: 42,      // hard cap (defaults to n_trials)
+  consecutive: 1,      // require this many sub-threshold refits in a row (de-bounce)
+}
+```
+
+Omit `stopping` (or `eig_fraction`) for a fixed-length run of `n_trials`. Each row
+records `ado_should_stop` and `ado_stop_reason` (`"eig_fraction"` or `"max_trials"`);
+the EIG that drove the decision is the grid-max MI in `ado_max_mutual_info`. A
+complementary precision-target rule is tracked in
+[#101](https://github.com/githubpsyche/jspsych-ado/issues/101).
+
 ### Debug traces
 
 `debug=1` prints a readable console summary after each adaptive update — the design
@@ -192,6 +219,7 @@ Continuous responses are not supported yet.
 ```bash
 node --test tests/js/*.test.mjs        # unit tests: MI engine, model adapter, façade
 node tests/js/stan_recovery.smoke.mjs  # real-WASM smoke: ADO recovers parameters
+node tests/js/stopping_recovery.smoke.mjs # real-WASM smoke: EIG-fraction adaptive stopping
 node tests/js/locate_file.smoke.mjs    # real-WASM smoke: emscripten honors the wasm locateFile patch
 npm install && npm run test:browser    # headless Worker/WASM browser smoke (puppeteer)
 npm run test:bundler                   # npm pack -> Vite build -> headless: hashed WASM loads

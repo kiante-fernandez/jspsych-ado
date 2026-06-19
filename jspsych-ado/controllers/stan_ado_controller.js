@@ -8,6 +8,7 @@ import {
   samplePriorDraws,
 } from "../ado/mi_engine.js";
 import { createSeededRng } from "../ado/ado_simulation.js";
+import { maxPossibleEig, makeStoppingEvaluator } from "../ado/stopping.js";
 
 // Number of prior draws used to pick the first design (before any data exist).
 const PRIOR_DRAWS = 2000;
@@ -47,6 +48,7 @@ function createStanAdoController({
   design_strategy = "ado",
   design_seed = null,
   testlet_size = 1,
+  stopping = null,
 }) {
   const sample_config = {
     num_chains: stan.num_chains ?? 2,
@@ -79,6 +81,25 @@ function createStanAdoController({
   const trials = [];
   const design_rng = createSeededRng(design_seed ?? sample_config.seed);
   const debug_draw_rng = createSeededRng((design_seed ?? sample_config.seed) + 1);
+
+  // Adaptive stopping (#21). EIG stopping is ADO-ONLY: the metric is the grid-max
+  // EIG of the next design (max_mutual_info), which only equals the best available
+  // next trial under design_strategy "ado". Under "random" we deliberately do NOT
+  // compute the grid-max EIG (random exists as a cheap baseline), so eig_fraction
+  // stopping is ignored there — only the max_trials cap applies. max_trials defaults
+  // to n_trials, so with no stopping config the run is fixed-length.
+  const stopper = makeStoppingEvaluator({
+    stopping,
+    default_max_trials: n_trials,
+    max_possible_eig: maxPossibleEig(model.responseSpace),
+  });
+
+  if (design_strategy === "random" && stopper.config.eig_fraction != null) {
+    console.warn(
+      "createStanAdoController: eig_fraction stopping is ignored under " +
+      "design_strategy=\"random\" (EIG stopping is ADO-only); only max_trials applies."
+    );
+  }
 
   let worker = null;
   let current_design_draws = null;
@@ -270,7 +291,11 @@ function createStanAdoController({
   }
 
   function nextBlockSize(from_index) {
-    const remaining = n_trials == null ? testlet_size : Math.max(0, n_trials - from_index);
+    // The effective trial cap is the stopping max_trials (which already falls back
+    // to n_trials), so the controller supplies designs for every node the timeline
+    // can run — `stopping: { max_trials > n_trials }` no longer underflows.
+    const cap = stopper.config.max_trials;
+    const remaining = cap == null ? testlet_size : Math.max(0, cap - from_index);
     return Math.min(testlet_size, remaining);
   }
 
@@ -285,6 +310,7 @@ function createStanAdoController({
       await send({ type: "init", moduleUrl: model.moduleUrl, wasmUrl: model.wasmUrl });
 
       trials.length = 0;
+      stopper.reset();
 
       const block_size = nextBlockSize(trials.length);
       let selection = selectDesignsWithMetrics([], 0);
@@ -312,6 +338,7 @@ function createStanAdoController({
         next_design_metrics: selection.next_design_metrics,
         selection_time_ms: selection.selection_time_ms,
         max_mutual_info: selection.max_mutual_info,
+        ...stopper.evaluate(trials.length, selection.max_mutual_info),
         post_mean: null,
         post_sd: null,
         posterior_draws: null,
@@ -355,6 +382,7 @@ function createStanAdoController({
         next_design_metrics: selection.next_design_metrics,
         selection_time_ms: selection.selection_time_ms,
         max_mutual_info: selection.max_mutual_info,
+        ...stopper.evaluate(trials.length, selection.max_mutual_info),
         post_mean,
         post_sd,
         posterior_draws: draws,

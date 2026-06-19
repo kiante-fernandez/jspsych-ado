@@ -25,6 +25,8 @@ jobs:
         run: node tests/js/weber_recovery.smoke.mjs
       - name: locateFile runtime smoke (emscripten honors the #57 glue patch)
         run: node tests/js/locate_file.smoke.mjs
+      - name: Adaptive-stopping recovery smoke (real WASM EIG stopping, #21)
+        run: node tests/js/stopping_recovery.smoke.mjs
 
   browser:
     name: Headless Worker/WASM smoke

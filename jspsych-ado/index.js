@@ -282,6 +282,9 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
   const n_trials = config.n_trials ?? spec.n_trials ?? DEFAULT_N_TRIALS;
   const testlet_size = normalizeTestletSize(config.testlet_size ?? spec.testlet_size);
   const response_labels = labelsToConfig(task.response_labels);
+  // Adaptive-stopping config (#21): EIG-fraction early stopping + min/max bounds.
+  // Omitted => fixed-length run of n_trials (max_trials defaults to n_trials).
+  const stopping = config.stopping ?? spec.stopping ?? null;
 
   const controller = createStanAdoController({
     model: adapter,
@@ -289,6 +292,7 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
     stan,
     n_trials,
     testlet_size,
+    stopping,
     session_id: config.session_id,
     design_strategy: config.design_strategy ?? "ado",
     design_seed: config.design_seed ?? null,
@@ -297,6 +301,7 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
   const timeline_config = {
     n_trials,
     testlet_size,
+    stopping,
     response_labels,
     presentation: task.presentation,
     choices: task.choices,
@@ -825,6 +830,7 @@ function registerModelPackage(model, overrides = {}) {
     stan: overrides.stan ?? model.stan,
     n_trials: overrides.n_trials ?? model.n_trials,
     testlet_size: overrides.testlet_size ?? model.testlet_size,
+    stopping: overrides.stopping ?? model.stopping,
   });
   return name;
 }

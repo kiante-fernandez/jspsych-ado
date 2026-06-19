@@ -8,6 +8,10 @@
 const default_dd_config = {
   n_trials: 42,
   testlet_size: 1,
+  // Adaptive early stopping (#21) is off by default (fixed 42-trial run). To enable
+  // it, add a `stopping` block — the loop then stops once the best next design's EIG
+  // drops below eig_fraction * ln(K), bounded by min/max_trials:
+  //   stopping: { eig_fraction: 0.1, min_trials: 8, max_trials: 42, consecutive: 1 },
   stan: {
     num_chains: 2,
     num_warmup: 500,
