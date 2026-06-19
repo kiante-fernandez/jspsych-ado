@@ -45,7 +45,7 @@
   "scripts": {
     "test": "node --test tests/js/*.test.mjs",
     "test:smoke": "node tests/js/stan_recovery.smoke.mjs",
-    "test:browser": "node tests/browser/dd_smoke.mjs && node tests/browser/line_length_discrimination_smoke.mjs && node tests/browser/byo_model_exponential_smoke.mjs",
+    "test:browser": "node tests/browser/dd_smoke.mjs && node tests/browser/line_length_discrimination_smoke.mjs && node tests/browser/byo_model_exponential_smoke.mjs && node tests/browser/byo_task_money_choice_smoke.mjs",
     "patch:wasm": "node scripts/patch-wasm-glue.mjs",
     "test:bundler": "node tests/bundler/run.mjs",
     "prepublishOnly": "npm test"
