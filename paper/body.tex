@@ -5,45 +5,38 @@
 
 \section{Summary}
 
-\texttt{jspsych-ado} brings browser-native \emph{adaptive design optimization} (ADO) to behavioral experiments built with jsPsych \citep{deleeuw2015jspsych}.
-After each response, a Bayesian model written in Stan \citep{carpenter2017stan} --- compiled to WebAssembly and run client-side in a Web Worker --- updates the posterior over the model parameters, and the next stimulus is chosen to maximize the expected information it provides about those parameters.
-Because the adaptive loop runs entirely in the participant's browser, experiments can be deployed as static web assets rather than server-backed applications.
-The package separates task presentation, response-model specification, and adaptive control so that new tasks and models can be implemented without rewriting the inference-and-design engine.
+\texttt{jspsych-ado} brings browser-native \emph{adaptive design optimization} (ADO) to behavioral experiments built with jsPsych \citep{deleeuw2015jspsych}. 
+After each response, a Bayesian model written in Stan \citep{carpenter2017stan} --- compiled to WebAssembly and run client-side in a Web Worker --- updates the posterior over the model parameters, and the next stimulus is chosen to maximize the expected information it provides about those parameters. 
+Because the ADO runs entirely in the participant's browser, experiments can be deployed as static web assets rather than server-backed applications.
+The package separates task presentation, response-model specification, and adaptive control so that new tasks, models, and algorithms can be implemented without rewriting the inference-and-design engine.
 
 \section{Statement of need}
 
-Many behavioral experiments use fixed stimulus schedules even when some trials are more informative than others for estimating model parameters or discriminating among theoretical accounts. 
-Adaptive design optimization (ADO) addresses this problem by treating stimulus selection as a sequential Bayesian design problem: after observing a response, the experimenter updates uncertainty about the model and selects the next design expected to provide the most information \citep{cavagnaro2010adaptive,myung2013tutorial}. 
-Applications to delay-discounting measurement, risky-choice model discrimination, and mnemonic-similarity testing show that ADO is useful across behavioral domains where participant time is limited and informative trials are valuable \citep{ahn2020rapid,cavagnaro2012optimal,villarreal2022adaptive}. 
-However, using ADO in practice requires researchers to connect experimental presentation, response modeling, Bayesian updating, and design selection within the same data-collection workflow.
+Many behavioral experiments present stimuli on a fixed schedule, even though some trials are more informative than others for estimating a model's parameters or discriminating between competing theoretical accounts. 
+Adaptive design optimization (ADO) removes this inefficiency by treating stimulus selection as a sequential Bayesian design problem: after each response, the experimenter updates a posterior over the parameters of a model of the participant and presents the design expected to yield the most information about them \citep{cavagnaro2010adaptive,myung2013tutorial}.
+For example, in delay discounting, if a participant accepts a delayed reward, ADO adjusts the amounts and delays of the next offer to better estimate the discount rate. 
+Data collection efficiency increases, as ADO has been shown to reach test-retest reliabilities of 0.95 or higher within 10-20 trials and to be three to eight times more efficient than a conventional staircase \citep{ahn2020rapid}.
+Comparable benefits have been reported for risky-choice model discrimination, menmonic-similarity testing, and psychophysical threshold estimation \citep{cavagnaro2012optimal,watson2017questplus}, making ADO valuable wherever participant time and attention is scarce \citep{ahn2020rapid,cavagnaro2012optimal,villarreal2022adaptive}.
 
-This integration is especially challenging for browser-based behavioral experiments. jsPsych has made it possible to build flexible online experiments with response-contingent timelines, reusable plugins, and simulation tools for testing experiment logic \citep{deleeuw2023jspsych}. 
-However, jsPsych does not provide a general model-based ADO layer: researchers must still implement or connect the model likelihood, posterior update, and next-stimulus selection logic for each adaptive experiment.
-As a result, applying ADO in browser studies typically requires custom glue code that is difficult to reuse, inspect, and validate across tasks.
+These conditions are most salient in online data collection, which is also where ADO is difficult to use. 
+Browser-based platforms such as jsPsych have made large-scale online experiments routine, with response-contingent timelines, reusable plugins, and simulation tools for validating experiment logic \citep{deleeuw2015jspsych,deleeuw2023jspsych}. 
+Currently, jsPsych does not provide a model-based ADO feature.
+The response model, posterior update, and information-based stimulus selection must be supplied for each adaptive study. 
+Existing ADO software runs the statistical estimation for ADO outside the browser \citep{yang2021adopy}, so an online experiment must reach a server between trials --- reintroducing the hosting, latency, and data-governance burdens many browser-native experiments.
+In practice, researchers are responsible for either setting up the server infrastructure or writing code that is difficult to reuse, inspect, and validate across tasks.
 
-Existing adaptive-design tools address important parts of this problem but do not provide this combination of capabilities for jsPsych experiments. 
-ADOpy lowers the barrier to ADO through a modular Python implementation \citep{yang2021adopy}, while QUEST+ and jsQuestPlus support adaptive psychophysical procedures, including browser-based use \citep{watson2017questplus,kuroki2022jsquestplus}. 
-
-These tools demonstrate the value of accessible adaptive experimentation, but they do not provide a jsPsych-native layer that couples task presentation, Bayesian response models, posterior updating, and information-based stimulus selection inside the browser experiment itself.
-\texttt{jspsych-ado} fills this gap by separating task, model, and controller components so that researchers can implement adaptive browser experiments without rewriting the inference-and-design engine for each new task.
-% TODO: expand with the concrete use cases and who benefits.
-%clinicnal settings? automated testing?
+\texttt{jspsych-ado} targets applied researchers who want to run an adaptive task without building an inference pipeline, and methodologists who want to develop new adaptive tasks and models.
+It runs the entire ADO loop in the participant's browser, with no Python and no server.
+A Bayesian model written in Stan \citep{carpenter2017stan} is compiled to WebAssembly and sampled client-side in a Web Worker, and the next design is chosen by maximizing mutual information over a candidate grid. 
+The package separates the task, the response model, and the adaptive controller, so a researcher can supply a custom Stan model and likelihood and obtain an adaptive experiment without modifying the inference-and-design engine.
+Because the result is a set of static web assets, adaptive experiments can be deployed on standard hosting and recruitment platforms alongside ordinary jsPsych studies.
+This makes \texttt{jspsych-ado} well suited to settings where brief, reliable measurement is essential, such as in clinical and individual-differences studies that draw on patient or population samples, and automated or remote assessments must be run efficiently and at scale.
 
 \section{State of the field}
 
-Advances in statistics and machine learning have offered algorithm-based ways to identify principled experimental designs decision based on information gain \citep{watson1983quest,cavagnaro2010adaptive,rainforth2024modern,huan2024optimal}. 
-Specifically relevant to our approach, Bayesian experimental design is a
-model-based approach to designing optimal experiments. We start with a Bayesian
-model $p(\theta)\,p(y \mid d, \theta)$ of the underlying process we are interested
-in. The model has parameters $\theta$ with prior $p(\theta)$: these are the
-quantities we would like to learn or infer. The data model $p(y \mid d, \theta)$
-describes how the data $y$ are generated given the parameters $\theta$ and the
-design $d$.
+Adaptive design optimization belongs to the broader framework of Bayesian experimental design, which uses a model of the process under study to identify maximally informative designs \citep{cavagnaro2010adaptive,rainforth2024modern,huan2024optimal}. 
+Given a model $p(\theta)\,p(y \mid d, \theta)$ with parameters $\theta$, prior $p(\theta)$, and a data model $p(y \mid d, \theta)$ relating the response $y$ to the design $d$, the optimal design $d^{*}$ maximizes the expected information gain (EIG) --- the expected reduction in entropy from the prior to the posterior:
 
-The optimal design $d^{*}$ is the one that maximises the expected information
-gain (EIG) about the parameters $\theta$. The EIG is the expected reduction in
-Shannon entropy from the prior $p(\theta)$ to the posterior $p(\theta \mid y, d)$
-that results from the experiment with design $d$:
 %
 \begin{equation}
 d^{*} = \arg\max_{d}\; \mathrm{EIG}(d),
@@ -53,26 +46,29 @@ d^{*} = \arg\max_{d}\; \mathrm{EIG}(d),
 \label{eq:eig}
 \end{equation}
 %
-where $H(\cdot)$ is the Shannon entropy and the expectation is taken over the
-prior predictive distribution $p(y \mid d) = \int p(y \mid d, \theta)\,p(\theta)\,\mathrm{d}\theta$.
 
+where $H(\cdot)$ is the Shannon entropy and the expectation is over the prior predictive $p(y \mid d) = \int p(y \mid d, \theta)\,p(\theta)\,\mathrm{d}\theta$.
+Methods of this kind are applied across the behavioral and biomedical sciences, including psychophysics \citep{watson2017questplus}, cognitive modeling \citep{myung2013tutorial}, computational psychiatry \citep{kwon2023adaptive}, cognitive neuroimaging \citep{bahg2020real}, and systems biology \citep{pauwels2014bayesian}.
 
-In general optimal design based on a mutual-information formulation like these are used in a variety of fields such as XXX CITE and YYY CITE they are widely used in psychophysics \citep{watson2017questplus}, XXX and more resently psychiaary XXX. With software implemetnations being brought (e.g.\ PyBOLE
-\citep{myrodia2026pybole}), ADOpy \citep{yang2020adopy}, and jsQuestPlus \citep{kuroki2023jsquestplus}
+Several software tools make these methods usable, but each leaves the browser-native, model-general case unaddressed.
+ADOpy provides a modular, grid-based Python implementation of ADO with reusable task, model, and engine components \citep{yang2021adopy}, and the DARC toolbox offers Bayesian adaptive design for delayed and risky choice in MATLAB and Python \citep{vincent2017darc}.
+Both are general in the models they support but run in desktop scientific-computing environments; embedding them in an online experiment requires a server that the browser queries between trials.
+The QUEST+ method, through its JavaScript port jsQuestPlus, runs adaptive psychophysical procedures in the browser, including under jsPsych \citep{watson2017questplus,kuroki2022jsquestplus}, but it is specialized to threshold and psychometric-function estimation rather than arbitrary user-specified models, and it performs inference over a precomputed grid rather than by general posterior sampling.
 
-While running Stan in the browser via WebAssembly was recently demonstrated\citep{stanplayground}, but it has not been used for applicaitons like adaptive design. \texttt{jspsych-ado} combines in-browser inference with mutual-information design optimization inside the jsPsych ecosystem.
-
+No existing tool combines execution within the browser with model-general, sampling-based ADO.
+Running Stan in the browser via WebAssembly was demonstrated only recently \citep{stanplayground}, and, to our knowledge, it has not previously been applied to adaptive design.
+\texttt{jspsych-ado} fills this gap, utilizing full client-side posterior sampling with mutual-information design selection inside the jsPsych ecosystem. 
+Moreover, jspsych-ado lets researchers supply their own Stan model, in addition to choosing from a catalogue of models. This design supports adaptive measurement
+across behavioral domains --- from value-based decisions under risk and ambiguity \citep{levy2010neural} to memory paradigms such as free recall \citep{manning2023feature} and the Mnemonic Similarity Task, for which ADO has already been developed \citep{villarreal2022adaptive} --- so that researchers studying memory, decision-making,
+and individual differences can run efficient, reliable adaptive tasks without leaving the
+browser. While ADOpy and DARC enable ADO within experiments, they are less amenable to being hosted on browsers for online experiments, and jsQuestPlus is architecturally committed to grid-based psychophysics. Thus, a jsPsych-native implementation was required. Models are compiled to WebAssembly once, ahead of data collection, so the deployed experiment depends only on static assets and performs its per-trial inference entirely on the participant's device.
 % TODO: expand statement of need / state of field with the concrete use cases and who benefits.
-%clinicnal settings? automated testing?
+%clinical settings? automated testing?
 % Can refer to https://github.com/githubpsyche/jspsych-ado/issues/35 for other possibly useful references. We hopefully want to 
 
 \section{Software design}
 
-Figure~\ref{fig:conceptual} summarizes the runtime loop implemented by \texttt{jspsych-ado}.
-On each trial, the controller scores candidate designs and selects the one expected to provide the most information.
-jsPsych then presents the selected design and records the participant's response.
-The inference backend uses the accumulated responses and registered model to update the posterior distribution over parameters.
-Candidate designs are the stimulus settings the controller can choose from, such as reward and delay values in a delay-discounting task or line lengths in a psychophysical task.
+Figure~\ref{fig:conceptual} summarizes the runtime loop implemented by \texttt{jspsych-ado}. On each trial, the controller scores candidate designs and selects the one expected to provide the most information. jsPsych then presents the selected design and records the participant's response. The inference backend uses the accumulated responses and registered model to update the posterior distribution over parameters. Candidate designs are the stimulus settings the controller can choose from, such as reward and delay values in a delay-discounting task.
 
 \begin{figure}
     \centering
@@ -150,17 +146,13 @@ counts in design $d$. The next design then maximizes the $\mathrm{EIG}(d)$, eval
 where $\bar{p}_d$ is the Monte-Carlo estimate of the posterior-predictive response probability $p(Y \mid d, D)$. This is exactly what the engine's design-selection routine computes from the posterior draws.
 
 \section{Research impact statement}
-
-Prior ADO software has emphasized that implementation demands limit broader use of adaptive design methods \citep{yang2021adopy}.
-\texttt{jspsych-ado} addresses the same problem for browser experiments by providing reusable jsPsych components for posterior updating, information-based design selection, and adaptive timeline construction.
-It is distributed through npm, documented with runnable examples, and organized around shareable task and model packages.
-The included examples span delay discounting, line-length psychophysics, and approximate-number discrimination; additional examples show how to add a new task or a new model through the same interface.
-This structure provides a common scaffold for collaborative development within the jsPsych ecosystem.
-The validation materials exercise the browser workflow directly: simulated participants run through the same jsPsych pages used in live studies, parameter-recovery examples compare information-based designs with random designs from the same candidate grid, and likelihood-parity checks compare the JavaScript and compiled Stan likelihoods.
-Continuous integration covers unit tests, browser smoke tests, Worker/WebAssembly execution, and bundler compatibility, supporting reuse by researchers who want to inspect, extend, and share adaptive jsPsych experiments.
+Because the nontrivial technical skills required to use ADO have been a barrier to its wider adoption, we believe jsPsych-ADO will positively impact the integration of adaptive designs across a broader range of tasks in the social and behavioral sciences.
+It lowers the barrier to entry for including an adaptive version of a task by eliminating the need to write bespoke adaptive design code, while offering implementations across a range of existing tasks and computational models used in prior work on adaptive designs, such as delay discounting \citep{lee2026rapid} and numeric discrimination \citep{halberda2008individual}. 
+Further, it enhances collaboration by providing researchers with a shared scaffold for developing and sharing new adaptive designs within a common ecosystem (i.e., jsPsych).
+We aim to continue developing jsPsych-ADO and extend its capabilities beyond those of existing implementations for adaptive experimental design.
 
 \section{AI usage disclosure}
 Generative AI tools were used during the development of jspsych-ado. Claude Code and OpenAI Codex assisted with code implementation, automating the release workflow, and providing code reviews during pull requests. All AI-generated content was reviewed and edited by the authors to ensure accuracy and clarity.
 \section{Acknowledgements}
 We thank the jsPsych Summer Hackathon participants for their support and feedback.
-
+We also thank the National Science Foundation under Award 2346214 for supporting the Hackathon.
