@@ -10,8 +10,8 @@ name: Build paper (LaTeX -> PDF + Markdown)
 on:
   push:
     paths:
-      - 'paper/**'
-      - '.github/workflows/draft-paper.yml'
+      - "paper/**"
+      - ".github/workflows/draft-paper.yml"
   workflow_dispatch:
 
 permissions:

@@ -19,7 +19,8 @@ test("Halberda task package exposes an adaptive dot-comparison design list", () 
 });
 
 test("Halberda canvas trials use the full drawing coordinate system", () => {
-  globalThis.jsPsychCanvasKeyboardResponse = globalThis.jsPsychCanvasKeyboardResponse || function jsPsychCanvasKeyboardResponse() {};
+  globalThis.jsPsychCanvasKeyboardResponse =
+    globalThis.jsPsychCanvasKeyboardResponse || function jsPsychCanvasKeyboardResponse() {};
   const design = task.design_grid[0];
   const ctx = {
     getDesign: () => design,
@@ -43,8 +44,12 @@ test("design generation includes both color orders and visual-control modes", ()
     control_modes: ["size_control", "area_control"],
   });
   assert.equal(designs.length, 4);
-  assert.ok(designs.some(d => d.n_blue === 10 && d.n_yellow === 5 && d.control_mode === "size_control"));
-  assert.ok(designs.some(d => d.n_blue === 5 && d.n_yellow === 10 && d.control_mode === "area_control"));
+  assert.ok(
+    designs.some((d) => d.n_blue === 10 && d.n_yellow === 5 && d.control_mode === "size_control"),
+  );
+  assert.ok(
+    designs.some((d) => d.n_blue === 5 && d.n_yellow === 10 && d.control_mode === "area_control"),
+  );
 });
 
 test("raw B/Y responses map to model outcome correct/incorrect", () => {
@@ -61,12 +66,18 @@ test("raw B/Y responses map to model outcome correct/incorrect", () => {
 
 test("Halberda task and Weber model validate as a compatible pair", () => {
   const task_result = validateTask(task);
-  assert.deepEqual(task_result.problems.filter(p => p.level === "error"), []);
+  assert.deepEqual(
+    task_result.problems.filter((p) => p.level === "error"),
+    [],
+  );
 
   const sample_design = task.design_grid[0];
   const model_result = validateModel(model, {
     sampleDesign: sample_design,
     sampleDraw: { w: 0.25 },
   });
-  assert.deepEqual(model_result.problems.filter(p => p.level === "error"), []);
+  assert.deepEqual(
+    model_result.problems.filter((p) => p.level === "error"),
+    [],
+  );
 });

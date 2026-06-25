@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
       - name: Unit tests (MI engine, model adapter, facade)
         run: node --test tests/js/*.test.mjs
       - name: Stan recovery smoke - hyperbolic (real WASM via fetch shim)
@@ -41,8 +41,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
       - name: Install dev deps (prettier)
         run: npm ci
       - name: Check formatting (prettier --check .)
@@ -55,8 +55,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
       - name: Install dev deps (puppeteer + Chromium)
         run: npm ci
       - name: Headless browser smokes (delay discounting + line length)
@@ -69,8 +69,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
       - name: Install dev deps (puppeteer + Chromium)
         run: npm ci
       # Packs the library, installs the tarball into tests/bundler/fixture, runs a

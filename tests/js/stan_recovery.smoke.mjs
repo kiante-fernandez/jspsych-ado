@@ -19,12 +19,10 @@ import "./_wasm_node_shim.mjs";
 
 const StanModel = (await import("../../core/tinystan/index.mjs")).default;
 const hyp = (await import("../../src/models/hyperbolic/model.js")).default;
-const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws } = await import(
-  "../../src/ado/mi_engine.js"
-);
-const { createSeededRng, simulateDelayDiscountingChoice } = await import(
-  "../../src/ado/ado_simulation.js"
-);
+const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws } =
+  await import("../../src/ado/mi_engine.js");
+const { createSeededRng, simulateDelayDiscountingChoice } =
+  await import("../../src/ado/ado_simulation.js");
 const { default_dd_config } = await import("../../demos/delay_discounting/dd_config.js");
 const delayDiscountingTask = (await import("../../src/tasks/delay_discounting/task.js")).default;
 
@@ -49,7 +47,11 @@ function runRecovery(trueParams, seed, nTrials) {
   const sim_rng = createSeededRng(seed + 1);
   const sim_config = { params: trueParams, rt: { choice: 0 } };
 
-  let { design } = selectOptimalDesign(designs, samplePriorDraws(hyp.prior, 2000, prior_rng), hyp.responseProb);
+  let { design } = selectOptimalDesign(
+    designs,
+    samplePriorDraws(hyp.prior, 2000, prior_rng),
+    hyp.responseProb,
+  );
   const trials = [];
   let summary = { post_mean: null, post_sd: null };
 
@@ -69,14 +71,17 @@ function runRecovery(trueParams, seed, nTrials) {
 }
 
 let failures = 0;
-const fail = (msg) => { console.log("  FAIL: " + msg); failures++; };
+const fail = (msg) => {
+  console.log("  FAIL: " + msg);
+  failures++;
+};
 
 // --- 1. Recovery across a (k, tau) sweep ------------------------------------
 const SWEEP_TRIALS = 30;
 const settings = [
-  { sweep: "k",   k: 1e-4, tau: 2.5 },
-  { sweep: "k",   k: 1e-3, tau: 2.5 },
-  { sweep: "k",   k: 1e-2, tau: 2.5 },
+  { sweep: "k", k: 1e-4, tau: 2.5 },
+  { sweep: "k", k: 1e-3, tau: 2.5 },
+  { sweep: "k", k: 1e-2, tau: 2.5 },
   { sweep: "tau", k: 5e-3, tau: 0.5 },
   { sweep: "tau", k: 5e-3, tau: 2.5 },
   { sweep: "tau", k: 5e-3, tau: 5.0 },
@@ -96,31 +101,37 @@ for (const s of settings) {
   results.push({ ...s, rec });
   console.log(
     `${s.sweep.padEnd(5)} | ${s.k.toExponential(1).padEnd(9)} ${String(s.tau).padEnd(8)} | ` +
-    `${rec.k.toExponential(1).padEnd(9)} ${rec.tau.toFixed(2).padEnd(7)} | ${k_ok ? "yes" : "NO"}`
+      `${rec.k.toExponential(1).padEnd(9)} ${rec.tau.toFixed(2).padEnd(7)} | ${k_ok ? "yes" : "NO"}`,
   );
 }
 
 // --- 2. tau ordering: recovered tau rises with true tau ---------------------
 console.log("\n[2] tau ordering (k fixed at 5e-3): recovered tau should rise with true tau");
-const tau_rows = results.filter(r => r.sweep === "tau").sort((a, b) => a.tau - b.tau);
-console.log("  true tau: " + tau_rows.map(r => r.tau).join(" < "));
-console.log("  rec  tau: " + tau_rows.map(r => r.rec.tau.toFixed(2)).join("   "));
+const tau_rows = results.filter((r) => r.sweep === "tau").sort((a, b) => a.tau - b.tau);
+console.log("  true tau: " + tau_rows.map((r) => r.tau).join(" < "));
+console.log("  rec  tau: " + tau_rows.map((r) => r.rec.tau.toFixed(2)).join("   "));
 for (let i = 1; i < tau_rows.length; i++) {
   if (!(tau_rows[i].rec.tau > tau_rows[i - 1].rec.tau)) {
-    fail(`tau not increasing: true ${tau_rows[i - 1].tau}->${tau_rows[i].tau} gave ` +
-         `${tau_rows[i - 1].rec.tau.toFixed(2)}->${tau_rows[i].rec.tau.toFixed(2)}`);
+    fail(
+      `tau not increasing: true ${tau_rows[i - 1].tau}->${tau_rows[i].tau} gave ` +
+        `${tau_rows[i - 1].rec.tau.toFixed(2)}->${tau_rows[i].rec.tau.toFixed(2)}`,
+    );
   }
 }
 
 // --- 3. Precision improves with more trials --------------------------------
 console.log("\n[3] Precision vs trials (true k=5e-3, tau=2.5): posterior SD of k should shrink");
 const trial_counts = [8, 24, 40];
-const sds = trial_counts.map(n => runRecovery({ k: 5e-3, tau: 2.5 }, 500, n).post_sd.k);
-trial_counts.forEach((n, i) => console.log(`  N=${String(n).padStart(2)} trials -> sd(k) = ${sds[i].toExponential(3)}`));
+const sds = trial_counts.map((n) => runRecovery({ k: 5e-3, tau: 2.5 }, 500, n).post_sd.k);
+trial_counts.forEach((n, i) =>
+  console.log(`  N=${String(n).padStart(2)} trials -> sd(k) = ${sds[i].toExponential(3)}`),
+);
 for (let i = 1; i < sds.length; i++) {
   if (!(sds[i] < sds[i - 1])) {
-    fail(`sd(k) did not shrink from N=${trial_counts[i - 1]} to N=${trial_counts[i]}: ` +
-         `${sds[i - 1].toExponential(3)} -> ${sds[i].toExponential(3)}`);
+    fail(
+      `sd(k) did not shrink from N=${trial_counts[i - 1]} to N=${trial_counts[i]}: ` +
+        `${sds[i - 1].toExponential(3)} -> ${sds[i].toExponential(3)}`,
+    );
   }
 }
 

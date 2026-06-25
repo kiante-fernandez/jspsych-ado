@@ -72,7 +72,9 @@ test("validateModel: continuous model without responseDensity is rejected", () =
 });
 
 test("validateModel: continuous model without moments or support is rejected", () => {
-  const { valid, problems } = validateModel(continuousModelPackage({ responseMoments: undefined, responseSupport: undefined }));
+  const { valid, problems } = validateModel(
+    continuousModelPackage({ responseMoments: undefined, responseSupport: undefined }),
+  );
   assert.equal(valid, false);
   assert.ok(problems.some((p) => /responseMoments|responseSupport/.test(p.message)));
 });
@@ -108,28 +110,48 @@ test("buildAdapter: forwards continuous fields, and the adapter drives the engin
 test("validateTaskModelPair: a matching continuous task/model pair passes", () => {
   const spec = continuousModelPackage();
   const adapter = buildAdapter({
-    spec, name: "cont_est", paramNames: ["theta"], prior: spec.prior,
-    moduleUrl: spec.moduleUrl, wasmUrl: spec.wasmUrl,
+    spec,
+    name: "cont_est",
+    paramNames: ["theta"],
+    prior: spec.prior,
+    moduleUrl: spec.moduleUrl,
+    wasmUrl: spec.wasmUrl,
   });
-  assert.doesNotThrow(() => validateTaskModelPair(continuousTask(), adapter, "cont_task", "cont_est"));
+  assert.doesNotThrow(() =>
+    validateTaskModelPair(continuousTask(), adapter, "cont_task", "cont_est"),
+  );
 });
 
 test("validateTaskModelPair: a responseDensityFactory that disagrees with responseDensity is caught", () => {
   const spec = continuousModelPackage({ responseDensityFactory: () => () => 0.123 });
   const adapter = buildAdapter({
-    spec, name: "cont_est", paramNames: ["theta"], prior: spec.prior,
-    moduleUrl: spec.moduleUrl, wasmUrl: spec.wasmUrl,
+    spec,
+    name: "cont_est",
+    paramNames: ["theta"],
+    prior: spec.prior,
+    moduleUrl: spec.moduleUrl,
+    wasmUrl: spec.wasmUrl,
   });
-  assert.throws(() => validateTaskModelPair(continuousTask(), adapter, "cont_task", "cont_est"), /disagrees/);
+  assert.throws(
+    () => validateTaskModelPair(continuousTask(), adapter, "cont_task", "cont_est"),
+    /disagrees/,
+  );
 });
 
 test("validateTaskModelPair: a bad continuous density (negative) is caught by the probe", () => {
   const spec = continuousModelPackage({ responseDensity: () => -1 });
   const adapter = buildAdapter({
-    spec, name: "cont_est", paramNames: ["theta"], prior: spec.prior,
-    moduleUrl: spec.moduleUrl, wasmUrl: spec.wasmUrl,
+    spec,
+    name: "cont_est",
+    paramNames: ["theta"],
+    prior: spec.prior,
+    moduleUrl: spec.moduleUrl,
+    wasmUrl: spec.wasmUrl,
   });
-  assert.throws(() => validateTaskModelPair(continuousTask(), adapter, "cont_task", "cont_est"), /density probe/);
+  assert.throws(
+    () => validateTaskModelPair(continuousTask(), adapter, "cont_task", "cont_est"),
+    /density probe/,
+  );
 });
 
 test("registerModelPackage + registerTask: a continuous pair registers without error", () => {
@@ -140,8 +162,9 @@ test("registerModelPackage + registerTask: a continuous pair registers without e
 
 test("registerModelPackage: continuous model missing responseDensity throws", () => {
   assert.throws(
-    () => registerModelPackage(continuousModelPackage({ id: "cont_bad", responseDensity: undefined })),
-    /responseDensity/
+    () =>
+      registerModelPackage(continuousModelPackage({ id: "cont_bad", responseDensity: undefined })),
+    /responseDensity/,
   );
 });
 
@@ -153,7 +176,7 @@ test("simulateContinuousResponse: draws a real response and records sim_* fields
     { x: 2 },
     { params: { theta: 1.5 }, rt: { choice: 300 } },
     createSeededRng(1),
-    model
+    model,
   );
   assert.equal(data.response, 3);
   assert.equal(data.sim_response, 3);
@@ -163,14 +186,23 @@ test("simulateContinuousResponse: draws a real response and records sim_* fields
 
 test("simulateContinuousResponse: requires a responseSampler", () => {
   assert.throws(
-    () => simulateContinuousResponse({ x: 1 }, { params: {}, rt: { choice: 1 } }, createSeededRng(1), {}),
-    /responseSampler/
+    () =>
+      simulateContinuousResponse(
+        { x: 1 },
+        { params: {}, rt: { choice: 1 } },
+        createSeededRng(1),
+        {},
+      ),
+    /responseSampler/,
   );
 });
 
 test("simulateContinuousResponse: rejects a non-finite sampled response", () => {
   assert.throws(
-    () => simulateContinuousResponse({ x: 1 }, { params: {}, rt: { choice: 1 } }, createSeededRng(1), { responseSampler: () => NaN }),
-    /finite number/
+    () =>
+      simulateContinuousResponse({ x: 1 }, { params: {}, rt: { choice: 1 } }, createSeededRng(1), {
+        responseSampler: () => NaN,
+      }),
+    /finite number/,
   );
 });

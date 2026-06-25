@@ -47,8 +47,8 @@ function getFiniteTracePoints(values) {
       missing: value === null || value === undefined,
       value: Number(value),
     }))
-    .filter(point => !point.missing && Number.isFinite(point.value))
-    .map(point => ({
+    .filter((point) => !point.missing && Number.isFinite(point.value))
+    .map((point) => ({
       trial: point.trial,
       value: point.value,
     }));
@@ -58,8 +58,8 @@ function getInfoGainScale(selected_points, realized_points, options = {}) {
   const width = Number.isFinite(Number(options.width)) ? Number(options.width) : SVG_WIDTH;
   const height = Number.isFinite(Number(options.height)) ? Number(options.height) : SVG_HEIGHT;
   const points = [...selected_points, ...realized_points];
-  const max_trial = Math.max(1, ...points.map(point => point.trial));
-  const values = points.map(point => point.value);
+  const max_trial = Math.max(1, ...points.map((point) => point.trial));
+  const values = points.map((point) => point.value);
   const raw_min = values.length ? Math.min(...values) : 0;
   const raw_max = values.length ? Math.max(...values) : 1;
   const raw_span = raw_max - raw_min;
@@ -67,9 +67,7 @@ function getInfoGainScale(selected_points, realized_points, options = {}) {
   const y_min = Number.isFinite(Number(options.y_min))
     ? Number(options.y_min)
     : Math.max(0, raw_min - padding);
-  const y_max = Number.isFinite(Number(options.y_max))
-    ? Number(options.y_max)
-    : raw_max + padding;
+  const y_max = Number.isFinite(Number(options.y_max)) ? Number(options.y_max) : raw_max + padding;
   const y_span = Math.max(y_max - y_min, 1e-12);
   const plot_width = width - MARGIN.left - MARGIN.right;
   const plot_height = height - MARGIN.top - MARGIN.bottom;
@@ -82,8 +80,8 @@ function getInfoGainScale(selected_points, realized_points, options = {}) {
     max_trial,
     y_min,
     y_max,
-    x: trial => MARGIN.left + ((trial - 1) / Math.max(1, max_trial - 1)) * plot_width,
-    y: value => MARGIN.top + ((y_max - value) / y_span) * plot_height,
+    x: (trial) => MARGIN.left + ((trial - 1) / Math.max(1, max_trial - 1)) * plot_width,
+    y: (value) => MARGIN.top + ((y_max - value) / y_span) * plot_height,
   };
 }
 
@@ -102,8 +100,9 @@ function buildLinePath(points, scale) {
 
 function buildPointCircles(points, scale, color) {
   return points
-    .map(point =>
-      `<circle cx="${coordinate(scale.x(point.trial))}" cy="${coordinate(scale.y(point.value))}" r="2.5" fill="${color}"></circle>`
+    .map(
+      (point) =>
+        `<circle cx="${coordinate(scale.x(point.trial))}" cy="${coordinate(scale.y(point.value))}" r="2.5" fill="${color}"></circle>`,
     )
     .join("");
 }
@@ -122,7 +121,11 @@ function buildYAxisTicks(scale, count = 4) {
   return ticks;
 }
 
-function buildInfoGainSvg(selected_design_mi_history, realized_information_gain_history, options = {}) {
+function buildInfoGainSvg(
+  selected_design_mi_history,
+  realized_information_gain_history,
+  options = {},
+) {
   const selected_points = getFiniteTracePoints(selected_design_mi_history);
   const realized_points = getFiniteTracePoints(realized_information_gain_history);
   const scale = getInfoGainScale(selected_points, realized_points, options);
@@ -131,20 +134,27 @@ function buildInfoGainSvg(selected_design_mi_history, realized_information_gain_
   const selected_path = buildLinePath(selected_points, scale);
   const realized_path = buildLinePath(realized_points, scale);
   const y_ticks = buildYAxisTicks(scale, 4);
-  const x_ticks = scale.max_trial === 1
-    ? [{ label: "1", x: scale.x(1) }]
-    : [
-        { label: "1", x: scale.x(1) },
-        { label: String(scale.max_trial), x: scale.x(scale.max_trial) },
-      ];
+  const x_ticks =
+    scale.max_trial === 1
+      ? [{ label: "1", x: scale.x(1) }]
+      : [
+          { label: "1", x: scale.x(1) },
+          { label: String(scale.max_trial), x: scale.x(scale.max_trial) },
+        ];
 
-  const grid_lines = y_ticks.map(tick =>
-    `<line x1="${MARGIN.left}" y1="${coordinate(tick.y)}" x2="${coordinate(right)}" y2="${coordinate(tick.y)}" stroke="${COLORS.grid}" stroke-width="1"></line>` +
-    `<text x="${MARGIN.left - 8}" y="${coordinate(tick.y + 3)}" text-anchor="end" fill="${COLORS.muted}" font-size="10">${formatTraceNumber(tick.value)}</text>`
-  ).join("");
-  const x_labels = x_ticks.map(tick =>
-    `<text x="${coordinate(tick.x)}" y="${coordinate(bottom + 17)}" text-anchor="middle" fill="${COLORS.muted}" font-size="10">${tick.label}</text>`
-  ).join("");
+  const grid_lines = y_ticks
+    .map(
+      (tick) =>
+        `<line x1="${MARGIN.left}" y1="${coordinate(tick.y)}" x2="${coordinate(right)}" y2="${coordinate(tick.y)}" stroke="${COLORS.grid}" stroke-width="1"></line>` +
+        `<text x="${MARGIN.left - 8}" y="${coordinate(tick.y + 3)}" text-anchor="end" fill="${COLORS.muted}" font-size="10">${formatTraceNumber(tick.value)}</text>`,
+    )
+    .join("");
+  const x_labels = x_ticks
+    .map(
+      (tick) =>
+        `<text x="${coordinate(tick.x)}" y="${coordinate(bottom + 17)}" text-anchor="middle" fill="${COLORS.muted}" font-size="10">${tick.label}</text>`,
+    )
+    .join("");
   const selected_line = selected_path
     ? `<path d="${selected_path}" fill="none" stroke="${COLORS.selected_design_mi}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"></path>${buildPointCircles(selected_points, scale, COLORS.selected_design_mi)}`
     : "";
@@ -176,14 +186,26 @@ function buildLegendItem(color, label) {
   ].join("");
 }
 
-function renderInfoGainDebugPanel(selected_design_mi_history, realized_information_gain_history, options = {}) {
+function renderInfoGainDebugPanel(
+  selected_design_mi_history,
+  realized_information_gain_history,
+  options = {},
+) {
   const selected_points = getFiniteTracePoints(selected_design_mi_history);
   const realized_points = getFiniteTracePoints(realized_information_gain_history);
-  const selected_count = Array.isArray(selected_design_mi_history) ? selected_design_mi_history.length : 0;
-  const realized_count = Array.isArray(realized_information_gain_history) ? realized_information_gain_history.length : 0;
+  const selected_count = Array.isArray(selected_design_mi_history)
+    ? selected_design_mi_history.length
+    : 0;
+  const realized_count = Array.isArray(realized_information_gain_history)
+    ? realized_information_gain_history.length
+    : 0;
   const trial_count = Math.max(selected_count, realized_count);
-  const latest_selected = selected_points.length ? selected_points[selected_points.length - 1].value : null;
-  const latest_realized = realized_points.length ? realized_points[realized_points.length - 1].value : null;
+  const latest_selected = selected_points.length
+    ? selected_points[selected_points.length - 1].value
+    : null;
+  const latest_realized = realized_points.length
+    ? realized_points[realized_points.length - 1].value
+    : null;
   const subtitle_parts = [`trial ${trial_count}`];
   if (selected_points.length) {
     subtitle_parts.push(`selected design MI ${formatTraceNumber(latest_selected)}`);
@@ -191,13 +213,13 @@ function renderInfoGainDebugPanel(selected_design_mi_history, realized_informati
   if (realized_points.length) {
     subtitle_parts.push(`realized IG ${formatTraceNumber(latest_realized)}`);
   }
-  const subtitle = trial_count > 0
-    ? subtitle_parts.join(" | ")
-    : "waiting for trials";
+  const subtitle = trial_count > 0 ? subtitle_parts.join(" | ") : "waiting for trials";
   const legend = [
     selected_points.length ? buildLegendItem(COLORS.selected_design_mi, "Selected design MI") : "",
     realized_points.length ? buildLegendItem(COLORS.realized_information_gain, "Realized IG") : "",
-  ].filter(Boolean).join("");
+  ]
+    .filter(Boolean)
+    .join("");
 
   return [
     `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px;">`,
@@ -207,7 +229,9 @@ function renderInfoGainDebugPanel(selected_design_mi_history, realized_informati
     `<div style="color:${COLORS.muted};font-size:10px;line-height:1.35;margin-top:2px;">Blue: expected learning from the selected design. Red: actual posterior update after the response.</div>`,
     `</div>`,
     `</div>`,
-    legend ? `<div style="display:flex;gap:12px;flex-wrap:wrap;color:${COLORS.muted};font-size:11px;margin:2px 0 4px;">${legend}</div>` : "",
+    legend
+      ? `<div style="display:flex;gap:12px;flex-wrap:wrap;color:${COLORS.muted};font-size:11px;margin:2px 0 4px;">${legend}</div>`
+      : "",
     buildInfoGainSvg(selected_design_mi_history, realized_information_gain_history, options),
   ].join("");
 }
@@ -247,7 +271,11 @@ function ensureInfoGainDebugPanel() {
   return panel;
 }
 
-function updateInfoGainDebugPanel(selected_design_mi_history, realized_information_gain_history, options = {}) {
+function updateInfoGainDebugPanel(
+  selected_design_mi_history,
+  realized_information_gain_history,
+  options = {},
+) {
   const selected_points = getFiniteTracePoints(selected_design_mi_history);
   const realized_points = getFiniteTracePoints(realized_information_gain_history);
   if (!selected_points.length && !realized_points.length) {

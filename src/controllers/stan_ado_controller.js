@@ -56,8 +56,14 @@ function createStanAdoController({
     seed: stan.seed ?? 123,
   };
 
-  if (sample_config.num_chains < 1 || sample_config.num_warmup < 0 || sample_config.num_samples < 1) {
-    throw new Error("createStanAdoController: stan settings need num_chains>=1, num_warmup>=0, num_samples>=1");
+  if (
+    sample_config.num_chains < 1 ||
+    sample_config.num_warmup < 0 ||
+    sample_config.num_samples < 1
+  ) {
+    throw new Error(
+      "createStanAdoController: stan settings need num_chains>=1, num_warmup>=0, num_samples>=1",
+    );
   }
   if (!["ado", "random"].includes(design_strategy)) {
     throw new Error(`createStanAdoController: unknown design_strategy "${design_strategy}"`);
@@ -73,10 +79,14 @@ function createStanAdoController({
   // engine); fails fast here if a continuous model lacks responseDensity/support.
   const scorer = createDesignScorer(model);
   if (designs.length === 0) {
-    throw new Error("createStanAdoController: grid_design produced no candidate designs (a dimension is empty)");
+    throw new Error(
+      "createStanAdoController: grid_design produced no candidate designs (a dimension is empty)",
+    );
   }
   if (testlet_size > designs.length) {
-    throw new Error("createStanAdoController: testlet_size cannot exceed the number of candidate designs");
+    throw new Error(
+      "createStanAdoController: testlet_size cannot exceed the number of candidate designs",
+    );
   }
 
   const trials = [];
@@ -99,7 +109,7 @@ function createStanAdoController({
   if (design_strategy === "random" && stopper.config.eig_fraction != null) {
     console.warn(
       "createStanAdoController: eig_fraction stopping is ignored under " +
-      "design_strategy=\"random\" (EIG stopping is ADO-only); only max_trials applies."
+        'design_strategy="random" (EIG stopping is ADO-only); only max_trials applies.',
     );
   } else if (stopper.config.eig_fraction != null && max_possible_eig == null) {
     // No finite maximum EIG to normalize the fraction against (e.g. a continuous
@@ -107,7 +117,7 @@ function createStanAdoController({
     // run is fixed-length via max_trials. See #110 (continuous) and #101 (precision-target).
     console.warn(
       "createStanAdoController: eig_fraction stopping is inert because this response " +
-      "space has no finite maximum EIG; only max_trials applies."
+        "space has no finite maximum EIG; only max_trials applies.",
     );
   }
 
@@ -169,7 +179,7 @@ function createStanAdoController({
     if (!draws || draws.length === 0) {
       return nullDesignMetrics(next_designs.length);
     }
-    return next_designs.map(design => ({
+    return next_designs.map((design) => ({
       mutual_info: scorer.mutualInfo(design, draws),
     }));
   }
@@ -201,7 +211,7 @@ function createStanAdoController({
     if (!current_design_draws || current_design_draws.length === 0) {
       return rows.map(() => null);
     }
-    return rows.map(row => {
+    return rows.map((row) => {
       const gain = scorer.realizedInformationGain(row.ado_design, current_design_draws, row.choice);
       return typeof gain === "number" && Number.isFinite(gain) ? gain : null;
     });
@@ -252,7 +262,7 @@ function createStanAdoController({
      *
      * @returns {Promise<Object>} Initial ADO state (null posteriors).
      */
-    start: async function() {
+    start: async function () {
       await client.init(model.moduleUrl, model.wasmUrl);
 
       trials.length = 0;
@@ -302,7 +312,7 @@ function createStanAdoController({
      * @param {Object|Array<Object>} trial_data - jsPsych choice row(s) with ado_design and choice.
      * @returns {Promise<Object>} Updated ADO state with posterior summaries.
      */
-    update: async function(trial_data) {
+    update: async function (trial_data) {
       const started_at = now();
 
       const rows = Array.isArray(trial_data) ? trial_data : [trial_data];

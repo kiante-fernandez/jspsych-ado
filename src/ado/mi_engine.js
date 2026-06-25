@@ -203,12 +203,15 @@ function xLogX(value) {
 function resolveContinuousSupport(support, design, draws) {
   const resolved = typeof support === "function" ? support(design, draws) : support;
   if (
-    !Array.isArray(resolved) || resolved.length !== 2 ||
-    !Number.isFinite(resolved[0]) || !Number.isFinite(resolved[1]) || !(resolved[0] < resolved[1])
+    !Array.isArray(resolved) ||
+    resolved.length !== 2 ||
+    !Number.isFinite(resolved[0]) ||
+    !Number.isFinite(resolved[1]) ||
+    !(resolved[0] < resolved[1])
   ) {
     throw new Error(
       "mutualInfoContinuous: needs a finite integration support [lo, hi] with lo < hi " +
-      "(pass options.support as [lo, hi] or a (design, draws) => [lo, hi] function)."
+        "(pass options.support as [lo, hi] or a (design, draws) => [lo, hi] function).",
     );
   }
   return resolved;
@@ -250,7 +253,8 @@ function mutualInfoContinuous(design, draws, densityFn, options = {}) {
     return 0;
   }
   const [lo, hi] = resolveContinuousSupport(options.support, design, draws);
-  let intervals = Number.isInteger(options.intervals) && options.intervals > 0 ? options.intervals : 256;
+  let intervals =
+    Number.isInteger(options.intervals) && options.intervals > 0 ? options.intervals : 256;
   if (intervals % 2 === 1) {
     intervals += 1; // Simpson needs an even interval count.
   }
@@ -356,7 +360,9 @@ function realizedGainFromLikelihoods(likelihoods) {
 function realizedInformationGain(design, draws, response, responseFn) {
   const response_index = Number(response);
   if (!Number.isInteger(response_index) || response_index < 0) {
-    throw new Error(`realizedInformationGain: response must be a nonnegative integer index (got ${response}).`);
+    throw new Error(
+      `realizedInformationGain: response must be a nonnegative integer index (got ${response}).`,
+    );
   }
 
   const likelihoods = [];
@@ -365,7 +371,7 @@ function realizedInformationGain(design, draws, response, responseFn) {
     if (response_index >= probs.length) {
       throw new Error(
         `realizedInformationGain: response index ${response_index} is outside ` +
-        `the response probability vector length ${probs.length}.`
+          `the response probability vector length ${probs.length}.`,
       );
     }
     const likelihood = probs[response_index];
@@ -391,7 +397,9 @@ function realizedInformationGain(design, draws, response, responseFn) {
 function realizedInformationGainContinuous(design, draws, response, densityFn) {
   const y = Number(response);
   if (!Number.isFinite(y)) {
-    throw new Error(`realizedInformationGainContinuous: response must be a finite number (got ${response}).`);
+    throw new Error(
+      `realizedInformationGainContinuous: response must be a finite number (got ${response}).`,
+    );
   }
   const likelihoods = [];
   for (const draw of draws) {
@@ -426,7 +434,9 @@ function applyFantasyUpdate(design, draws, weights, responseFn, rng) {
     if (mean_probs === null) {
       mean_probs = new Array(probs.length).fill(0);
     } else if (probs.length !== mean_probs.length) {
-      throw new Error("applyFantasyUpdate: response probability vectors changed length across draws.");
+      throw new Error(
+        "applyFantasyUpdate: response probability vectors changed length across draws.",
+      );
     }
     draw_probs[s] = probs;
     for (let r = 0; r < probs.length; r++) {
@@ -596,7 +606,9 @@ function makeContinuousSupportResolver(model, sdMultiple = DEFAULT_SUPPORT_SD_MU
         const mean = Number(moments && moments.mean);
         const sd = Number(moments && moments.sd);
         if (!Number.isFinite(mean) || !Number.isFinite(sd) || sd <= 0) {
-          throw new Error("responseMoments(design, draw) must return finite { mean, sd } with sd > 0.");
+          throw new Error(
+            "responseMoments(design, draw) must return finite { mean, sd } with sd > 0.",
+          );
         }
         const half = sdMultiple * sd;
         if (mean - half < lo) {
@@ -611,7 +623,7 @@ function makeContinuousSupportResolver(model, sdMultiple = DEFAULT_SUPPORT_SD_MU
   }
   throw new Error(
     "Continuous model needs responseSupport ([lo, hi] or a (design, draws) => [lo, hi] function) " +
-    "or responseMoments(design, draw) => { mean, sd } for automatic support."
+      "or responseMoments(design, draw) => { mean, sd } for automatic support.",
   );
 }
 
@@ -633,7 +645,7 @@ function selectOptimalDesignsContinuous(designs, draws, scoreDesign, count = 1) 
   const k = Math.min(count, designs.length);
   if (k > 1) {
     throw new Error(
-      "selectOptimalDesignsContinuous: testlet batching (count > 1) is not yet supported for continuous responses."
+      "selectOptimalDesignsContinuous: testlet batching (count > 1) is not yet supported for continuous responses.",
     );
   }
   if (k <= 0) {

@@ -15,7 +15,7 @@ You **author in LaTeX** (Overleaf); the JOSS **Markdown is generated** from it.
 - `paper.tex` — LaTeX wrapper (title, authors+ORCIDs, metadata sidebar, footer) that
   `\input{body}`. Uses `joss.cls`. Compile this for the styled PDF.
 - `joss.cls` — an **unofficial JOSS-style** class (logo header, left metadata sidebar,
-  sans headings, footer citation). It *approximates* the JOSS look so we can draft in
+  sans headings, footer citation). It _approximates_ the JOSS look so we can draft in
   LaTeX; JOSS has no official LaTeX class.
 - `frontmatter.yaml` — JOSS metadata (title, authors, ORCIDs, affiliations, tags) for
   the generated `paper.md`. (Keep its author list in sync with `paper.tex`.)

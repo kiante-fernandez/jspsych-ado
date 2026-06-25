@@ -33,7 +33,4 @@ const default_halberda_simulation_config = {
   },
 };
 
-export {
-  default_halberda_config,
-  default_halberda_simulation_config,
-};
+export { default_halberda_config, default_halberda_simulation_config };

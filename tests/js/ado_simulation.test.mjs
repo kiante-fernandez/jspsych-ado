@@ -54,7 +54,12 @@ test("simulateDelayDiscountingChoice agrees with generic binary categorical samp
     const generic = simulateCategoricalChoice(DESIGN, SIM_CONFIG, fixedRng(draw), TEST_MODEL, {
       response_labels: { 0: "SS", 1: "LL" },
     });
-    const delay_discounting = simulateDelayDiscountingChoice(DESIGN, SIM_CONFIG, fixedRng(draw), TEST_MODEL);
+    const delay_discounting = simulateDelayDiscountingChoice(
+      DESIGN,
+      SIM_CONFIG,
+      fixedRng(draw),
+      TEST_MODEL,
+    );
     assert.equal(delay_discounting.response, generic.response);
   }
 });

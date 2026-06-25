@@ -22,7 +22,9 @@ function getRunSelection(params) {
     if (VALID_CONTROLLERS.includes(requested_controller)) {
       controller_mode = requested_controller;
     } else {
-      console.warn(`Unknown controller "${requested_controller}"; using controller=${controller_mode}.`);
+      console.warn(
+        `Unknown controller "${requested_controller}"; using controller=${controller_mode}.`,
+      );
     }
   }
 
@@ -30,7 +32,9 @@ function getRunSelection(params) {
     if (VALID_STRATEGIES.includes(requested_strategy)) {
       design_strategy = requested_strategy;
     } else {
-      console.warn(`Unknown strategy "${requested_strategy}"; using strategy=${design_strategy || "none"}.`);
+      console.warn(
+        `Unknown strategy "${requested_strategy}"; using strategy=${design_strategy || "none"}.`,
+      );
     }
   }
 
@@ -44,9 +48,12 @@ function getRunSelection(params) {
   return {
     controller_mode,
     design_strategy,
-    ado_mode: controller_mode === "mock"
-      ? controller_mode
-      : (design_strategy === "random" ? "random" : "stan"),
+    ado_mode:
+      controller_mode === "mock"
+        ? controller_mode
+        : design_strategy === "random"
+          ? "random"
+          : "stan",
   };
 }
 
@@ -149,7 +156,7 @@ function addAdoDataProperties(jsPsych, { run_settings, model, simulation_config 
     simulate: run_settings.simulation_mode,
     simulation_seed: simulation_config.seed,
     ...Object.fromEntries(
-      Object.entries(simulation_config.params).map(([name, value]) => ["sim_" + name, value])
+      Object.entries(simulation_config.params).map(([name, value]) => ["sim_" + name, value]),
     ),
   });
 }
@@ -180,14 +187,10 @@ function makeTimelineConfig(task, config) {
   };
 }
 
-function createExperimentAdoTimeline(jsPsych, {
-  task,
-  model,
-  config,
-  run_context,
-  session_id,
-  design_seed = null,
-}) {
+function createExperimentAdoTimeline(
+  jsPsych,
+  { task, model, config, run_context, session_id, design_seed = null },
+) {
   const timeline_config = makeTimelineConfig(task, config);
 
   if (run_context.controller_mode === "mock") {
@@ -201,17 +204,21 @@ function createExperimentAdoTimeline(jsPsych, {
     return createAdoTimeline(jsPsych, mock_controller, timeline_config, run_context);
   }
 
-  return jsPsychADO.createTimeline(jsPsych, {
-    model: model.id,
-    task: task.id,
-    session_id,
-    n_trials: config.n_trials,
-    design_strategy: run_context.design_strategy,
-    design_seed,
-    testlet_size: config.testlet_size,
-    stopping: config.stopping,
-    plugins: config.plugins,
-  }, run_context);
+  return jsPsychADO.createTimeline(
+    jsPsych,
+    {
+      model: model.id,
+      task: task.id,
+      session_id,
+      n_trials: config.n_trials,
+      design_strategy: run_context.design_strategy,
+      design_seed,
+      testlet_size: config.testlet_size,
+      stopping: config.stopping,
+      plugins: config.plugins,
+    },
+    run_context,
+  );
 }
 
 export {

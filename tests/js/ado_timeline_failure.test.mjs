@@ -46,9 +46,15 @@ function withTimelinePlugins(run) {
 test("a rejecting controller.start() ends the experiment with an error row, not a hang", async () => {
   await withTimelinePlugins(async () => {
     let ended = null;
-    const jsPsych = { endExperiment: (message) => { ended = message; } };
+    const jsPsych = {
+      endExperiment: (message) => {
+        ended = message;
+      },
+    };
     const controller = {
-      start: async () => { throw new Error("worker boom"); },
+      start: async () => {
+        throw new Error("worker boom");
+      },
       update: async () => ({}),
     };
 
@@ -56,7 +62,11 @@ test("a rejecting controller.start() ends the experiment with an error row, not 
     const result = await runNode(tl[0]); // the initialize_ado node
 
     assert.equal(result.ado_event, "error", "the start node should emit an error event");
-    assert.match(result.ado_error, /worker boom/, "the rejection message should be recorded in the data");
+    assert.match(
+      result.ado_error,
+      /worker boom/,
+      "the rejection message should be recorded in the data",
+    );
     assert.ok(ended != null, "endExperiment must be called so the run does not hang");
     assert.match(ended, /worker boom/, "the visible end message should include the failure reason");
   });
@@ -65,7 +75,11 @@ test("a rejecting controller.start() ends the experiment with an error row, not 
 test("a rejecting controller.update() ends the experiment with an error row, not a hang", async () => {
   await withTimelinePlugins(async () => {
     let ended = null;
-    const jsPsych = { endExperiment: (message) => { ended = message; } };
+    const jsPsych = {
+      endExperiment: (message) => {
+        ended = message;
+      },
+    };
     const controller = {
       start: async () => ({
         session_id: "s",
@@ -79,7 +93,9 @@ test("a rejecting controller.update() ends the experiment with an error row, not
         should_stop: false,
         stop_reason: null,
       }),
-      update: async () => { throw new Error("sampling boom"); },
+      update: async () => {
+        throw new Error("sampling boom");
+      },
     };
 
     const tl = createAdoTimeline(jsPsych, controller, TIMELINE_CONFIG, {});
@@ -95,8 +111,16 @@ test("a rejecting controller.update() ends the experiment with an error row, not
     const result = await runNode(update_trial);
 
     assert.equal(result.ado_event, "error", "the update node should emit an error event");
-    assert.match(result.ado_error, /sampling boom/, "the rejection message should be recorded in the data");
+    assert.match(
+      result.ado_error,
+      /sampling boom/,
+      "the rejection message should be recorded in the data",
+    );
     assert.ok(ended != null, "endExperiment must be called so the run does not hang");
-    assert.match(ended, /sampling boom/, "the visible end message should include the failure reason");
+    assert.match(
+      ended,
+      /sampling boom/,
+      "the visible end message should include the failure reason",
+    );
   });
 });

@@ -20,3 +20,7 @@ tests/bundler/fixture/
 
 # Paper build artifacts
 paper/*.bbl
+
+# Demo pages are hand-authored HTML templates (a <base> tag + inline module scripts
+# with carefully ordered imports); not Prettier-managed.
+*.html

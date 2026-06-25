@@ -7,11 +7,11 @@ choices, and response labels.
 
 A package contains:
 
-| File | What it is |
-| --- | --- |
-| `<name>.stan` | the Stan model (source of truth for the likelihood + priors) |
-| `main.js` + `main.wasm` | the compiled WebAssembly model (committed) |
-| `model.js` | the JS adapter the engine talks to |
+| File                    | What it is                                                   |
+| ----------------------- | ------------------------------------------------------------ |
+| `<name>.stan`           | the Stan model (source of truth for the likelihood + priors) |
+| `main.js` + `main.wasm` | the compiled WebAssembly model (committed)                   |
+| `model.js`              | the JS adapter the engine talks to                           |
 
 `model.js` exports a default object:
 

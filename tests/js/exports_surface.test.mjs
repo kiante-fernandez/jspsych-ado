@@ -19,6 +19,9 @@ test("package exports are exactly the curated public surface", async () => {
 test("internal subpaths are NOT re-exposed as public exports", async () => {
   const pkg = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
   for (const internal of ["./ado/*", "./controllers/*", "./core/tinystan/*"]) {
-    assert.ok(!(internal in pkg.exports), `${internal} must stay internal, not a public export subpath`);
+    assert.ok(
+      !(internal in pkg.exports),
+      `${internal} must stay internal, not a public export subpath`,
+    );
   }
 });

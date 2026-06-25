@@ -17,9 +17,15 @@ import "./_wasm_node_shim.mjs";
 
 const StanModel = (await import("../../core/tinystan/index.mjs")).default;
 const lll = (await import("../../src/models/line_length_discrimination_3ifc/model.js")).default;
-const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws, getResponseProbsFunction } =
-  await import("../../src/ado/mi_engine.js");
-const { createSeededRng, simulateCategoricalChoice } = await import("../../src/ado/ado_simulation.js");
+const {
+  enumerateDesigns,
+  selectOptimalDesign,
+  summarizeDraws,
+  samplePriorDraws,
+  getResponseProbsFunction,
+} = await import("../../src/ado/mi_engine.js");
+const { createSeededRng, simulateCategoricalChoice } =
+  await import("../../src/ado/ado_simulation.js");
 const { makeStanDataBuilder } = await import("../../src/ado/stan_data.js");
 
 const buildData = makeStanDataBuilder({ stanData: lll.stanData, responseSpace: lll.responseSpace });
@@ -35,8 +41,8 @@ console.log("stan version:", model.stanVersion());
 const DELTAS = [4, 8, 16, 32];
 const designs = enumerateDesigns(
   [0, 1, 2].flatMap((target_index) =>
-    DELTAS.map((delta) => ({ standard_length: 100, delta, target_index }))
-  )
+    DELTAS.map((delta) => ({ standard_length: 100, delta, target_index })),
+  ),
 );
 const sample_config = { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 };
 
@@ -45,7 +51,11 @@ function runRecovery(trueParams, seed, nTrials) {
   const sim_rng = createSeededRng(seed + 1);
   const sim_config = { params: trueParams, rt: { choice: 0 } };
 
-  let { design } = selectOptimalDesign(designs, samplePriorDraws(lll.prior, 2000, prior_rng), responseProbs);
+  let { design } = selectOptimalDesign(
+    designs,
+    samplePriorDraws(lll.prior, 2000, prior_rng),
+    responseProbs,
+  );
   const trials = [];
   let summary = { post_mean: null, post_sd: null };
 
@@ -63,7 +73,11 @@ function runRecovery(trueParams, seed, nTrials) {
     const n = fit.draws[idx.sensitivity].length;
     const draws = new Array(n);
     for (let s = 0; s < n; s++) {
-      draws[s] = { sensitivity: fit.draws[idx.sensitivity][s], bias_b: fit.draws[idx.bias_b][s], bias_c: fit.draws[idx.bias_c][s] };
+      draws[s] = {
+        sensitivity: fit.draws[idx.sensitivity][s],
+        bias_b: fit.draws[idx.bias_b][s],
+        bias_c: fit.draws[idx.bias_c][s],
+      };
     }
 
     summary = summarizeDraws(draws, lll.params);
@@ -73,7 +87,10 @@ function runRecovery(trueParams, seed, nTrials) {
 }
 
 let failures = 0;
-const fail = (msg) => { console.log("  FAIL: " + msg); failures++; };
+const fail = (msg) => {
+  console.log("  FAIL: " + msg);
+  failures++;
+};
 
 const TRIALS = 90;
 console.log(`\n[1] Recovery of all 3 params (${TRIALS} adaptive trials)\n`);
@@ -90,20 +107,31 @@ console.log(`bias_c      | ${truth.bias_c.toFixed(2)} | ${rec.bias_c.toFixed(3)}
 if (!(Math.abs(Math.log(rec.sensitivity) - Math.log(truth.sensitivity)) < Math.log(1.5))) {
   fail(`sensitivity off: true ${truth.sensitivity}, recovered ${rec.sensitivity}`);
 }
-if (!(Math.abs(rec.bias_b - truth.bias_b) < 0.3)) fail(`bias_b off: true ${truth.bias_b}, recovered ${rec.bias_b}`);
-if (!(Math.abs(rec.bias_c - truth.bias_c) < 0.3)) fail(`bias_c off: true ${truth.bias_c}, recovered ${rec.bias_c}`);
+if (!(Math.abs(rec.bias_b - truth.bias_b) < 0.3))
+  fail(`bias_b off: true ${truth.bias_b}, recovered ${rec.bias_b}`);
+if (!(Math.abs(rec.bias_c - truth.bias_c) < 0.3))
+  fail(`bias_c off: true ${truth.bias_c}, recovered ${rec.bias_c}`);
 
 console.log("\n[2] Sensitivity ordering: recovered sensitivity rises with true sensitivity");
 const lowS = runRecovery({ sensitivity: 1.0, bias_b: 0, bias_c: 0 }, 320, 50).post_mean.sensitivity;
-const highS = runRecovery({ sensitivity: 3.0, bias_b: 0, bias_c: 0 }, 340, 50).post_mean.sensitivity;
+const highS = runRecovery({ sensitivity: 3.0, bias_b: 0, bias_c: 0 }, 340, 50).post_mean
+  .sensitivity;
 console.log(`  true 1.0 -> rec ${lowS.toFixed(3)} ;  true 3.0 -> rec ${highS.toFixed(3)}`);
-if (!(highS > lowS)) fail(`sensitivity not increasing: 1.0->${lowS.toFixed(3)}, 3.0->${highS.toFixed(3)}`);
+if (!(highS > lowS))
+  fail(`sensitivity not increasing: 1.0->${lowS.toFixed(3)}, 3.0->${highS.toFixed(3)}`);
 
 console.log("\n[3] Precision-vs-trials: sensitivity posterior SD shrinks with more trials");
 const sdFew = runRecovery(truth, 360, 5).post_sd.sensitivity;
 const sdMany = runRecovery(truth, 360, 90).post_sd.sensitivity;
-console.log(`  SD(sensitivity): ${sdFew.toFixed(3)} (5 trials) -> ${sdMany.toFixed(3)} (90 trials)`);
-if (!(sdMany < 0.75 * sdFew)) fail(`posterior SD did not shrink enough: ${sdFew.toFixed(3)} -> ${sdMany.toFixed(3)}`);
+console.log(
+  `  SD(sensitivity): ${sdFew.toFixed(3)} (5 trials) -> ${sdMany.toFixed(3)} (90 trials)`,
+);
+if (!(sdMany < 0.75 * sdFew))
+  fail(`posterior SD did not shrink enough: ${sdFew.toFixed(3)} -> ${sdMany.toFixed(3)}`);
 
-console.log(failures === 0 ? "\nPASS: all 3IFC recovery checks passed." : `\nFAIL: ${failures} check(s) failed.`);
+console.log(
+  failures === 0
+    ? "\nPASS: all 3IFC recovery checks passed."
+    : `\nFAIL: ${failures} check(s) failed.`,
+);
 process.exit(failures === 0 ? 0 : 1);

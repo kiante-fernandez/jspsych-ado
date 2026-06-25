@@ -43,11 +43,19 @@ function makeOptionCardHtml(design, index) {
   const delay = is_ss ? design.t_ss : design.t_ll;
   const key_hint = is_ss ? "S" : "L";
   const delay_text = delay === 0 ? "available now" : "available in " + formatDelay(delay);
-  return "<button class=\"dd-option-card\">"
-    + "<span class=\"dd-key-hint\">" + key_hint + "</span>"
-    + "<span class=\"dd-amount\">" + formatReward(amount) + "</span>"
-    + "<span class=\"dd-when\">" + delay_text + "</span>"
-    + "</button>";
+  return (
+    '<button class="dd-option-card">' +
+    '<span class="dd-key-hint">' +
+    key_hint +
+    "</span>" +
+    '<span class="dd-amount">' +
+    formatReward(amount) +
+    "</span>" +
+    '<span class="dd-when">' +
+    delay_text +
+    "</span>" +
+    "</button>"
+  );
 }
 
 /**
@@ -66,12 +74,7 @@ function formatDebugOffer(label, reward, delay) {
 
 const design_grid = {
   t_ss: [0],
-  t_ll: [
-    0.43, 0.714, 1, 2, 3,
-    4.3, 6.44, 8.6, 10.8, 12.9,
-    17.2, 21.5, 26, 52, 104,
-    156, 260, 520
-  ],
+  t_ll: [0.43, 0.714, 1, 2, 3, 4.3, 6.44, 8.6, 10.8, 12.9, 17.2, 21.5, 26, 52, 104, 156, 260, 520],
   r_ss: arange(12.5, 800, 12.5), // half-open: 12.5 .. 787.5 (excludes 800)
   r_ll: [800],
 };
@@ -81,7 +84,8 @@ const presentation = {
   button_html: (design) => [makeOptionCardHtml(design, 0), makeOptionCardHtml(design, 1)],
   // Physical key -> button index, so S/L select the SS/LL cards.
   keymap: { s: 0, l: 1 },
-  prompt: "<p style=\"margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;\">Press <strong>S</strong> for Smaller-sooner &nbsp;·&nbsp; Press <strong>L</strong> for Larger-later</p>",
+  prompt:
+    '<p style="margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;">Press <strong>S</strong> for Smaller-sooner &nbsp;·&nbsp; Press <strong>L</strong> for Larger-later</p>',
   // Pretty offer lines for the debug console (falls back to key=value otherwise).
   describeDesign: (design) => [
     formatDebugOffer("SS", design.r_ss, design.t_ss),

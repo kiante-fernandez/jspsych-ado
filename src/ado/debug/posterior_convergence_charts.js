@@ -28,8 +28,9 @@ function isFiniteNumber(value) {
 function getParamAxisDomain(series, opts) {
   opts = opts || {};
 
-  var data_lo = Infinity, data_hi = -Infinity;
-  series.forEach(function(d) {
+  var data_lo = Infinity,
+    data_hi = -Infinity;
+  series.forEach(function (d) {
     var sd = d.sd || 0;
     var lo = d.mean - sd;
     var hi = d.mean + sd;
@@ -42,7 +43,8 @@ function getParamAxisDomain(series, opts) {
   });
 
   var has_data = Number.isFinite(data_lo) && Number.isFinite(data_hi);
-  var has_preferred_range = isFiniteNumber(opts.y_min) && isFiniteNumber(opts.y_max) && opts.y_min < opts.y_max;
+  var has_preferred_range =
+    isFiniteNumber(opts.y_min) && isFiniteNumber(opts.y_max) && opts.y_min < opts.y_max;
   var has_lower_bound = isFiniteNumber(opts.lower_bound);
   var has_upper_bound = isFiniteNumber(opts.upper_bound);
   var min_y_span = isFiniteNumber(opts.min_y_span) && opts.min_y_span > 0 ? opts.min_y_span : null;
@@ -92,7 +94,12 @@ function getParamAxisDomain(series, opts) {
     var fallback_span = min_y_span || 0.002;
     if (has_lower_bound && has_upper_bound && opts.lower_bound < opts.upper_bound) {
       fallback_span = Math.min(fallback_span, opts.upper_bound - opts.lower_bound);
-      var bounded_center = has_data ? Math.min(opts.upper_bound - fallback_span / 2, Math.max(opts.lower_bound + fallback_span / 2, data_lo)) : (opts.lower_bound + opts.upper_bound) / 2;
+      var bounded_center = has_data
+        ? Math.min(
+            opts.upper_bound - fallback_span / 2,
+            Math.max(opts.lower_bound + fallback_span / 2, data_lo),
+          )
+        : (opts.lower_bound + opts.upper_bound) / 2;
       y_min = bounded_center - fallback_span / 2;
       y_max = bounded_center + fallback_span / 2;
     } else if (has_upper_bound) {
@@ -138,21 +145,37 @@ function getParamAxisDomain(series, opts) {
  */
 function makeParamConvergenceSvg(series, param_name, opts) {
   opts = opts || {};
-  var W = opts.width || 500, H = opts.height || 200;
-  var ml = 44, mr = 12, mt = 12, mb = 34;
+  var W = opts.width || 500,
+    H = opts.height || 200;
+  var ml = 44,
+    mr = 12,
+    mt = 12,
+    mb = 34;
   var pw = W - ml - mr;
   var ph = H - mt - mb;
   var n = series.length;
 
   if (n === 0) {
-    return "<svg width=\"" + W + "\" height=\"" + H + "\"><text x=\"" + (W / 2) + "\" y=\"" + (H / 2) + "\" text-anchor=\"middle\" font-size=\"12\" fill=\"#6b7280\">No data yet</text></svg>";
+    return (
+      '<svg width="' +
+      W +
+      '" height="' +
+      H +
+      '"><text x="' +
+      W / 2 +
+      '" y="' +
+      H / 2 +
+      '" text-anchor="middle" font-size="12" fill="#6b7280">No data yet</text></svg>'
+    );
   }
 
   var axis = getParamAxisDomain(series, opts);
   var y_min = axis.y_min;
   var y_max = axis.y_max;
 
-  function sx(i) { return ml + (n === 1 ? pw / 2 : (i / (n - 1)) * pw); }
+  function sx(i) {
+    return ml + (n === 1 ? pw / 2 : (i / (n - 1)) * pw);
+  }
   function sy(v) {
     if (v < y_min) {
       v = y_min;
@@ -163,26 +186,53 @@ function makeParamConvergenceSvg(series, param_name, opts) {
     return mt + ph - ((v - y_min) / (y_max - y_min)) * ph;
   }
 
-  var band_top = [], band_bot = [];
-  series.forEach(function(d, i) {
+  var band_top = [],
+    band_bot = [];
+  series.forEach(function (d, i) {
     band_top.push(sx(i) + "," + sy(d.mean + (d.sd || 0)));
     band_bot.unshift(sx(i) + "," + sy(d.mean - (d.sd || 0)));
   });
   var band_pts = band_top.concat(band_bot).join(" ");
-  var line_pts = series.map(function(d, i) { return sx(i) + "," + sy(d.mean); }).join(" ");
+  var line_pts = series
+    .map(function (d, i) {
+      return sx(i) + "," + sy(d.mean);
+    })
+    .join(" ");
 
   var y_ticks = "";
   for (var t = 0; t <= 3; t++) {
     var v = y_min + (y_max - y_min) * (t / 3);
     var yp = sy(v);
-    y_ticks += "<line x1=\"" + ml + "\" y1=\"" + yp + "\" x2=\"" + (ml + pw) + "\" y2=\"" + yp + "\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>"
-      + "<text x=\"" + (ml - 4) + "\" y=\"" + (yp + 4) + "\" text-anchor=\"end\" font-size=\"9\" fill=\"#6b7280\">" + formatAxisTick(v) + "</text>";
+    y_ticks +=
+      '<line x1="' +
+      ml +
+      '" y1="' +
+      yp +
+      '" x2="' +
+      (ml + pw) +
+      '" y2="' +
+      yp +
+      '" stroke="#e5e7eb" stroke-width="1"/>' +
+      '<text x="' +
+      (ml - 4) +
+      '" y="' +
+      (yp + 4) +
+      '" text-anchor="end" font-size="9" fill="#6b7280">' +
+      formatAxisTick(v) +
+      "</text>";
   }
 
   var x_ticks = "";
   var tick_indices = n === 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1];
-  tick_indices.forEach(function(i) {
-    x_ticks += "<text x=\"" + sx(i) + "\" y=\"" + (mt + ph + 16) + "\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6b7280\">" + series[i].trial + "</text>";
+  tick_indices.forEach(function (i) {
+    x_ticks +=
+      '<text x="' +
+      sx(i) +
+      '" y="' +
+      (mt + ph + 16) +
+      '" text-anchor="middle" font-size="9" fill="#6b7280">' +
+      series[i].trial +
+      "</text>";
   });
 
   var param_label = opts.label || param_name;
@@ -197,19 +247,53 @@ function makeParamConvergenceSvg(series, param_name, opts) {
     axis_notes.push("upper bound");
   }
   var axis_note = axis_notes.length
-    ? "<text x=\"" + (ml + pw) + "\" y=\"" + (mt + 10) + "\" text-anchor=\"end\" font-size=\"9\" fill=\"#b45309\">" + axis_notes.join("; ") + "</text>"
+    ? '<text x="' +
+      (ml + pw) +
+      '" y="' +
+      (mt + 10) +
+      '" text-anchor="end" font-size="9" fill="#b45309">' +
+      axis_notes.join("; ") +
+      "</text>"
     : "";
 
-  return "<svg width=\"" + W + "\" height=\"" + H + "\" style=\"display:block;\">"
-    + "<rect x=\"" + ml + "\" y=\"" + mt + "\" width=\"" + pw + "\" height=\"" + ph + "\" fill=\"#f9fafb\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>"
-    + y_ticks
-    + axis_note
-    + "<polygon points=\"" + band_pts + "\" fill=\"rgba(99,102,241,0.15)\"/>"
-    + "<polyline points=\"" + line_pts + "\" fill=\"none\" stroke=\"#4f46e5\" stroke-width=\"2\" stroke-linejoin=\"round\"/>"
-    + x_ticks
-    + "<text x=\"" + (ml + pw / 2) + "\" y=\"" + (H - 4) + "\" text-anchor=\"middle\" font-size=\"10\" fill=\"#374151\">Trial</text>"
-    + "<text x=\"10\" y=\"" + (mt + ph / 2) + "\" text-anchor=\"middle\" font-size=\"10\" fill=\"#374151\" transform=\"rotate(-90 10 " + (mt + ph / 2) + ")\">" + param_label + "</text>"
-    + "</svg>";
+  return (
+    '<svg width="' +
+    W +
+    '" height="' +
+    H +
+    '" style="display:block;">' +
+    '<rect x="' +
+    ml +
+    '" y="' +
+    mt +
+    '" width="' +
+    pw +
+    '" height="' +
+    ph +
+    '" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>' +
+    y_ticks +
+    axis_note +
+    '<polygon points="' +
+    band_pts +
+    '" fill="rgba(99,102,241,0.15)"/>' +
+    '<polyline points="' +
+    line_pts +
+    '" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linejoin="round"/>' +
+    x_ticks +
+    '<text x="' +
+    (ml + pw / 2) +
+    '" y="' +
+    (H - 4) +
+    '" text-anchor="middle" font-size="10" fill="#374151">Trial</text>' +
+    '<text x="10" y="' +
+    (mt + ph / 2) +
+    '" text-anchor="middle" font-size="10" fill="#374151" transform="rotate(-90 10 ' +
+    (mt + ph / 2) +
+    ')">' +
+    param_label +
+    "</text>" +
+    "</svg>"
+  );
 }
 
 /**
@@ -238,18 +322,23 @@ function updateLiveCharts(param_history, ado_state, run_context) {
   if (!container) {
     container = document.createElement("div");
     container.id = "ado-live-posterior-chart";
-    container.style.cssText = "position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,0.95);border-top:1px solid #e5e7eb;z-index:1000;pointer-events:none;padding:0.3rem 0;";
+    container.style.cssText =
+      "position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,0.95);border-top:1px solid #e5e7eb;z-index:1000;pointer-events:none;padding:0.3rem 0;";
     document.body.appendChild(container);
   }
 
-  var header = "<div style=\"text-align:center;font-size:0.7rem;color:#9ca3af;margin-bottom:0.1rem;\">Running posterior [debug]</div>";
-  var charts_html = "<div style=\"display:flex;justify-content:center;gap:0.75rem;\">";
-  params.forEach(function(param) {
+  var header =
+    '<div style="text-align:center;font-size:0.7rem;color:#9ca3af;margin-bottom:0.1rem;">Running posterior [debug]</div>';
+  var charts_html = '<div style="display:flex;justify-content:center;gap:0.75rem;">';
+  params.forEach(function (param) {
     var display = getParamDisplay(param, run_context.posterior_display);
     var label = display.label || param;
-    charts_html += "<div style=\"text-align:center;\">"
-      + "<div style=\"font-size:0.7rem;color:#6b7280;margin-bottom:2px;\">" + label + "</div>"
-      + makeParamConvergenceSvg(param_history[param], param, {
+    charts_html +=
+      '<div style="text-align:center;">' +
+      '<div style="font-size:0.7rem;color:#6b7280;margin-bottom:2px;">' +
+      label +
+      "</div>" +
+      makeParamConvergenceSvg(param_history[param], param, {
         width: 280,
         height: 150,
         label: label,
@@ -258,8 +347,8 @@ function updateLiveCharts(param_history, ado_state, run_context) {
         lower_bound: display.lower_bound,
         upper_bound: display.upper_bound,
         min_y_span: display.min_y_span,
-      })
-      + "</div>";
+      }) +
+      "</div>";
   });
   charts_html += "</div>";
 
@@ -282,40 +371,60 @@ function makeDebriefStimulus(param_history, posterior_display) {
   if (params.length === 0) {
     return "<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>";
   }
-  var last_values = params.map(function(param) {
-    var series = param_history[param];
-    if (!series.length) { return ""; }
-    var last = series[series.length - 1];
-    var display = getParamDisplay(param, posterior_display);
-    var label = display.label || param;
-    return "<p style=\"margin:0.25rem 0;font-size:0.9rem;color:#374151;\">"
-      + "<strong>" + label + "</strong>: "
-      + last.mean.toPrecision(3) + " ± " + last.sd.toPrecision(2) + "</p>";
-  }).join("");
-  var charts = "<div style=\"display:flex;justify-content:center;gap:1rem;flex-wrap:wrap;margin-top:0.75rem;\">"
-    + params.map(function(param) {
+  var last_values = params
+    .map(function (param) {
+      var series = param_history[param];
+      if (!series.length) {
+        return "";
+      }
+      var last = series[series.length - 1];
       var display = getParamDisplay(param, posterior_display);
       var label = display.label || param;
-      return "<div style=\"text-align:center;\">"
-        + "<div style=\"font-size:0.8rem;color:#6b7280;margin-bottom:4px;\">" + label + " posterior trajectory</div>"
-        + makeParamConvergenceSvg(param_history[param], param, {
-          width: 380,
-          height: 220,
-          label: label,
-          y_min: display.y_min,
-          y_max: display.y_max,
-          lower_bound: display.lower_bound,
-          upper_bound: display.upper_bound,
-          min_y_span: display.min_y_span,
-        })
-        + "</div>";
-    }).join("")
-    + "</div>";
-  return "<h2>Finished</h2>"
-    + "<p style=\"color:#6b7280;font-size:0.85rem;\">Estimated parameters (posterior mean ± SD):</p>"
-    + last_values
-    + charts
-    + "<p style=\"margin-top:1rem;\">Click SUBMIT to finish.</p>";
+      return (
+        '<p style="margin:0.25rem 0;font-size:0.9rem;color:#374151;">' +
+        "<strong>" +
+        label +
+        "</strong>: " +
+        last.mean.toPrecision(3) +
+        " ± " +
+        last.sd.toPrecision(2) +
+        "</p>"
+      );
+    })
+    .join("");
+  var charts =
+    '<div style="display:flex;justify-content:center;gap:1rem;flex-wrap:wrap;margin-top:0.75rem;">' +
+    params
+      .map(function (param) {
+        var display = getParamDisplay(param, posterior_display);
+        var label = display.label || param;
+        return (
+          '<div style="text-align:center;">' +
+          '<div style="font-size:0.8rem;color:#6b7280;margin-bottom:4px;">' +
+          label +
+          " posterior trajectory</div>" +
+          makeParamConvergenceSvg(param_history[param], param, {
+            width: 380,
+            height: 220,
+            label: label,
+            y_min: display.y_min,
+            y_max: display.y_max,
+            lower_bound: display.lower_bound,
+            upper_bound: display.upper_bound,
+            min_y_span: display.min_y_span,
+          }) +
+          "</div>"
+        );
+      })
+      .join("") +
+    "</div>";
+  return (
+    "<h2>Finished</h2>" +
+    '<p style="color:#6b7280;font-size:0.85rem;">Estimated parameters (posterior mean ± SD):</p>' +
+    last_values +
+    charts +
+    '<p style="margin-top:1rem;">Click SUBMIT to finish.</p>'
+  );
 }
 
 function appendPosteriorHistory(run_context, ado_result) {
@@ -332,7 +441,7 @@ function appendPosteriorHistory(run_context, ado_result) {
     run_context.param_history[param].push({
       trial: ado_result.trial_index,
       mean: ado_result.post_mean[param],
-      sd: ado_result.post_sd ? (ado_result.post_sd[param] || 0) : 0,
+      sd: ado_result.post_sd ? ado_result.post_sd[param] || 0 : 0,
     });
   }
 }
@@ -365,12 +474,14 @@ function appendInformationGainHistory(run_context, rows, ado_result) {
   }
 
   const row_list = Array.isArray(rows) ? rows : [rows];
-  const selected_design_mi = sumFiniteDebugValues(row_list.map(row => row && row.ado_mutual_info));
+  const selected_design_mi = sumFiniteDebugValues(
+    row_list.map((row) => row && row.ado_mutual_info),
+  );
   run_context.information_gain_history.selected_design_mi.push(selected_design_mi);
   run_context.information_gain_history.realized_information_gain.push(
     hasFiniteDebugValue(ado_result.realized_information_gain)
       ? ado_result.realized_information_gain
-      : null
+      : null,
   );
 }
 
@@ -380,14 +491,13 @@ function updateInformationGainPanel(run_context) {
   }
   updateInfoGainDebugPanel(
     run_context.information_gain_history.selected_design_mi,
-    run_context.information_gain_history.realized_information_gain
+    run_context.information_gain_history.realized_information_gain,
   );
 }
 
 function removeAdoDebugPanels() {
-  const posterior_chart = typeof document !== "undefined"
-    ? document.getElementById("ado-live-posterior-chart")
-    : null;
+  const posterior_chart =
+    typeof document !== "undefined" ? document.getElementById("ado-live-posterior-chart") : null;
   if (posterior_chart) {
     posterior_chart.remove();
   }

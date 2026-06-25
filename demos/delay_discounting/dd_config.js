@@ -35,10 +35,7 @@ const default_dd_simulation_config = {
     instructions: 300,
     choice: 500,
     end: 300,
-  }
+  },
 };
 
-export {
-  default_dd_config,
-  default_dd_simulation_config,
-};
+export { default_dd_config, default_dd_simulation_config };

@@ -34,9 +34,11 @@ function createStanWorkerClient() {
     worker = new Worker(new URL("../ado/stan_worker.js", import.meta.url), {
       type: "module",
     });
-    worker.onmessage = function(event) {
+    worker.onmessage = function (event) {
       const message = event.data;
-      settlePending(p => (message.type === "error" ? p.reject(new Error(message.error)) : p.resolve(message)));
+      settlePending((p) =>
+        message.type === "error" ? p.reject(new Error(message.error)) : p.resolve(message),
+      );
     };
     // Worker-script-level failures (bad module path / 404 / parse error in the
     // worker or its imports) fire onerror and never post a message, so the pending
@@ -44,15 +46,21 @@ function createStanWorkerClient() {
     // its thread/WASM instance isn't leaked), then reject the in-flight request with
     // a clear error; any later send() fails fast rather than null-dereferencing the
     // worker. (#8)
-    worker.onerror = function(event) {
-      if (worker) { worker.terminate(); }
+    worker.onerror = function (event) {
+      if (worker) {
+        worker.terminate();
+      }
       worker = null;
-      settlePending(p => p.reject(new Error("Stan worker failed to load: " + (event.message || "worker error"))));
+      settlePending((p) =>
+        p.reject(new Error("Stan worker failed to load: " + (event.message || "worker error"))),
+      );
     };
-    worker.onmessageerror = function() {
-      if (worker) { worker.terminate(); }
+    worker.onmessageerror = function () {
+      if (worker) {
+        worker.terminate();
+      }
       worker = null;
-      settlePending(p => p.reject(new Error("Stan worker message could not be deserialized")));
+      settlePending((p) => p.reject(new Error("Stan worker message could not be deserialized")));
     };
   }
 
@@ -60,7 +68,9 @@ function createStanWorkerClient() {
     // Requests are strictly sequential; a concurrent send would clobber the single
     // pending slot and orphan the first promise, so fail loudly instead.
     if (pending) {
-      return Promise.reject(new Error("Stan controller received a request while one was already in flight"));
+      return Promise.reject(
+        new Error("Stan controller received a request while one was already in flight"),
+      );
     }
     // The worker is created in init() via ensureWorker(); if it died (onerror/
     // onmessageerror nulled it), fail with a clear message instead of dereferencing

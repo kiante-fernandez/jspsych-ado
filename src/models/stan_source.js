@@ -21,8 +21,8 @@ async function compileToModuleUrl(stanCode, server, authToken) {
   } catch (networkError) {
     throw new Error(
       `prepareModels: could not reach the compile server at ${base}. Check the URL/CORS, ` +
-      `or run one locally (docker run -p 8083:8080 ghcr.io/flatironinstitute/stan-wasm-server:latest) ` +
-      `and pass compileServer:"http://localhost:8083". Original error: ${String(networkError)}`
+        `or run one locally (docker run -p 8083:8080 ghcr.io/flatironinstitute/stan-wasm-server:latest) ` +
+        `and pass compileServer:"http://localhost:8083". Original error: ${String(networkError)}`,
     );
   }
   if (!res.ok) {
@@ -44,8 +44,8 @@ function parseStanPriors(stanCode, paramSpecs) {
   // Strip comments first so a commented-out or stale sampling statement
   // (e.g. `// k ~ normal(0,1);`) can't be matched instead of the real prior. (#6)
   const source = stanCode
-    .replace(/\/\*[\s\S]*?\*\//g, " ")  // block comments
-    .replace(/\/\/[^\n]*/g, " ");       // line comments
+    .replace(/\/\*[\s\S]*?\*\//g, " ") // block comments
+    .replace(/\/\/[^\n]*/g, " "); // line comments
 
   for (const p of paramSpecs) {
     const name = typeof p === "string" ? p : p.name;
@@ -61,7 +61,7 @@ function parseStanPriors(stanCode, paramSpecs) {
     if (!match) {
       throw new Error(
         `registerModel: no prior found for "${name}" in the Stan source. Add a sampling ` +
-        `statement (e.g. ${name} ~ normal(...);) or pass an explicit \`prior\`.`
+          `statement (e.g. ${name} ~ normal(...);) or pass an explicit \`prior\`.`,
       );
     }
     const dist = match[1];
@@ -69,7 +69,7 @@ function parseStanPriors(stanCode, paramSpecs) {
     if (args.some(Number.isNaN)) {
       throw new Error(
         `registerModel: could not read numeric prior arguments for "${name}" ("${match[2].trim()}"). ` +
-        `Pass an explicit \`prior\`.`
+          `Pass an explicit \`prior\`.`,
       );
     }
     // normal/lognormal each take exactly 2 numeric arguments; a wrong arity would
@@ -77,7 +77,7 @@ function parseStanPriors(stanCode, paramSpecs) {
     if ((dist === "normal" || dist === "lognormal") && args.length !== 2) {
       throw new Error(
         `registerModel: "${name}" prior ${dist}(...) expects 2 numeric arguments but got ` +
-        `${args.length} ("${match[2].trim()}"). Pass an explicit \`prior\`.`
+          `${args.length} ("${match[2].trim()}"). Pass an explicit \`prior\`.`,
       );
     }
 
@@ -88,8 +88,8 @@ function parseStanPriors(stanCode, paramSpecs) {
         if (Math.abs(args[0]) > 1e-9) {
           throw new Error(
             `registerModel: "${name}" is lower-bounded at 0 with a non-zero-mean normal prior ` +
-            `(a truncated normal), which the prior sampler can't represent. Pass an explicit ` +
-            `\`prior\` (e.g. { dist:"halfnormal", sd:... }).`
+              `(a truncated normal), which the prior sampler can't represent. Pass an explicit ` +
+              `\`prior\` (e.g. { dist:"halfnormal", sd:... }).`,
           );
         }
         prior[name] = { dist: "halfnormal", sd: args[1] };
@@ -99,7 +99,7 @@ function parseStanPriors(stanCode, paramSpecs) {
     } else {
       throw new Error(
         `registerModel: unsupported Stan prior "${dist}(...)" for "${name}". Auto-parse supports ` +
-        `normal, lognormal, and normal+<lower=0> (half-normal). Pass an explicit \`prior\` for others.`
+          `normal, lognormal, and normal+<lower=0> (half-normal). Pass an explicit \`prior\` for others.`,
       );
     }
   }

@@ -15,10 +15,10 @@ import "./_wasm_node_shim.mjs";
 const StanModel = (await import("../../core/tinystan/index.mjs")).default;
 const exp = (await import("../../demos/byo_model_exponential/model.js")).default;
 const ddTask = (await import("../../src/tasks/delay_discounting/task.js")).default;
-const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws } = await import(
-  "../../src/ado/mi_engine.js"
-);
-const { createSeededRng, simulateDelayDiscountingChoice } = await import("../../src/ado/ado_simulation.js");
+const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws } =
+  await import("../../src/ado/mi_engine.js");
+const { createSeededRng, simulateDelayDiscountingChoice } =
+  await import("../../src/ado/ado_simulation.js");
 const { makeStanDataBuilder } = await import("../../src/ado/stan_data.js");
 
 const buildData = makeStanDataBuilder({ stanData: exp.stanData, responseSpace: exp.responseSpace });
@@ -36,7 +36,11 @@ function runRecovery(trueParams, seed, nTrials) {
   const sim_rng = createSeededRng(seed + 1);
   const sim_config = { params: trueParams, rt: { choice: 0 } };
 
-  let { design } = selectOptimalDesign(designs, samplePriorDraws(exp.prior, 2000, prior_rng), exp.responseProb);
+  let { design } = selectOptimalDesign(
+    designs,
+    samplePriorDraws(exp.prior, 2000, prior_rng),
+    exp.responseProb,
+  );
   const trials = [];
   let summary = { post_mean: null, post_sd: null };
 
@@ -57,7 +61,10 @@ function runRecovery(trueParams, seed, nTrials) {
 }
 
 let failures = 0;
-const fail = (msg) => { console.log("  FAIL: " + msg); failures++; };
+const fail = (msg) => {
+  console.log("  FAIL: " + msg);
+  failures++;
+};
 
 const TRIALS = 42;
 console.log(`\n[1] Recovery of k and tau (${TRIALS} adaptive trials)\n`);
@@ -65,20 +72,32 @@ const truth = { k: 0.05, tau: 3.0 };
 const rec = runRecovery(truth, 400, TRIALS).post_mean;
 console.log(`  k:   true ${truth.k}  -> rec ${rec.k.toExponential(2)}`);
 console.log(`  tau: true ${truth.tau}  -> rec ${rec.tau.toFixed(2)}`);
-if (!(Math.abs(Math.log(rec.k) - Math.log(truth.k)) < Math.log(3))) fail(`k off: true ${truth.k}, rec ${rec.k}`);
-if (!(Math.abs(Math.log(rec.tau) - Math.log(truth.tau)) < Math.log(3))) fail(`tau off: true ${truth.tau}, rec ${rec.tau}`);
+if (!(Math.abs(Math.log(rec.k) - Math.log(truth.k)) < Math.log(3)))
+  fail(`k off: true ${truth.k}, rec ${rec.k}`);
+if (!(Math.abs(Math.log(rec.tau) - Math.log(truth.tau)) < Math.log(3)))
+  fail(`tau off: true ${truth.tau}, rec ${rec.tau}`);
 
 console.log("\n[2] k ordering: recovered k rises with the true discount rate");
 const lowK = runRecovery({ k: 0.02, tau: 3 }, 420, 36).post_mean.k;
 const highK = runRecovery({ k: 0.12, tau: 3 }, 440, 36).post_mean.k;
-console.log(`  true 0.02 -> rec ${lowK.toExponential(2)} ;  true 0.12 -> rec ${highK.toExponential(2)}`);
-if (!(highK > lowK)) fail(`k not increasing: 0.02->${lowK.toExponential(2)}, 0.12->${highK.toExponential(2)}`);
+console.log(
+  `  true 0.02 -> rec ${lowK.toExponential(2)} ;  true 0.12 -> rec ${highK.toExponential(2)}`,
+);
+if (!(highK > lowK))
+  fail(`k not increasing: 0.02->${lowK.toExponential(2)}, 0.12->${highK.toExponential(2)}`);
 
 console.log("\n[3] Precision-vs-trials: k posterior SD shrinks with more trials");
 const sdFew = runRecovery(truth, 460, 6).post_sd.k;
 const sdMany = runRecovery(truth, 460, 42).post_sd.k;
-console.log(`  SD(k): ${sdFew.toExponential(2)} (6 trials) -> ${sdMany.toExponential(2)} (42 trials)`);
-if (!(sdMany < sdFew)) fail(`posterior SD did not shrink: ${sdFew.toExponential(2)} -> ${sdMany.toExponential(2)}`);
+console.log(
+  `  SD(k): ${sdFew.toExponential(2)} (6 trials) -> ${sdMany.toExponential(2)} (42 trials)`,
+);
+if (!(sdMany < sdFew))
+  fail(`posterior SD did not shrink: ${sdFew.toExponential(2)} -> ${sdMany.toExponential(2)}`);
 
-console.log(failures === 0 ? "\nPASS: all exponential recovery checks passed." : `\nFAIL: ${failures} check(s) failed.`);
+console.log(
+  failures === 0
+    ? "\nPASS: all exponential recovery checks passed."
+    : `\nFAIL: ${failures} check(s) failed.`,
+);
 process.exit(failures === 0 ? 0 : 1);

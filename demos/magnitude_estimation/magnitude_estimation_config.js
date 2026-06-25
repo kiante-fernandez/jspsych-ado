@@ -36,7 +36,4 @@ const default_magnitude_estimation_simulation_config = {
   },
 };
 
-export {
-  default_magnitude_estimation_config,
-  default_magnitude_estimation_simulation_config,
-};
+export { default_magnitude_estimation_config, default_magnitude_estimation_simulation_config };

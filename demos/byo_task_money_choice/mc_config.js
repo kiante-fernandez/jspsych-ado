@@ -32,7 +32,4 @@ const default_mc_simulation_config = {
   },
 };
 
-export {
-  default_mc_config,
-  default_mc_simulation_config,
-};
+export { default_mc_config, default_mc_simulation_config };

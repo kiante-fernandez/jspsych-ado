@@ -66,7 +66,15 @@ async function compileStanModel({
   authToken = DEFAULT_TOKEN,
 } = {}) {
   // Validate the adapter pieces up front so a typo fails here, not deep in the worker.
-  for (const [key, value] of Object.entries({ id, stan, params, designKeys, responseSpace, prior, buildData })) {
+  for (const [key, value] of Object.entries({
+    id,
+    stan,
+    params,
+    designKeys,
+    responseSpace,
+    prior,
+    buildData,
+  })) {
     if (value == null) {
       throw new Error(`compileStanModel: missing required option "${key}".`);
     }
@@ -77,12 +85,16 @@ async function compileStanModel({
   // Validate responseSpace up front so a typo fails here, not deep in the engine. (#12)
   if (responseSpace.type !== "binary" && responseSpace.type !== "categorical") {
     throw new Error(
-      `compileStanModel: unsupported responseSpace.type "${responseSpace.type}" (expected "binary" or "categorical").`
+      `compileStanModel: unsupported responseSpace.type "${responseSpace.type}" (expected "binary" or "categorical").`,
     );
   }
-  if (responseSpace.type === "categorical" &&
-      !(Number.isInteger(responseSpace.n_categories) && responseSpace.n_categories >= 2)) {
-    throw new Error("compileStanModel: categorical responseSpace needs an integer n_categories >= 2.");
+  if (
+    responseSpace.type === "categorical" &&
+    !(Number.isInteger(responseSpace.n_categories) && responseSpace.n_categories >= 2)
+  ) {
+    throw new Error(
+      "compileStanModel: categorical responseSpace needs an integer n_categories >= 2.",
+    );
   }
   if (responseSpace.type === "categorical" && typeof responseProbs !== "function") {
     throw new Error("compileStanModel: categorical models must provide responseProbs.");
@@ -107,9 +119,9 @@ async function compileStanModel({
     } catch (networkError) {
       throw new Error(
         `compileStanModel: could not reach the compile server at ${base}. ` +
-        `Check the URL/CORS, or run a local server ` +
-        `(docker run -p 8083:8080 ghcr.io/flatironinstitute/stan-wasm-server:latest) ` +
-        `and pass server:"http://localhost:8083". Original error: ${String(networkError)}`
+          `Check the URL/CORS, or run a local server ` +
+          `(docker run -p 8083:8080 ghcr.io/flatironinstitute/stan-wasm-server:latest) ` +
+          `and pass server:"http://localhost:8083". Original error: ${String(networkError)}`,
       );
     }
 
@@ -134,7 +146,17 @@ async function compileStanModel({
   }
 
   // Identical shape to models/<name>/model.js default export.
-  return { id, params, designKeys, responseSpace, prior, moduleUrl, buildData, responseProb, responseProbs };
+  return {
+    id,
+    params,
+    designKeys,
+    responseSpace,
+    prior,
+    moduleUrl,
+    buildData,
+    responseProb,
+    responseProbs,
+  };
 }
 
 export { compileStanModel };

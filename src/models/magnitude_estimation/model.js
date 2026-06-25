@@ -109,13 +109,13 @@ function buildData(trials) {
   for (let i = 0; i < trials.length; i++) {
     if (!Number.isFinite(log_s[i])) {
       throw new Error(
-        `magnitude_estimation.buildData: log_s is not finite at row ${i} (s=${trials[i].s}); magnitudes must be > 0.`
+        `magnitude_estimation.buildData: log_s is not finite at row ${i} (s=${trials[i].s}); magnitudes must be > 0.`,
       );
     }
     if (!Number.isFinite(log_y[i])) {
       throw new Error(
         `magnitude_estimation.buildData: log_y is not finite at row ${i} (choice=${trials[i].choice}); ` +
-        `the response must be log(estimate) with estimate > 0 (the task's responseToOutcome logs it).`
+          `the response must be log(estimate) with estimate > 0 (the task's responseToOutcome logs it).`,
       );
     }
   }

@@ -3,9 +3,9 @@ const LINE_KEYS = ["line_length_a", "line_length_b", "line_length_c"];
 
 function softmax(values) {
   const max_value = Math.max(...values);
-  const exp_values = values.map(value => Math.exp(value - max_value));
+  const exp_values = values.map((value) => Math.exp(value - max_value));
   const total = exp_values.reduce((sum, value) => sum + value, 0);
-  return exp_values.map(value => value / total);
+  return exp_values.map((value) => value / total);
 }
 
 function getLineLength(design, index) {

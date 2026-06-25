@@ -19,10 +19,10 @@ import "./_wasm_node_shim.mjs";
 
 const StanModel = (await import("../../core/tinystan/index.mjs")).default;
 const me = (await import("../../src/models/magnitude_estimation/model.js")).default;
-const { enumerateDesigns, createDesignScorer, summarizeDraws, samplePriorDraws } = await import(
-  "../../src/ado/mi_engine.js"
-);
-const { createSeededRng, simulateContinuousResponse } = await import("../../src/ado/ado_simulation.js");
+const { enumerateDesigns, createDesignScorer, summarizeDraws, samplePriorDraws } =
+  await import("../../src/ado/mi_engine.js");
+const { createSeededRng, simulateContinuousResponse } =
+  await import("../../src/ado/ado_simulation.js");
 
 const createModule = (await import(me.moduleUrl)).default;
 const model = await StanModel.load(createModule, () => {});
@@ -61,7 +61,11 @@ function runRecovery(trueParams, seed, nTrials) {
     if (li < 0 || bi < 0 || si < 0) {
       throw new Error("magnitude_estimation: loga/b/sigma not found in Stan output");
     }
-    const draws = fit.draws[li].map((loga, i) => ({ loga, b: fit.draws[bi][i], sigma: fit.draws[si][i] }));
+    const draws = fit.draws[li].map((loga, i) => ({
+      loga,
+      b: fit.draws[bi][i],
+      sigma: fit.draws[si][i],
+    }));
 
     summary = summarizeDraws(draws, me.params);
     design = nextDesign(draws);
@@ -70,7 +74,10 @@ function runRecovery(trueParams, seed, nTrials) {
 }
 
 let failures = 0;
-const fail = (msg) => { console.log("  FAIL: " + msg); failures++; };
+const fail = (msg) => {
+  console.log("  FAIL: " + msg);
+  failures++;
+};
 
 const TRIALS = 30;
 const truth = { loga: -1.5, b: 0.7, sigma: 0.25 };
@@ -82,19 +89,29 @@ console.log(`  sigma: true ${truth.sigma}  -> rec ${rec.sigma.toFixed(3)}`);
 if (!(Math.abs(rec.b - truth.b) < 0.15)) fail(`b off: true ${truth.b}, rec ${rec.b.toFixed(3)}`);
 // loga is the intercept at log_s=0 (s=1), extrapolated below the grid and correlated
 // with b, so it is intentionally the loosest of the three checks (a nuisance scale).
-if (!(Math.abs(rec.loga - truth.loga) < 0.5)) fail(`loga off: true ${truth.loga}, rec ${rec.loga.toFixed(3)}`);
-if (!(Math.abs(rec.sigma - truth.sigma) < 0.15)) fail(`sigma off: true ${truth.sigma}, rec ${rec.sigma.toFixed(3)}`);
+if (!(Math.abs(rec.loga - truth.loga) < 0.5))
+  fail(`loga off: true ${truth.loga}, rec ${rec.loga.toFixed(3)}`);
+if (!(Math.abs(rec.sigma - truth.sigma) < 0.15))
+  fail(`sigma off: true ${truth.sigma}, rec ${rec.sigma.toFixed(3)}`);
 
 console.log("\n[2] b ordering: recovered exponent rises with the true exponent");
-const bs = [0.4, 0.7, 1.2].map((b, i) => runRecovery({ loga: -1.5, b, sigma: 0.25 }, 820 + i * 20, 24).post_mean.b);
+const bs = [0.4, 0.7, 1.2].map(
+  (b, i) => runRecovery({ loga: -1.5, b, sigma: 0.25 }, 820 + i * 20, 24).post_mean.b,
+);
 console.log("  true: 0.4, 0.7, 1.2  -> rec: " + bs.map((x) => x.toFixed(2)).join(", "));
-if (!(bs[0] < bs[1] && bs[1] < bs[2])) fail(`b not increasing: ${bs.map((x) => x.toFixed(2)).join(", ")}`);
+if (!(bs[0] < bs[1] && bs[1] < bs[2]))
+  fail(`b not increasing: ${bs.map((x) => x.toFixed(2)).join(", ")}`);
 
 console.log("\n[3] Precision-vs-trials: b posterior SD shrinks with more trials");
 const sdFew = runRecovery(truth, 860, 6).post_sd.b;
 const sdMany = runRecovery(truth, 860, 30).post_sd.b;
 console.log(`  SD(b): ${sdFew.toFixed(4)} (6 trials) -> ${sdMany.toFixed(4)} (30 trials)`);
-if (!(sdMany < sdFew)) fail(`posterior SD did not shrink: ${sdFew.toFixed(4)} -> ${sdMany.toFixed(4)}`);
+if (!(sdMany < sdFew))
+  fail(`posterior SD did not shrink: ${sdFew.toFixed(4)} -> ${sdMany.toFixed(4)}`);
 
-console.log(failures === 0 ? "\nPASS: all magnitude-estimation recovery checks passed." : `\nFAIL: ${failures} check(s) failed.`);
+console.log(
+  failures === 0
+    ? "\nPASS: all magnitude-estimation recovery checks passed."
+    : `\nFAIL: ${failures} check(s) failed.`,
+);
 process.exit(failures === 0 ? 0 : 1);

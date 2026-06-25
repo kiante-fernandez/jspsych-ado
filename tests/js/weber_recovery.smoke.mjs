@@ -15,26 +15,33 @@ import "./_wasm_node_shim.mjs";
 
 const StanModel = (await import("../../core/tinystan/index.mjs")).default;
 const weber = (await import("../../src/models/weber_dots/model.js")).default;
-const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws } = await import(
-  "../../src/ado/mi_engine.js"
-);
-const { createSeededRng, simulateDelayDiscountingChoice } = await import(
-  "../../src/ado/ado_simulation.js"
-);
+const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws } =
+  await import("../../src/ado/mi_engine.js");
+const { createSeededRng, simulateDelayDiscountingChoice } =
+  await import("../../src/ado/ado_simulation.js");
 
 const { makeStanDataBuilder } = await import("../../src/ado/stan_data.js");
 // The model declares a stanData map; generate its buildData (the framework does this
 // in buildAdapter — done here directly since this smoke bypasses the facade/worker).
-const buildData = makeStanDataBuilder({ stanData: weber.stanData, responseSpace: weber.responseSpace });
+const buildData = makeStanDataBuilder({
+  stanData: weber.stanData,
+  responseSpace: weber.responseSpace,
+});
 
 const createModule = (await import(weber.moduleUrl)).default;
 const model = await StanModel.load(createModule, () => {});
 console.log("stan version:", model.stanVersion());
 
 const PAIRS = [
-  { n_blue: 10, n_yellow: 11 }, { n_blue: 10, n_yellow: 12 }, { n_blue: 10, n_yellow: 13 },
-  { n_blue: 10, n_yellow: 15 }, { n_blue: 10, n_yellow: 20 }, { n_blue: 10, n_yellow: 30 },
-  { n_blue: 12, n_yellow: 10 }, { n_blue: 16, n_yellow: 10 }, { n_blue: 20, n_yellow: 10 },
+  { n_blue: 10, n_yellow: 11 },
+  { n_blue: 10, n_yellow: 12 },
+  { n_blue: 10, n_yellow: 13 },
+  { n_blue: 10, n_yellow: 15 },
+  { n_blue: 10, n_yellow: 20 },
+  { n_blue: 10, n_yellow: 30 },
+  { n_blue: 12, n_yellow: 10 },
+  { n_blue: 16, n_yellow: 10 },
+  { n_blue: 20, n_yellow: 10 },
 ];
 const designs = enumerateDesigns(PAIRS);
 const sample_config = { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 };
@@ -44,7 +51,11 @@ function runRecovery(trueW, seed, nTrials) {
   const sim_rng = createSeededRng(seed + 1);
   const sim_config = { params: { w: trueW }, rt: { choice: 0 } };
 
-  let { design } = selectOptimalDesign(designs, samplePriorDraws(weber.prior, 2000, prior_rng), weber.responseProb);
+  let { design } = selectOptimalDesign(
+    designs,
+    samplePriorDraws(weber.prior, 2000, prior_rng),
+    weber.responseProb,
+  );
   const trials = [];
   let summary = { post_mean: null, post_sd: null };
 
@@ -55,7 +66,9 @@ function runRecovery(trueW, seed, nTrials) {
     const fit = model.sample({ data: buildData(trials), ...sample_config });
     const wi = fit.paramNames.indexOf("w");
     if (wi < 0) {
-      throw new Error(`weber model: parameter "w" not found in Stan output (got: ${fit.paramNames.join(", ")})`);
+      throw new Error(
+        `weber model: parameter "w" not found in Stan output (got: ${fit.paramNames.join(", ")})`,
+      );
     }
     const draws = fit.draws[wi].map((w) => ({ w }));
 
@@ -66,7 +79,10 @@ function runRecovery(trueW, seed, nTrials) {
 }
 
 let failures = 0;
-const fail = (msg) => { console.log("  FAIL: " + msg); failures++; };
+const fail = (msg) => {
+  console.log("  FAIL: " + msg);
+  failures++;
+};
 
 const TRIALS = 40;
 const trueWs = [0.1, 0.25, 0.5];
@@ -89,7 +105,9 @@ console.log("  true w: " + trueWs.join(" < "));
 console.log("  rec  w: " + recs.map((r) => r.toFixed(3)).join("   "));
 for (let i = 1; i < recs.length; i++) {
   if (!(recs[i] > recs[i - 1])) {
-    fail(`w not increasing: true ${trueWs[i - 1]}->${trueWs[i]} gave ${recs[i - 1].toFixed(3)}->${recs[i].toFixed(3)}`);
+    fail(
+      `w not increasing: true ${trueWs[i - 1]}->${trueWs[i]} gave ${recs[i - 1].toFixed(3)}->${recs[i].toFixed(3)}`,
+    );
   }
 }
 

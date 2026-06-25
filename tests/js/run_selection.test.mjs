@@ -14,7 +14,7 @@ function selection(query) {
 function selectionWithWarnings(query) {
   const original_warn = console.warn;
   const warnings = [];
-  console.warn = function(message) {
+  console.warn = function (message) {
     warnings.push(message);
   };
 

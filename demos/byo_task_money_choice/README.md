@@ -31,12 +31,15 @@ That's it — no model, no Stan, no engine code. You register it with
 ## How it's used here
 
 ```js
-import moneyChoiceTask from "./task.js";                          // your task
-import hyperbolicModel from ".../models/hyperbolic/model.js";     // packaged model
+import moneyChoiceTask from "./task.js"; // your task
+import hyperbolicModel from ".../models/hyperbolic/model.js"; // packaged model
 
 jsPsychADO.registerTask(moneyChoiceTask.id, moneyChoiceTask);
 jsPsychADO.registerModelPackage(hyperbolicModel, { stan, n_trials: 42 });
-const ado = jsPsychADO.createTimeline(jsPsych, { task: moneyChoiceTask.id, model: hyperbolicModel.id });
+const ado = jsPsychADO.createTimeline(jsPsych, {
+  task: moneyChoiceTask.id,
+  model: hyperbolicModel.id,
+});
 ```
 
 `createTimeline` validates that the task and model are compatible (the task's design

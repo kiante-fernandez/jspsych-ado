@@ -83,9 +83,8 @@ function copyPosteriorFields(data, ado_state) {
  * @param {?Object} design_metric - Metric aligned with the current design.
  */
 function copySelectionFields(data, ado_state, design_metric) {
-  data.ado_selection_time_ms = ado_state && ado_state.selection_time_ms != null
-    ? ado_state.selection_time_ms
-    : null;
+  data.ado_selection_time_ms =
+    ado_state && ado_state.selection_time_ms != null ? ado_state.selection_time_ms : null;
   const normalized = normalizeDesignMetric(design_metric);
   data.ado_mutual_info = normalized.mutual_info;
 }
@@ -119,8 +118,14 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
   let testlet_rows = [];
 
   const presentation = config.presentation;
-  if (!presentation || (typeof presentation.getChoiceTrials !== "function" && typeof presentation.makeStimulus !== "function")) {
-    throw new Error("createAdoTimeline: config.presentation must provide getChoiceTrials or makeStimulus.");
+  if (
+    !presentation ||
+    (typeof presentation.getChoiceTrials !== "function" &&
+      typeof presentation.makeStimulus !== "function")
+  ) {
+    throw new Error(
+      "createAdoTimeline: config.presentation must provide getChoiceTrials or makeStimulus.",
+    );
   }
   // Default: the raw button/key index IS the model outcome. Tasks where the
   // outcome depends on the design (e.g. "chose the more numerous side") override this.
@@ -149,7 +154,9 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
     done({ ado_event: "error", ado_error: message });
     jsPsych.endExperiment(
       "<p>The experiment encountered an error and cannot continue.</p>" +
-      "<p style=\"color: #9ca3af; font-size: 0.85rem;\">" + message + "</p>"
+        '<p style="color: #9ca3af; font-size: 0.85rem;">' +
+        message +
+        "</p>",
     );
   }
 
@@ -173,34 +180,39 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
   const initialize_ado = {
     type: callFunctionPlugin,
     async: true,
-    func: function(done) {
-      adaptive_controller.start(run_context).then(result => {
-        ado_state = result;
-        if (testlet_size > 1 && !result.next_designs) {
-          return failExperiment(
-            new Error("Adaptive controller did not return next_designs; testlet_size > 1 requires a batch-aware controller."),
-            done
-          );
-        }
-        current_designs = designsFromResult(result);
-        current_design_metrics = metricsFromResult(result, current_designs.length);
-        current_design = current_designs[0] ?? null;
-        current_design_metric = current_design_metrics[0] ?? null;
-        done({
-          ado_event: "start",
-          ado_session_id: result.session_id,
-          ado_trial_index: result.trial_index,
-          ado_mode: run_context.ado_mode,
-          controller_mode: run_context.controller_mode,
-          design_strategy: run_context.design_strategy,
-          ado_next_design: result.next_design,
-          ado_next_designs: current_designs.slice(),
-          ado_next_design_metrics: current_design_metrics.slice(),
-          ado_selection_time_ms: result.selection_time_ms ?? null,
-          ado_max_mutual_info: result.max_mutual_info ?? null,
-        });
-      }).catch(error => failExperiment(error, done));
-    }
+    func: function (done) {
+      adaptive_controller
+        .start(run_context)
+        .then((result) => {
+          ado_state = result;
+          if (testlet_size > 1 && !result.next_designs) {
+            return failExperiment(
+              new Error(
+                "Adaptive controller did not return next_designs; testlet_size > 1 requires a batch-aware controller.",
+              ),
+              done,
+            );
+          }
+          current_designs = designsFromResult(result);
+          current_design_metrics = metricsFromResult(result, current_designs.length);
+          current_design = current_designs[0] ?? null;
+          current_design_metric = current_design_metrics[0] ?? null;
+          done({
+            ado_event: "start",
+            ado_session_id: result.session_id,
+            ado_trial_index: result.trial_index,
+            ado_mode: run_context.ado_mode,
+            controller_mode: run_context.controller_mode,
+            design_strategy: run_context.design_strategy,
+            ado_next_design: result.next_design,
+            ado_next_designs: current_designs.slice(),
+            ado_next_design_metrics: current_design_metrics.slice(),
+            ado_selection_time_ms: result.selection_time_ms ?? null,
+            ado_max_mutual_info: result.max_mutual_info ?? null,
+          });
+        })
+        .catch((error) => failExperiment(error, done));
+    },
   };
 
   // Adaptive stopping (#21): build up to max_trials testlets, each wrapped in a
@@ -232,21 +244,22 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
       plugins: injected_plugins,
     };
 
-    const choice_trials = typeof presentation.getChoiceTrials === "function"
-      ? presentation.getChoiceTrials(ctx)
-      : [htmlButtonChoice(ctx, presentation, injected_plugins)];
+    const choice_trials =
+      typeof presentation.getChoiceTrials === "function"
+        ? presentation.getChoiceTrials(ctx)
+        : [htmlButtonChoice(ctx, presentation, injected_plugins)];
 
-    const response_trials = choice_trials.filter(t => t && t.__ado_is_response);
+    const response_trials = choice_trials.filter((t) => t && t.__ado_is_response);
     if (response_trials.length !== 1) {
       throw new Error(
         `createAdoTimeline: a choice must contain exactly one response-collecting trial ` +
-        `(built via htmlButtonChoice/canvasResponse/canvasSliderChoice); got ${response_trials.length}.`
+          `(built via htmlButtonChoice/canvasResponse/canvasSliderChoice); got ${response_trials.length}.`,
       );
     }
 
     const first_trial = choice_trials[0];
     const inner_on_start = first_trial.on_start;
-    first_trial.on_start = function(trial) {
+    first_trial.on_start = function (trial) {
       current_design = current_designs.shift();
       current_design_metric = current_design_metrics.shift() ?? null;
       if (current_design == null) {
@@ -265,7 +278,7 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
     const response_trial = response_trials[0];
     delete response_trial.__ado_is_response;
     const inner_on_finish = response_trial.on_finish;
-    response_trial.on_finish = function(data) {
+    response_trial.on_finish = function (data) {
       if (inner_on_finish) {
         inner_on_finish.call(this, data);
       }
@@ -277,7 +290,7 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
       data.choice = choice;
       // Discrete tasks map the outcome index to a label; continuous tasks have no
       // labels (response_labels is absent), so the label is simply null there.
-      data.choice_label = config.response_labels ? config.response_labels[choice] ?? null : null;
+      data.choice_label = config.response_labels ? (config.response_labels[choice] ?? null) : null;
       data.ado_design = { ...design };
       data.testlet_index = Math.floor(i / testlet_size);
       data.testlet_position = i % testlet_size;
@@ -288,56 +301,59 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
 
     testlet_trials.push(...choice_trials);
 
-    const at_boundary = ((i + 1) % testlet_size === 0) || (i + 1 === max_trials);
+    const at_boundary = (i + 1) % testlet_size === 0 || i + 1 === max_trials;
     if (at_boundary) {
       testlet_trials.push({
         type: callFunctionPlugin,
         async: true,
-        func: function(done) {
+        func: function (done) {
           const batch = testlet_rows.slice();
           testlet_rows.length = 0;
           const payload = testlet_size === 1 ? batch[0] : batch;
-          adaptive_controller.update(payload).then(result => {
-            ado_state = result;
-            // Once the controller signals a stop, the remaining testlet nodes skip
-            // via their conditional_function below, ending the run early.
-            stopped = Boolean(result.should_stop);
-            current_designs = designsFromResult(result);
-            current_design_metrics = metricsFromResult(result, current_designs.length);
-            current_design = current_designs[0] ?? null;
-            current_design_metric = current_design_metrics[0] ?? null;
-            logAdoTrial(run_context, batch[batch.length - 1], result, config);
-            appendPosteriorHistory(run_context, result);
-            appendInformationGainHistory(run_context, batch, result);
-            done({
-              ado_event: "update",
-              ado_session_id: result.session_id,
-              ado_trial_index: result.trial_index,
-              ado_testlet_size: batch.length,
-              ado_mode: run_context.ado_mode,
-              controller_mode: run_context.controller_mode,
-              design_strategy: run_context.design_strategy,
-              ado_next_design: result.next_design,
-              ado_next_designs: current_designs.slice(),
-              ado_next_design_metrics: current_design_metrics.slice(),
-              ado_post_mean: result.post_mean,
-              ado_post_sd: result.post_sd,
-              ado_api_latency_ms: result.api_latency_ms,
-              ado_selection_time_ms: result.selection_time_ms ?? null,
-              ado_max_mutual_info: result.max_mutual_info ?? null,
-              ado_realized_information_gain: result.realized_information_gain ?? null,
-              ado_realized_information_gains: result.realized_information_gains ?? null,
-              // The EIG used for the stop decision is the grid-max MI already
-              // recorded as ado_max_mutual_info; no separate ado_eig column.
-              ado_should_stop: Boolean(result.should_stop),
-              ado_stop_reason: result.stop_reason ?? null,
-            });
-          }).catch(error => failExperiment(error, done));
+          adaptive_controller
+            .update(payload)
+            .then((result) => {
+              ado_state = result;
+              // Once the controller signals a stop, the remaining testlet nodes skip
+              // via their conditional_function below, ending the run early.
+              stopped = Boolean(result.should_stop);
+              current_designs = designsFromResult(result);
+              current_design_metrics = metricsFromResult(result, current_designs.length);
+              current_design = current_designs[0] ?? null;
+              current_design_metric = current_design_metrics[0] ?? null;
+              logAdoTrial(run_context, batch[batch.length - 1], result, config);
+              appendPosteriorHistory(run_context, result);
+              appendInformationGainHistory(run_context, batch, result);
+              done({
+                ado_event: "update",
+                ado_session_id: result.session_id,
+                ado_trial_index: result.trial_index,
+                ado_testlet_size: batch.length,
+                ado_mode: run_context.ado_mode,
+                controller_mode: run_context.controller_mode,
+                design_strategy: run_context.design_strategy,
+                ado_next_design: result.next_design,
+                ado_next_designs: current_designs.slice(),
+                ado_next_design_metrics: current_design_metrics.slice(),
+                ado_post_mean: result.post_mean,
+                ado_post_sd: result.post_sd,
+                ado_api_latency_ms: result.api_latency_ms,
+                ado_selection_time_ms: result.selection_time_ms ?? null,
+                ado_max_mutual_info: result.max_mutual_info ?? null,
+                ado_realized_information_gain: result.realized_information_gain ?? null,
+                ado_realized_information_gains: result.realized_information_gains ?? null,
+                // The EIG used for the stop decision is the grid-max MI already
+                // recorded as ado_max_mutual_info; no separate ado_eig column.
+                ado_should_stop: Boolean(result.should_stop),
+                ado_stop_reason: result.stop_reason ?? null,
+              });
+            })
+            .catch((error) => failExperiment(error, done));
         },
-        on_finish: function() {
+        on_finish: function () {
           updateLiveCharts(run_context.param_history || {}, ado_state, run_context);
           updateInformationGainPanel(run_context);
-        }
+        },
       });
       // Skip this whole testlet (its choices + update) once a prior testlet's update
       // set `stopped`. The first testlet always runs (stopped starts false).

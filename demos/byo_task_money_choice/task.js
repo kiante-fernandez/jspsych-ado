@@ -54,7 +54,8 @@ const moneyChoiceTask = {
     makeStimulus,
     button_html: buttonHtml,
     keymap: { a: 0, b: 1 }, // A = sooner, B = later
-    prompt: '<p style="margin-top:1rem;font-size:0.8rem;color:#9ca3af;">Press <strong>A</strong> for the sooner option · <strong>B</strong> for the later option</p>',
+    prompt:
+      '<p style="margin-top:1rem;font-size:0.8rem;color:#9ca3af;">Press <strong>A</strong> for the sooner option · <strong>B</strong> for the later option</p>',
   },
   choices: ["SS", "LL"],
   response_labels: { 0: "SS", 1: "LL" }, // 0 = smaller-sooner, 1 = larger-later

@@ -97,19 +97,19 @@ const jsPsych = initJsPsych();
 
 jsPsychADO.registerTask(delayDiscountingTask.id, delayDiscountingTask);
 jsPsychADO.registerModelPackage(hyperbolic, {
-  stan:     { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 },
+  stan: { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 },
   n_trials: 42,
 });
 
 const ado = jsPsychADO.createTimeline(jsPsych, {
-  task:  delayDiscountingTask.id,
+  task: delayDiscountingTask.id,
   model: hyperbolic.id,
   // Inject the jsPsych plugin classes the timeline builds trials from. A static
   // page that loads the plugins' UMD <script> builds can omit this — the timeline
   // falls back to the globals those scripts define.
   plugins: { htmlButtonResponse, callFunction },
 });
-jsPsych.run([ /* instructions, */ ...ado /*, end screen */ ]);
+jsPsych.run([/* instructions, */ ...ado /*, end screen */]);
 ```
 
 ### Using with a bundler

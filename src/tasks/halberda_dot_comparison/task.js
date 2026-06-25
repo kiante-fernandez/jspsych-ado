@@ -1,7 +1,4 @@
-import {
-  canvasFrame,
-  canvasResponse,
-} from "../../ado/response_trials.js";
+import { canvasFrame, canvasResponse } from "../../ado/response_trials.js";
 
 const CANVAS_W = 800;
 const CANVAS_H = 600;
@@ -31,23 +28,27 @@ function makeDotComparisonDesigns({
   const designs = [];
   for (const ratio of ratios) {
     for (const large_count of large_counts) {
-      const small_count = Math.max(1, Math.round(large_count * ratio.small / ratio.large));
+      const small_count = Math.max(1, Math.round((large_count * ratio.small) / ratio.large));
       if (small_count >= large_count) {
         continue;
       }
       for (const control_mode of control_modes) {
-        designs.push(makeDesign({
-          n_blue: large_count,
-          n_yellow: small_count,
-          ratio,
-          control_mode,
-        }));
-        designs.push(makeDesign({
-          n_blue: small_count,
-          n_yellow: large_count,
-          ratio,
-          control_mode,
-        }));
+        designs.push(
+          makeDesign({
+            n_blue: large_count,
+            n_yellow: small_count,
+            ratio,
+            control_mode,
+          }),
+        );
+        designs.push(
+          makeDesign({
+            n_blue: small_count,
+            n_yellow: large_count,
+            ratio,
+            control_mode,
+          }),
+        );
       }
     }
   }
@@ -86,7 +87,7 @@ function generateDotPositions(n, existing_dots, min_dist = 22) {
     const y = 70 + Math.random() * (CANVAS_H - 140);
     const candidate = { x, y, r };
     const all_dots = existing_dots.concat(dots);
-    const ok = all_dots.every(d => distance(x, y, d.x, d.y) > min_dist + r + d.r);
+    const ok = all_dots.every((d) => distance(x, y, d.x, d.y) > min_dist + r + d.r);
     if (ok) {
       dots.push(candidate);
     }
@@ -102,8 +103,8 @@ function makeDots(n_blue, n_yellow, control_mode) {
     const target_total_area = 2800;
     const blue_r = Math.sqrt(target_total_area / (Math.PI * n_blue));
     const yellow_r = Math.sqrt(target_total_area / (Math.PI * n_yellow));
-    blue_dots = blue_dots.map(d => ({ ...d, r: blue_r * (0.85 + Math.random() * 0.30) }));
-    yellow_dots = yellow_dots.map(d => ({ ...d, r: yellow_r * (0.85 + Math.random() * 0.30) }));
+    blue_dots = blue_dots.map((d) => ({ ...d, r: blue_r * (0.85 + Math.random() * 0.3) }));
+    yellow_dots = yellow_dots.map((d) => ({ ...d, r: yellow_r * (0.85 + Math.random() * 0.3) }));
   }
 
   return { blue_dots, yellow_dots };
@@ -150,12 +151,12 @@ function drawDots(canvas, design) {
   const ctx = clearCanvas(canvas);
   const dots = makeDots(design.n_blue, design.n_yellow, design.control_mode);
   const all_dots = shuffle(
-    dots.blue_dots.map(d => ({ ...d, color: "blue" })).concat(
-      dots.yellow_dots.map(d => ({ ...d, color: "yellow" }))
-    )
+    dots.blue_dots
+      .map((d) => ({ ...d, color: "blue" }))
+      .concat(dots.yellow_dots.map((d) => ({ ...d, color: "yellow" }))),
   );
 
-  all_dots.forEach(d => {
+  all_dots.forEach((d) => {
     ctx.beginPath();
     ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
     ctx.fillStyle = d.color === "blue" ? "#1f77b4" : "#f2c230";
@@ -204,9 +205,13 @@ const presentation = {
     // Pass ctx.plugins so injected jsPsych plugin classes reach the canvas factories
     // under a bundler (falls back to globals for static-served pages). (#57)
     return [
-      withCanvasSize(canvasFrame({ draw: drawFixation, getDesign, duration: FIXATION_MS }, ctx.plugins)),
+      withCanvasSize(
+        canvasFrame({ draw: drawFixation, getDesign, duration: FIXATION_MS }, ctx.plugins),
+      ),
       withCanvasSize(canvasFrame({ draw: drawDots, getDesign, duration: STIM_MS }, ctx.plugins)),
-      withCanvasSize(canvasResponse({ draw: drawResponsePrompt, getDesign, choices: RESPONSE_KEYS }, ctx)),
+      withCanvasSize(
+        canvasResponse({ draw: drawResponsePrompt, getDesign, choices: RESPONSE_KEYS }, ctx),
+      ),
     ];
   },
   describeDesign,

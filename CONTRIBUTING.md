@@ -56,7 +56,7 @@ For task, model, or demo contributions, start with the relevant README:
 The library is organized around a single coupling point — the **controller contract**:
 
 - `src/index.js` — the public **facade**: `registerTask`, `registerModel` / `registerModelPackage`, `prepareModels`, `createTimeline`.
-- `src/controllers/` — an adaptive **controller** exposing two async methods, `start(context)` and `update(trial_data)`. This `start`/`update` contract is the *only* coupling between the timeline and inference, so `stan_ado_controller.js` (live; Stan compiled to WASM, run in a Web Worker) and `mock_ado_controller.js` (no-WASM dev) are interchangeable behind it.
+- `src/controllers/` — an adaptive **controller** exposing two async methods, `start(context)` and `update(trial_data)`. This `start`/`update` contract is the _only_ coupling between the timeline and inference, so `stan_ado_controller.js` (live; Stan compiled to WASM, run in a Web Worker) and `mock_ado_controller.js` (no-WASM dev) are interchangeable behind it.
 - `src/ado/` — the model- and task-agnostic engine: mutual-information design selection (`mi_engine.js`), the Stan Web Worker (`stan_worker.js`), the generic timeline (`ado_timeline.js`), early stopping (`stopping.js`), and the simulated participant (`ado_simulation.js`).
 - `src/tasks/<name>/` and `src/models/<name>/` — pluggable **task** (presentation, design grid, response coding) and **model** (parameters, prior, likelihood, Stan data + compiled artifacts) packages.
 - `demos/` — runnable example pages (not part of the published library).
@@ -85,7 +85,7 @@ looks non-idiomatic, this is usually why:
 - **No build step, no `@jspsych/config`, no TypeScript.** The library is plain ES
   modules served as-is. It ships committed `.wasm` and runs Stan in a Web Worker, and
   `@jspsych/config`'s Rollup setup cannot emit a Web Worker or hash/emit a `.wasm`
-  asset. So instead of a `src/` → `dist/` build, the source under `src/` *is* what
+  asset. So instead of a `src/` → `dist/` build, the source under `src/` _is_ what
   ships. Consumers who bundle (Vite/webpack) get correct asset emission via each
   model's `new URL("./main.{js,wasm}", import.meta.url)` (see the `#57` notes).
 - **Compiling a model is offline + committed.** There is no in-browser compilation,

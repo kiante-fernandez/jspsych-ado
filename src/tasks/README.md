@@ -27,8 +27,8 @@ there is no inclusive-vs-exclusive ambiguity:
 
 ```js
 import { arange, linspace } from "jspsych-ado";
-arange(12.5, 800, 12.5)  // HALF-OPEN [start, stop): 12.5 .. 787.5 (excludes 800)
-linspace(4, 48, 12)      // INCLUSIVE [start, stop]: 12 points, 4 .. 48
+arange(12.5, 800, 12.5); // HALF-OPEN [start, stop): 12.5 .. 787.5 (excludes 800)
+linspace(4, 48, 12); // INCLUSIVE [start, stop]: 12 points, 4 .. 48
 ```
 
 For simple button tasks, `presentation` can provide `makeStimulus(design)` plus

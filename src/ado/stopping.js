@@ -33,7 +33,9 @@ function toUnitFractionOrNull(value) {
   // achievable EIG (ln K), i.e. "always stop the instant min_trials is reached" — a
   // footgun, not a feature; <= 0 is meaningless. Anything outside (0, 1] (including
   // non-numeric) disables EIG stopping.
-  return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 1 ? value : null;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 1
+    ? value
+    : null;
 }
 
 function toFiniteNumberOrNull(value) {
@@ -53,7 +55,10 @@ function normalizeStoppingConfig(stopping, default_max_trials = null) {
   const source = stopping || {};
   return {
     min_trials: toNonNegativeInteger(source.min_trials, 0),
-    max_trials: toNonNegativeInteger(source.max_trials, toNonNegativeInteger(default_max_trials, null)),
+    max_trials: toNonNegativeInteger(
+      source.max_trials,
+      toNonNegativeInteger(default_max_trials, null),
+    ),
     // Fraction of the maximum achievable EIG, in (0, 1]; anything outside that range
     // (<= 0, > 1, or non-numeric) turns EIG stopping off.
     eig_fraction: toUnitFractionOrNull(source.eig_fraction),
@@ -74,7 +79,11 @@ function maxPossibleEig(responseSpace) {
   if (responseSpace.type === "binary") {
     return Math.log(2);
   }
-  if (responseSpace.type === "categorical" && Number.isInteger(responseSpace.n_categories) && responseSpace.n_categories >= 2) {
+  if (
+    responseSpace.type === "categorical" &&
+    Number.isInteger(responseSpace.n_categories) &&
+    responseSpace.n_categories >= 2
+  ) {
     return Math.log(responseSpace.n_categories);
   }
   return null;
@@ -93,7 +102,13 @@ function maxPossibleEig(responseSpace) {
  *   stop_reason is "max_trials" or "eig_fraction"; consecutive_below is the updated
  *   sub-threshold streak to feed back in on the next call.
  */
-function evaluateStopping({ completed_trials, eig, max_possible_eig, consecutive_below = 0, stopping }) {
+function evaluateStopping({
+  completed_trials,
+  eig,
+  max_possible_eig,
+  consecutive_below = 0,
+  stopping,
+}) {
   const cfg = stopping || normalizeStoppingConfig();
   const completed = toNonNegativeInteger(completed_trials, 0);
   const eig_value = toFiniteNumberOrNull(eig);
@@ -102,7 +117,8 @@ function evaluateStopping({ completed_trials, eig, max_possible_eig, consecutive
   const threshold = cfg.eig_fraction != null && max_eig != null ? cfg.eig_fraction * max_eig : null;
   // A trial counts as "below" only once past min_trials (early EIG estimates from a
   // prior-dominated posterior are unreliable). A non-below trial resets the streak.
-  const below = threshold != null && eig_value != null && completed >= cfg.min_trials && eig_value < threshold;
+  const below =
+    threshold != null && eig_value != null && completed >= cfg.min_trials && eig_value < threshold;
   const next_consecutive = below ? consecutive_below + 1 : 0;
 
   if (cfg.max_trials != null && completed >= cfg.max_trials) {
@@ -129,7 +145,11 @@ function evaluateStopping({ completed_trials, eig, max_possible_eig, consecutive
  * @returns {{config:Object, reset:Function, evaluate:Function}} `evaluate(completed_trials, eig)`
  *   returns {should_stop, stop_reason}; `reset()` clears the streak for a new run.
  */
-function makeStoppingEvaluator({ stopping, default_max_trials = null, max_possible_eig = null } = {}) {
+function makeStoppingEvaluator({
+  stopping,
+  default_max_trials = null,
+  max_possible_eig = null,
+} = {}) {
   const config = normalizeStoppingConfig(stopping, default_max_trials);
   let consecutive_below = 0;
   return {
@@ -138,7 +158,13 @@ function makeStoppingEvaluator({ stopping, default_max_trials = null, max_possib
       consecutive_below = 0;
     },
     evaluate(completed_trials, eig) {
-      const result = evaluateStopping({ completed_trials, eig, max_possible_eig, consecutive_below, stopping: config });
+      const result = evaluateStopping({
+        completed_trials,
+        eig,
+        max_possible_eig,
+        consecutive_below,
+        stopping: config,
+      });
       consecutive_below = result.consecutive_below;
       return { should_stop: result.should_stop, stop_reason: result.stop_reason };
     },

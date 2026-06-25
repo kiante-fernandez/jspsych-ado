@@ -21,7 +21,13 @@ import { nullDesignMetrics, makeBlockSizer } from "./controller_common.js";
  * @param {number} [options.testlet_size=1] - Choice trials shown between updates.
  * @returns {Object} Controller with async start(context) and update(trial_data).
  */
-function createMockAdoController({ grid_design, params = [], n_trials = null, testlet_size = 1, stopping = null } = {}) {
+function createMockAdoController({
+  grid_design,
+  params = [],
+  n_trials = null,
+  testlet_size = 1,
+  stopping = null,
+} = {}) {
   const designs = enumerateDesigns(grid_design);
   if (designs.length === 0) {
     throw new Error("createMockAdoController: grid_design produced no candidate designs.");
@@ -72,7 +78,7 @@ function createMockAdoController({ grid_design, params = [], n_trials = null, te
      * @param {Object} context - Run context; session_id is used if present.
      * @returns {Promise<Object>} ADO state with next_design and null posteriors.
      */
-    start: async function(context) {
+    start: async function (context) {
       session_id = (context && context.session_id) || "mock-session";
       trial_index = 0;
       const next_designs = mockDesigns(trial_index);
@@ -97,7 +103,7 @@ function createMockAdoController({ grid_design, params = [], n_trials = null, te
      * @param {Object|Array<Object>} trial_data - Choice row(s) with ado_trial_index.
      * @returns {Promise<Object>} Updated mock ADO state.
      */
-    update: async function(trial_data) {
+    update: async function (trial_data) {
       const rows = Array.isArray(trial_data) ? trial_data : [trial_data];
       trial_index += rows.length;
       const { post_mean, post_sd } = mockPosterior(trial_index);
@@ -115,7 +121,7 @@ function createMockAdoController({ grid_design, params = [], n_trials = null, te
         post_sd,
         api_latency_ms: null,
       };
-    }
+    },
   };
 }
 

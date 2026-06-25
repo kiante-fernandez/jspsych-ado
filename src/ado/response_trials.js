@@ -33,8 +33,8 @@ function requirePlugin(plugins, key) {
   if (!plugin) {
     throw new Error(
       `createAdoTimeline: jsPsych plugin "${PLUGIN_GLOBALS[key]}" is not available. ` +
-      `Load its UMD <script> build (which sets globalThis.${PLUGIN_GLOBALS[key]}), or ` +
-      `pass it when bundling via createTimeline(..., { plugins: { ${key}: <PluginClass> } }).`
+        `Load its UMD <script> build (which sets globalThis.${PLUGIN_GLOBALS[key]}), or ` +
+        `pass it when bundling via createTimeline(..., { plugins: { ${key}: <PluginClass> } }).`,
     );
   }
   return plugin;
@@ -93,16 +93,16 @@ function htmlButtonChoice(ctx, presentation, plugins = ctx && ctx.plugins) {
 
   const trial = {
     type: requirePlugin(plugins, "htmlButtonResponse"),
-    stimulus: function() {
+    stimulus: function () {
       return presentation.makeStimulus(ctx.getDesign());
     },
     choices: ctx.choices,
     margin_vertical: presentation.margin_vertical ?? "0px",
     margin_horizontal: presentation.margin_horizontal ?? "12px",
-    simulation_options: function() {
+    simulation_options: function () {
       return makeChoiceSimulationOptions(ctx.run_context, ctx.getDesign());
     },
-    data: function() {
+    data: function () {
       const state = ctx.getState();
       return {
         task: ctx.task,
@@ -112,7 +112,7 @@ function htmlButtonChoice(ctx, presentation, plugins = ctx && ctx.plugins) {
         ...ctx.getDesign(),
       };
     },
-    on_finish: function(data) {
+    on_finish: function (data) {
       if (key_handler) {
         document.removeEventListener("keydown", key_handler);
         key_handler = null;
@@ -123,7 +123,7 @@ function htmlButtonChoice(ctx, presentation, plugins = ctx && ctx.plugins) {
   };
 
   if (presentation.button_html) {
-    trial.button_html = function() {
+    trial.button_html = function () {
       return presentation.button_html(ctx.getDesign());
     };
   }
@@ -137,8 +137,8 @@ function htmlButtonChoice(ctx, presentation, plugins = ctx && ctx.plugins) {
     for (const [key, index] of Object.entries(presentation.keymap)) {
       keymap[key.toUpperCase()] = index;
     }
-    trial.on_load = function() {
-      key_handler = function(e) {
+    trial.on_load = function () {
+      key_handler = function (e) {
         const index = keymap[e.key.toUpperCase()];
         if (index === undefined) {
           return;
@@ -146,9 +146,13 @@ function htmlButtonChoice(ctx, presentation, plugins = ctx && ctx.plugins) {
         // jsPsych v8 / plugin-html-button-response v2 renders buttons as
         // `#...-btngroup [data-choice="N"]`; v7 used `#...-button-N`. Try the v8
         // selector first and fall back to v7 so keyboard shortcuts work on both. (#5)
-        const btn = document.querySelector('#jspsych-html-button-response-btngroup [data-choice="' + index + '"]')
-          || document.querySelector("#jspsych-html-button-response-button-" + index);
-        if (btn) { btn.click(); }
+        const btn =
+          document.querySelector(
+            '#jspsych-html-button-response-btngroup [data-choice="' + index + '"]',
+          ) || document.querySelector("#jspsych-html-button-response-button-" + index);
+        if (btn) {
+          btn.click();
+        }
       };
       document.addEventListener("keydown", key_handler);
     };
@@ -174,7 +178,7 @@ function htmlButtonChoice(ctx, presentation, plugins = ctx && ctx.plugins) {
 function canvasFrame({ draw, getDesign, duration = null }, plugins) {
   return {
     type: requirePlugin(plugins, "canvasKeyboardResponse"),
-    stimulus: function(canvas) {
+    stimulus: function (canvas) {
       draw(canvas, getDesign());
     },
     choices: "NO_KEYS",
@@ -199,17 +203,17 @@ function canvasFrame({ draw, getDesign, duration = null }, plugins) {
  * @returns {Object} jsPsych canvas-keyboard-response trial (response-collecting).
  */
 function canvasResponse({ draw, getDesign, choices }, ctx, plugins = ctx && ctx.plugins) {
-  const lower_choices = choices.map(key => String(key).toLowerCase());
+  const lower_choices = choices.map((key) => String(key).toLowerCase());
   return {
     type: requirePlugin(plugins, "canvasKeyboardResponse"),
-    stimulus: function(canvas) {
+    stimulus: function (canvas) {
       draw(canvas, getDesign());
     },
     choices,
-    simulation_options: function() {
+    simulation_options: function () {
       return makeChoiceSimulationOptions(ctx.run_context, getDesign());
     },
-    data: function() {
+    data: function () {
       const state = ctx.getState();
       return {
         task: ctx.task,
@@ -219,7 +223,7 @@ function canvasResponse({ draw, getDesign, choices }, ctx, plugins = ctx && ctx.
         ...getDesign(),
       };
     },
-    on_finish: function(data) {
+    on_finish: function (data) {
       // Map the recorded key to its index. In jsPsych simulation, response may
       // already be an index; tolerate both.
       if (typeof data.response === "number") {
@@ -255,13 +259,24 @@ function canvasResponse({ draw, getDesign, choices }, ctx, plugins = ctx && ctx.
  * @returns {Object} jsPsych canvas-slider-response trial (response-collecting).
  */
 function canvasSliderChoice(
-  { draw, getDesign, min = 0, max = 100, step = 1, slider_start = null, labels, prompt, require_movement = false, canvas_size },
+  {
+    draw,
+    getDesign,
+    min = 0,
+    max = 100,
+    step = 1,
+    slider_start = null,
+    labels,
+    prompt,
+    require_movement = false,
+    canvas_size,
+  },
   ctx,
-  plugins = ctx && ctx.plugins
+  plugins = ctx && ctx.plugins,
 ) {
   const trial = {
     type: requirePlugin(plugins, "canvasSliderResponse"),
-    stimulus: function(canvas) {
+    stimulus: function (canvas) {
       draw(canvas, getDesign());
     },
     min,
@@ -269,10 +284,10 @@ function canvasSliderChoice(
     step,
     slider_start: slider_start != null ? slider_start : (min + max) / 2,
     require_movement,
-    simulation_options: function() {
+    simulation_options: function () {
       return makeChoiceSimulationOptions(ctx.run_context, getDesign());
     },
-    data: function() {
+    data: function () {
       const state = ctx.getState();
       return {
         task: ctx.task,
@@ -282,7 +297,7 @@ function canvasSliderChoice(
         ...getDesign(),
       };
     },
-    on_finish: function(data) {
+    on_finish: function (data) {
       data.__ado_response = data.response; // raw slider value (continuous)
     },
     __ado_is_response: true,

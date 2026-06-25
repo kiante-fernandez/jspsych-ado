@@ -68,7 +68,9 @@ test("updateInfoGainDebugPanel does not create a panel without finite data", () 
   let created = false;
   globalThis.document = {
     body: {
-      appendChild: () => { created = true; },
+      appendChild: () => {
+        created = true;
+      },
     },
     createElement: () => ({ setAttribute: () => {}, style: {}, innerHTML: "" }),
     getElementById: () => null,
@@ -88,9 +90,14 @@ test("removeInfoGainDebugPanel removes the debug panel when present", () => {
   let removed = false;
   globalThis.document = {
     body: {},
-    getElementById: id => id === "ado-info-gain-debug-panel"
-      ? { remove: () => { removed = true; } }
-      : null,
+    getElementById: (id) =>
+      id === "ado-info-gain-debug-panel"
+        ? {
+            remove: () => {
+              removed = true;
+            },
+          }
+        : null,
   };
 
   try {

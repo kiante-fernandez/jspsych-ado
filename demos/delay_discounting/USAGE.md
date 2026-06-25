@@ -51,11 +51,15 @@ jsPsychADO.registerModelPackage(hyperbolicModel, {
   testlet_size: default_dd_config.testlet_size,
 });
 
-const timeline = jsPsychADO.createTimeline(jsPsych, {
-  task: delayDiscountingTask.id,
-  model: hyperbolicModel.id,
-  design_strategy: "ado",
-}, { debug: true });
+const timeline = jsPsychADO.createTimeline(
+  jsPsych,
+  {
+    task: delayDiscountingTask.id,
+    model: hyperbolicModel.id,
+    design_strategy: "ado",
+  },
+  { debug: true },
+);
 
 jsPsych.run(timeline);
 ```
@@ -84,18 +88,23 @@ const controller = createMockAdoController({
   testlet_size: default_dd_config.testlet_size,
 });
 
-const timeline = createAdoTimeline(jsPsych, controller, {
-  n_trials: default_dd_config.n_trials,
-  testlet_size: default_dd_config.testlet_size,
-  response_labels: delayDiscountingTask.response_labels,
-  presentation: delayDiscountingTask.presentation,
-  choices: delayDiscountingTask.choices,
-  task: delayDiscountingTask.id,
-}, {
-  controller_mode: "mock",
-  model_id: hyperbolicModel.id,
-  posterior_display: hyperbolicModel.posterior_display,
-});
+const timeline = createAdoTimeline(
+  jsPsych,
+  controller,
+  {
+    n_trials: default_dd_config.n_trials,
+    testlet_size: default_dd_config.testlet_size,
+    response_labels: delayDiscountingTask.response_labels,
+    presentation: delayDiscountingTask.presentation,
+    choices: delayDiscountingTask.choices,
+    task: delayDiscountingTask.id,
+  },
+  {
+    controller_mode: "mock",
+    model_id: hyperbolicModel.id,
+    posterior_display: hyperbolicModel.posterior_display,
+  },
+);
 ```
 
 ### Adding a task
@@ -143,11 +152,11 @@ export default {
   moduleUrl: new URL("./main.js", import.meta.url).href,
   buildData: (trials) => ({
     N: trials.length,
-    t_ss: trials.map(t => t.t_ss),
-    t_ll: trials.map(t => t.t_ll),
-    r_ss: trials.map(t => t.r_ss),
-    r_ll: trials.map(t => t.r_ll),
-    y: trials.map(t => t.choice),
+    t_ss: trials.map((t) => t.t_ss),
+    t_ll: trials.map((t) => t.t_ll),
+    r_ss: trials.map((t) => t.r_ss),
+    r_ll: trials.map((t) => t.r_ll),
+    y: trials.map((t) => t.choice),
   }),
   responseProb: (design, p) => {
     const vss = design.r_ss * Math.exp(-p.r * design.t_ss);

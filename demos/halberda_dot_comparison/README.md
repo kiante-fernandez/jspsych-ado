@@ -4,7 +4,7 @@ This experiment is a jsPsych reproduction of the core non-verbal number acuity
 task from:
 
 Halberda, J., Mazzocco, M. M. M., & Feigenson, L. (2008). Individual differences
-in non-verbal number acuity correlate with maths achievement. *Nature, 455*,
+in non-verbal number acuity correlate with maths achievement. _Nature, 455_,
 665-668.
 
 Participants briefly see intermixed blue and yellow dots and answer which color

@@ -4,7 +4,7 @@
 # from paper.tex; keep the two author lists in sync.)
 # Author order: co-authors alphabetical by surname; Kianté Fernandez last & corresponding.
 # Names resolved from ORCID records. TODO: per-author affiliations.
-title: 'jspsych-ado: In-browser adaptive design optimization for jsPsych experiments'
+title: "jspsych-ado: In-browser adaptive design optimization for jsPsych experiments"
 tags:
   - JavaScript
   - jsPsych
@@ -44,7 +44,7 @@ bibliography: paper.bib
 
 # Summary
 
-`jspsych-ado` brings browser-native *adaptive design optimization* (ADO) to behavioral experiments built with jsPsych [@deleeuw2015jspsych].
+`jspsych-ado` brings browser-native _adaptive design optimization_ (ADO) to behavioral experiments built with jsPsych [@deleeuw2015jspsych].
 After each response, a Bayesian model written in Stan [@carpenter2017stan] --- compiled to WebAssembly and run client-side in a Web Worker --- updates the posterior over the model parameters, and the next stimulus is chosen to maximize the expected information it provides about those parameters.
 Because the ADO runs entirely in the participant's browser, experiments can be deployed as static web assets rather than server-backed applications.
 The package separates task presentation, response-model specification, and adaptive control so that new tasks, models, and algorithms can be implemented without rewriting the inference-and-design engine.
@@ -76,11 +76,13 @@ This makes `jspsych-ado` well suited to settings where brief, reliable measureme
 Adaptive design optimization belongs to the broader framework of Bayesian experimental design, which uses a model of the process under study to identify maximally informative designs [@cavagnaro2010adaptive; @rainforth2024modern; @huan2024optimal].
 Given a model $p(\theta)\,p(y \mid d, \theta)$ with parameters $\theta$, prior $p(\theta)$, and a data model $p(y \mid d, \theta)$ relating the response $y$ to the design $d$, the optimal design $d^{*}$ maximizes the expected information gain (EIG) --- the expected reduction in entropy from the prior to the posterior:
 
-$$d^{*} = \arg\max_{d}\; \mathrm{EIG}(d),
+$$
+d^{*} = \arg\max_{d}\; \mathrm{EIG}(d),
 \qquad
 \mathrm{EIG}(d)
   = \mathbb{E}_{p(y \mid d)}\!\Big[\, H\big(p(\theta)\big) - H\big(p(\theta \mid y, d)\big) \,\Big],
-\label{eq:eig}$$
+\label{eq:eig}
+$$
 
 where $H(\cdot)$ is the Shannon entropy and the expectation is over the prior predictive $p(y \mid d) = \int p(y \mid d, \theta)\,p(\theta)\,\mathrm{d}\theta$.
 Methods of this kind are applied across the behavioral and biomedical sciences, including psychophysics [@watson2017questplus], cognitive modeling [@myung2013tutorial], computational psychiatry [@kwon2023adaptive], cognitive neuroimaging [@bahg2020real], and systems biology [@pauwels2014bayesian].
@@ -144,16 +146,24 @@ chosen to maximize the expected information gain about $w$.
 After $t$ trials, the accumulated dataset is $D = \{(d_i, y_i)\}_{i=1}^{t}$, and Stan samples the posterior over $\theta$:
 $$p(\theta \mid D) \;\propto\; p(\theta)\,\prod_{i=1}^{t} p(y_i \mid d_i, \theta).$$
 The probit psychometric function gives the probability of a correct response as
-$$p(Y = 1 \mid d, \theta)
+
+$$
+p(Y = 1 \mid d, \theta)
   = \Phi\!\left(\frac{n_{\text{large}} - n_{\text{small}}}
-                     {w\,\sqrt{n_{\text{large}}^{2} + n_{\text{small}}^{2}}}\right),$$
+                     {w\,\sqrt{n_{\text{large}}^{2} + n_{\text{small}}^{2}}}\right),
+$$
+
 where $n_{\text{large}}$ and $n_{\text{small}}$ are the larger and smaller dot
 counts in design $d$. The next design then maximizes the $\mathrm{EIG}(d)$, evaluated under the current posterior $p(\theta \mid D)$ and estimated by Monte Carlo over the posterior draws $\theta^{(s)} \sim p(\theta \mid D)$:
-$$d^{*} = \arg\max_{d \in \mathcal{G}}\; I(\Theta; Y \mid d, D)
+
+$$
+d^{*} = \arg\max_{d \in \mathcal{G}}\; I(\Theta; Y \mid d, D)
         = H\!\big(\bar{p}_d\big)
           - \frac{1}{S}\sum_{s=1}^{S} H\!\big(p(Y \mid d, \theta^{(s)})\big),
   \qquad
-  \bar{p}_d = \frac{1}{S}\sum_{s=1}^{S} p(Y \mid d, \theta^{(s)}),$$
+  \bar{p}_d = \frac{1}{S}\sum_{s=1}^{S} p(Y \mid d, \theta^{(s)}),
+$$
+
 where $\bar{p}_d$ is the Monte-Carlo estimate of the posterior-predictive response probability $p(Y \mid d, D)$. This is exactly what the engine's design-selection routine computes from the posterior draws.
 
 # Research impact statement

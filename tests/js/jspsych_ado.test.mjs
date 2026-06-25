@@ -110,7 +110,7 @@ function installFakeWorker() {
 
 function installFakeFetch() {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async function(url) {
+  globalThis.fetch = async function (url) {
     const text_url = String(url);
     if (text_url.endsWith("/models/test-model.stan")) {
       return {
@@ -179,14 +179,20 @@ test("parseStanPriors emits the prior schema sampled by mi_engine", () => {
 
 test("parseStanPriors ignores commented-out sampling statements (#6)", () => {
   const code = "model {\n  // k ~ normal(0, 1); legacy line\n  k ~ lognormal(-4, 2);\n}";
-  assert.deepEqual(parseStanPriors(code, ["k"]), { k: { dist: "lognormal", meanlog: -4, sdlog: 2 } });
+  assert.deepEqual(parseStanPriors(code, ["k"]), {
+    k: { dist: "lognormal", meanlog: -4, sdlog: 2 },
+  });
 });
 
 test("parseStanPriors treats lower=0.5 as not-half-normal but still recognizes exact lower=0 (#7)", () => {
   const truncated = "parameters { real<lower=0.5> k; }\nmodel { k ~ normal(0, 1); }";
   assert.deepEqual(parseStanPriors(truncated, ["k"]), { k: { dist: "normal", mean: 0, sd: 1 } });
-  assert.deepEqual(parseStanPriors("real<lower=0> w; w ~ normal(0, 1);", ["w"]), { w: { dist: "halfnormal", sd: 1 } });
-  assert.deepEqual(parseStanPriors("real<lower=0, upper=1> w; w ~ normal(0, 2);", ["w"]), { w: { dist: "halfnormal", sd: 2 } });
+  assert.deepEqual(parseStanPriors("real<lower=0> w; w ~ normal(0, 1);", ["w"]), {
+    w: { dist: "halfnormal", sd: 1 },
+  });
+  assert.deepEqual(parseStanPriors("real<lower=0, upper=1> w; w ~ normal(0, 2);", ["w"]), {
+    w: { dist: "halfnormal", sd: 2 },
+  });
 });
 
 test("parseStanPriors rejects a wrong-arity normal/lognormal prior instead of yielding NaN draws (#13)", () => {
@@ -213,12 +219,17 @@ test("stanUrl registration derives priors after prepareModels fetches the source
 
     await prepareModels({ compileServer: "http://compile.test" });
 
-    const timeline = flattenTimeline(createTimeline({}, {
-      task: "stan-url-task",
-      model: "stan-url-model",
-      n_trials: 1,
-      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 17 },
-    }));
+    const timeline = flattenTimeline(
+      createTimeline(
+        {},
+        {
+          task: "stan-url-task",
+          model: "stan-url-model",
+          n_trials: 1,
+          stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 17 },
+        },
+      ),
+    );
 
     const start_data = await new Promise((resolve, reject) => {
       timeline[0].func((data) => resolve(data));
@@ -255,12 +266,17 @@ test("createTimeline composes on_finish: raw response -> outcome, full design, l
 
     await prepareModels({ compileServer: "http://compile.test" });
 
-    const timeline = flattenTimeline(createTimeline({}, {
-      task: "data-flow-task",
-      model: "data-flow-model",
-      n_trials: 1,
-      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 5 },
-    }));
+    const timeline = flattenTimeline(
+      createTimeline(
+        {},
+        {
+          task: "data-flow-task",
+          model: "data-flow-model",
+          n_trials: 1,
+          stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 5 },
+        },
+      ),
+    );
 
     // Drive start so current_design is the (single) grid design.
     await new Promise((resolve, reject) => {
@@ -299,22 +315,29 @@ test("createTimeline forwards design strategy into the Stan controller", async (
     await prepareModels({ compileServer: "http://compile.test" });
 
     assert.throws(
-      () => createTimeline({}, {
-        task: "strategy-task",
-        model: "strategy-forwarding-model",
-        design_strategy: "unsupported",
-      }),
-      /unknown design_strategy/
+      () =>
+        createTimeline(
+          {},
+          {
+            task: "strategy-task",
+            model: "strategy-forwarding-model",
+            design_strategy: "unsupported",
+          },
+        ),
+      /unknown design_strategy/,
     );
 
-    const timeline = createTimeline({}, {
-      task: "strategy-task",
-      model: "strategy-forwarding-model",
-      n_trials: 1,
-      design_strategy: "random",
-      design_seed: 23,
-      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 7 },
-    });
+    const timeline = createTimeline(
+      {},
+      {
+        task: "strategy-task",
+        model: "strategy-forwarding-model",
+        n_trials: 1,
+        design_strategy: "random",
+        design_seed: 23,
+        stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 7 },
+      },
+    );
 
     const start_data = await new Promise((resolve, reject) => {
       timeline[0].func((data) => resolve(data));
@@ -346,13 +369,18 @@ test("createTimeline schedules updates at testlet boundaries", async () => {
     registerTestModel("testlet-structure-model");
     await prepareModels({ compileServer: "http://compile.test" });
 
-    const timeline = flattenTimeline(createTimeline({}, {
-      task: "testlet-structure-task",
-      model: "testlet-structure-model",
-      n_trials: 5,
-      testlet_size: 2,
-      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 5 },
-    }));
+    const timeline = flattenTimeline(
+      createTimeline(
+        {},
+        {
+          task: "testlet-structure-task",
+          model: "testlet-structure-model",
+          n_trials: 5,
+          testlet_size: 2,
+          stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 5 },
+        },
+      ),
+    );
 
     const choices = timeline.filter((t) => t.type === "html-button-response");
     const calls = timeline.filter((t) => t.type === "call-function");
@@ -380,12 +408,20 @@ test("createTimeline rejects a non-positive-integer testlet_size", async () => {
     await prepareModels({ compileServer: "http://compile.test" });
 
     assert.throws(
-      () => createTimeline({}, { task: "testlet-validation-task", model: "testlet-validation-model", testlet_size: 0 }),
-      /positive integer/
+      () =>
+        createTimeline(
+          {},
+          { task: "testlet-validation-task", model: "testlet-validation-model", testlet_size: 0 },
+        ),
+      /positive integer/,
     );
     assert.throws(
-      () => createTimeline({}, { task: "testlet-validation-task", model: "testlet-validation-model", testlet_size: 1.5 }),
-      /positive integer/
+      () =>
+        createTimeline(
+          {},
+          { task: "testlet-validation-task", model: "testlet-validation-model", testlet_size: 1.5 },
+        ),
+      /positive integer/,
     );
   } finally {
     restoreFetch();
@@ -398,13 +434,13 @@ test("createTimeline rejects a non-positive-integer testlet_size", async () => {
 test("createTimeline requires known task and model", () => {
   assert.throws(
     () => createTimeline({}, { task: "missing-task", model: "missing-model" }),
-    /unknown task/
+    /unknown task/,
   );
 
   registerTestTask("known-task");
   assert.throws(
     () => createTimeline({}, { task: "known-task", model: "missing-model" }),
-    /unknown model/
+    /unknown model/,
   );
 });
 
@@ -422,7 +458,7 @@ test("createTimeline rejects incompatible task/model design keys and response sp
 
   assert.throws(
     () => createTimeline({}, { task: "compat-task", model: "missing-key-model" }),
-    /missing design key "missing_key"/
+    /missing design key "missing_key"/,
   );
 
   registerTestTask("categorical-task", {
@@ -446,7 +482,7 @@ test("createTimeline rejects incompatible task/model design keys and response sp
 
   assert.throws(
     () => createTimeline({}, { task: "categorical-task", model: "binary-model-for-mismatch" }),
-    /responseSpace mismatch/
+    /responseSpace mismatch/,
   );
 
   registerModel("categorical-count-mismatch-model", {
@@ -460,8 +496,9 @@ test("createTimeline rejects incompatible task/model design keys and response sp
   });
 
   assert.throws(
-    () => createTimeline({}, { task: "categorical-task", model: "categorical-count-mismatch-model" }),
-    /responseSpace category count mismatch/
+    () =>
+      createTimeline({}, { task: "categorical-task", model: "categorical-count-mismatch-model" }),
+    /responseSpace category count mismatch/,
   );
 });
 
@@ -484,7 +521,7 @@ test("createTimeline checks every curated design row for required keys", () => {
 
   assert.throws(
     () => createTimeline({}, { task: "curated-bad-row-task", model: "curated-bad-row-model" }),
-    /row 1 is missing design key "r_ll"/
+    /row 1 is missing design key "r_ll"/,
   );
 });
 
@@ -511,11 +548,11 @@ test("createTimeline rejects bad responseProb and buildData probes", () => {
 
   assert.throws(
     () => createTimeline({}, { task: "probe-task", model: "bad-response-prob-model" }),
-    /response likelihood probe failed/
+    /response likelihood probe failed/,
   );
   assert.throws(
     () => createTimeline({}, { task: "probe-task", model: "bad-build-data-model" }),
-    /buildData probe returned undefined/
+    /buildData probe returned undefined/,
   );
 });
 
@@ -556,9 +593,9 @@ test("createAdoTimeline passes completed testlets as batches and refills designs
         trial_index: done,
         next_design: done < designs.length ? designs[done] : null,
         next_designs: done < designs.length ? [designs[done]] : [],
-        next_design_metrics: done < designs.length ? [{ mutual_info: 0.30 }] : [],
+        next_design_metrics: done < designs.length ? [{ mutual_info: 0.3 }] : [],
         selection_time_ms: done < designs.length ? 5 : null,
-        max_mutual_info: done < designs.length ? 0.30 : null,
+        max_mutual_info: done < designs.length ? 0.3 : null,
         post_mean: { k: done },
         post_sd: { k: 0.1 },
         api_latency_ms: 1,
@@ -567,14 +604,21 @@ test("createAdoTimeline passes completed testlets as batches and refills designs
   };
 
   try {
-    const timeline = flattenTimeline(createAdoTimeline(jsPsych, controller, {
-      n_trials: 3,
-      testlet_size: 2,
-      response_labels: { 0: "SS", 1: "LL" },
-      presentation: TEST_PRESENTATION,
-      choices: ["SS", "LL"],
-      task: "demo",
-    }, {}));
+    const timeline = flattenTimeline(
+      createAdoTimeline(
+        jsPsych,
+        controller,
+        {
+          n_trials: 3,
+          testlet_size: 2,
+          response_labels: { 0: "SS", 1: "LL" },
+          presentation: TEST_PRESENTATION,
+          choices: ["SS", "LL"],
+          task: "demo",
+        },
+        {},
+      ),
+    );
 
     await new Promise((resolve, reject) => {
       timeline[0].func(resolve);
@@ -602,7 +646,7 @@ test("createAdoTimeline passes completed testlets as batches and refills designs
     const third = { ...timeline[4].data(), response: 1 };
     timeline[4].on_finish(third);
     assert.equal(third.ado_selection_time_ms, 5);
-    assert.equal(third.ado_mutual_info, 0.30);
+    assert.equal(third.ado_mutual_info, 0.3);
 
     const second_update = await new Promise((resolve, reject) => {
       timeline[5].func(resolve);
@@ -612,15 +656,21 @@ test("createAdoTimeline passes completed testlets as batches and refills designs
     assert.equal(seen_batches.length, 2);
     assert.equal(seen_batches[0].length, 2);
     assert.equal(seen_batches[1].length, 1);
-    assert.deepEqual(seen_batches[0].map((row) => row.trial_number), [1, 2]);
-    assert.deepEqual(seen_batches[0].map((row) => row.testlet_position), [0, 1]);
+    assert.deepEqual(
+      seen_batches[0].map((row) => row.trial_number),
+      [1, 2],
+    );
+    assert.deepEqual(
+      seen_batches[0].map((row) => row.testlet_position),
+      [0, 1],
+    );
     assert.equal(seen_batches[1][0].trial_number, 3);
     assert.equal(seen_batches[1][0].post_mean_k, 2);
     assert.equal(first_update.ado_testlet_size, 2);
     assert.equal(second_update.ado_testlet_size, 1);
-    assert.deepEqual(first_update.ado_next_design_metrics, [{ mutual_info: 0.30 }]);
+    assert.deepEqual(first_update.ado_next_design_metrics, [{ mutual_info: 0.3 }]);
     assert.equal(first_update.ado_selection_time_ms, 5);
-    assert.equal(first_update.ado_max_mutual_info, 0.30);
+    assert.equal(first_update.ado_max_mutual_info, 0.3);
     assert.deepEqual(second_update.ado_next_design_metrics, []);
     assert.equal(second_update.ado_selection_time_ms, null);
     assert.equal(second_update.ado_max_mutual_info, null);
@@ -633,13 +683,20 @@ test("createAdoTimeline passes completed testlets as batches and refills designs
 test("controllers supply designs up to stopping.max_trials, not just n_trials (#102 review)", async () => {
   // n_trials: 2 with max_trials: 4 must not underflow the design queue: the timeline
   // builds 4 testlet nodes, so the controller must keep supplying designs through 4.
-  const c = createMockAdoController({ grid_design: { a: [1, 2, 3, 4, 5] }, n_trials: 2, stopping: { max_trials: 4 } });
+  const c = createMockAdoController({
+    grid_design: { a: [1, 2, 3, 4, 5] },
+    n_trials: 2,
+    stopping: { max_trials: 4 },
+  });
   let r = await c.start();
   assert.ok(r.next_design != null, "start should supply a design");
   for (let t = 1; t <= 4; t++) {
     r = await c.update({ ado_design: r.next_design, choice: 0 });
     if (t < 4) {
-      assert.ok(r.next_design != null, `a design must be supplied through trial ${t} (max_trials=4)`);
+      assert.ok(
+        r.next_design != null,
+        `a design must be supplied through trial ${t} (max_trials=4)`,
+      );
     } else {
       assert.equal(r.next_design, null, "no design beyond the max_trials cap");
     }
@@ -663,7 +720,7 @@ test("stan controller warns that eig_fraction stopping is ignored under design_s
   }
   assert.ok(
     warnings.some((w) => /eig_fraction stopping is ignored under design_strategy="random"/.test(w)),
-    "expected a warning that EIG stopping is ADO-only"
+    "expected a warning that EIG stopping is ADO-only",
   );
 });
 
@@ -672,48 +729,93 @@ test("createAdoTimeline skips remaining testlets once the controller signals sho
   globalThis.jsPsychHtmlButtonResponse = "html-button-response";
   try {
     const design = { t_ss: 0, t_ll: 1, r_ss: 100, r_ll: 200 };
-    const jsPsych = { endExperiment: (m) => { throw new Error(m); } };
+    const jsPsych = {
+      endExperiment: (m) => {
+        throw new Error(m);
+      },
+    };
     let update_count = 0;
     const base = {
-      session_id: "s", next_design: design, next_designs: [design],
-      next_design_metrics: [{ mutual_info: 0.5 }], max_mutual_info: 0.5, eig: 0.5,
-      post_mean: { k: 1 }, post_sd: { k: 0.1 },
+      session_id: "s",
+      next_design: design,
+      next_designs: [design],
+      next_design_metrics: [{ mutual_info: 0.5 }],
+      max_mutual_info: 0.5,
+      eig: 0.5,
+      post_mean: { k: 1 },
+      post_sd: { k: 0.1 },
     };
     const controller = {
-      start: async () => ({ ...base, trial_index: 0, should_stop: false, stop_reason: null, post_mean: null, post_sd: null }),
+      start: async () => ({
+        ...base,
+        trial_index: 0,
+        should_stop: false,
+        stop_reason: null,
+        post_mean: null,
+        post_sd: null,
+      }),
       update: async () => {
         update_count += 1;
-        const should_stop = update_count >= 2;   // stop after the 2nd testlet
-        return { ...base, trial_index: update_count, should_stop, stop_reason: should_stop ? "eig_fraction" : null };
+        const should_stop = update_count >= 2; // stop after the 2nd testlet
+        return {
+          ...base,
+          trial_index: update_count,
+          should_stop,
+          stop_reason: should_stop ? "eig_fraction" : null,
+        };
       },
     };
 
-    const tl = createAdoTimeline(jsPsych, controller, {
-      n_trials: 4, testlet_size: 1, stopping: { max_trials: 4 },
-      response_labels: { 0: "SS", 1: "LL" }, presentation: TEST_PRESENTATION, choices: ["SS", "LL"], task: "stop-demo",
-    }, {});
+    const tl = createAdoTimeline(
+      jsPsych,
+      controller,
+      {
+        n_trials: 4,
+        testlet_size: 1,
+        stopping: { max_trials: 4 },
+        response_labels: { 0: "SS", 1: "LL" },
+        presentation: TEST_PRESENTATION,
+        choices: ["SS", "LL"],
+        task: "stop-demo",
+      },
+      {},
+    );
 
     // [init, node1, node2, node3, node4]; each node_k wraps [choice, update] with a
     // conditional_function that gates whether the testlet runs.
     assert.equal(tl.length, 5);
     for (let k = 1; k <= 4; k++) {
-      assert.equal(typeof tl[k].conditional_function, "function", `node ${k} should be a conditional testlet node`);
+      assert.equal(
+        typeof tl[k].conditional_function,
+        "function",
+        `node ${k} should be a conditional testlet node`,
+      );
       assert.equal(tl[k].timeline.length, 2);
     }
 
-    await new Promise((res, rej) => { tl[0].func(res); setTimeout(() => rej(new Error("start timeout")), 100); });
+    await new Promise((res, rej) => {
+      tl[0].func(res);
+      setTimeout(() => rej(new Error("start timeout")), 100);
+    });
 
     async function runTestlet(node) {
       const choice = node.timeline[0];
       choice.on_start({});
       choice.on_finish({ ...choice.data(), response: 1 });
-      await new Promise((res, rej) => { node.timeline[1].func(res); setTimeout(() => rej(new Error("update timeout")), 100); });
+      await new Promise((res, rej) => {
+        node.timeline[1].func(res);
+        setTimeout(() => rej(new Error("update timeout")), 100);
+      });
     }
 
-    assert.equal(tl[2].conditional_function(), true);     // nothing stopped yet
-    await runTestlet(tl[1]);                               // update 1 -> should_stop false
-    assert.equal(tl[2].conditional_function(), true, "node 2 should still run after a non-stopping update");
-    await runTestlet(tl[2]);                               // update 2 -> should_stop true
+    assert.equal(tl[2].conditional_function(), true); // nothing stopped yet
+    await runTestlet(tl[1]); // update 1 -> should_stop false
+    assert.equal(
+      tl[2].conditional_function(),
+      true,
+      "node 2 should still run after a non-stopping update",
+    );
+    await runTestlet(tl[2]); // update 2 -> should_stop true
     assert.equal(tl[3].conditional_function(), false, "node 3 should be skipped after the stop");
     assert.equal(tl[4].conditional_function(), false, "node 4 should be skipped after the stop");
   } finally {
@@ -779,7 +881,7 @@ test("Stan random strategy scores selected designs without claiming max MI", asy
 
     assert.equal(state.next_designs.length, 2);
     assert.equal(state.next_design_metrics.length, 2);
-    assert.ok(state.next_design_metrics.every(metric => Number.isFinite(metric.mutual_info)));
+    assert.ok(state.next_design_metrics.every((metric) => Number.isFinite(metric.mutual_info)));
     assert.equal(state.max_mutual_info, null);
     assert.ok(state.selection_time_ms >= 0);
   } finally {
@@ -858,12 +960,15 @@ test("registerModelPackage -> createTimeline forwards wasmUrl to the worker init
       responseProb,
     });
 
-    const timeline = createTimeline({}, {
-      task: "wasmurl-task",
-      model: "wasmurl-model",
-      n_trials: 1,
-      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 7 },
-    });
+    const timeline = createTimeline(
+      {},
+      {
+        task: "wasmurl-task",
+        model: "wasmurl-model",
+        n_trials: 1,
+        stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 7 },
+      },
+    );
 
     await new Promise((resolve, reject) => {
       timeline[0].func(resolve);
@@ -883,35 +988,38 @@ test("registerModelPackage -> createTimeline forwards wasmUrl to the worker init
 
 test("registerTask validates presentation while registerModel stays stats-only", () => {
   assert.throws(
-    () => registerTask("no-presentation-task", {
-      design_grid: DESIGN_GRID,
-      designKeys: DESIGN_KEYS,
-      responseSpace: RESPONSE_SPACE,
-      response_labels: ["SS", "LL"],
-    }),
-    /presentation/
+    () =>
+      registerTask("no-presentation-task", {
+        design_grid: DESIGN_GRID,
+        designKeys: DESIGN_KEYS,
+        responseSpace: RESPONSE_SPACE,
+        response_labels: ["SS", "LL"],
+      }),
+    /presentation/,
   );
 
   assert.throws(
-    () => registerTask("no-response-label-task", {
-      design_grid: DESIGN_GRID,
-      designKeys: DESIGN_KEYS,
-      responseSpace: RESPONSE_SPACE,
-      presentation: TEST_PRESENTATION,
-      choices: ["SS", "LL"],
-    }),
-    /response_labels/
+    () =>
+      registerTask("no-response-label-task", {
+        design_grid: DESIGN_GRID,
+        designKeys: DESIGN_KEYS,
+        responseSpace: RESPONSE_SPACE,
+        presentation: TEST_PRESENTATION,
+        choices: ["SS", "LL"],
+      }),
+    /response_labels/,
   );
 
   assert.throws(
-    () => registerModel("missing-response-prob", {
-      stanCode: STAN_CODE,
-      params: ["k"],
-      designKeys: DESIGN_KEYS,
-      responseSpace: RESPONSE_SPACE,
-      toStanData: TO_STAN_DATA,
-    }),
-    /responseProb/
+    () =>
+      registerModel("missing-response-prob", {
+        stanCode: STAN_CODE,
+        params: ["k"],
+        designKeys: DESIGN_KEYS,
+        responseSpace: RESPONSE_SPACE,
+        toStanData: TO_STAN_DATA,
+      }),
+    /responseProb/,
   );
 });
 
@@ -926,32 +1034,35 @@ test("registerModel rejects stale task-owned fields", () => {
   };
 
   assert.throws(
-    () => registerModel("old-response-mapper", {
-      ...base,
-      responseToOutcome: () => 1,
-    }),
-    /responseToOutcome belongs on a task/
+    () =>
+      registerModel("old-response-mapper", {
+        ...base,
+        responseToOutcome: () => 1,
+      }),
+    /responseToOutcome belongs on a task/,
   );
   assert.throws(
-    () => registerModel("old-task-label", {
-      ...base,
-      task: "demo",
-    }),
-    /task belongs on a task/
+    () =>
+      registerModel("old-task-label", {
+        ...base,
+        task: "demo",
+      }),
+    /task belongs on a task/,
   );
 });
 
 test("moduleUrl registration requires an explicit prior", () => {
   assert.throws(
-    () => registerModel("module-needs-prior", {
-      moduleUrl: "/compiled/main.js",
-      params: ["k"],
-      designKeys: DESIGN_KEYS,
-      responseSpace: RESPONSE_SPACE,
-      responseProb: () => 0.5,
-      toStanData: TO_STAN_DATA,
-    }),
-    /Pass an explicit `prior` when registering with `moduleUrl`/
+    () =>
+      registerModel("module-needs-prior", {
+        moduleUrl: "/compiled/main.js",
+        params: ["k"],
+        designKeys: DESIGN_KEYS,
+        responseSpace: RESPONSE_SPACE,
+        responseProb: () => 0.5,
+        toStanData: TO_STAN_DATA,
+      }),
+    /Pass an explicit `prior` when registering with `moduleUrl`/,
   );
 });
 
@@ -975,12 +1086,15 @@ test("explicit prior overrides parsed priors", async () => {
 
     await prepareModels({ compileServer: "http://compile.test" });
 
-    const timeline = createTimeline({}, {
-      task: "explicit-prior-task",
-      model: "explicit-prior-model",
-      n_trials: 1,
-      stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 19 },
-    });
+    const timeline = createTimeline(
+      {},
+      {
+        task: "explicit-prior-task",
+        model: "explicit-prior-model",
+        n_trials: 1,
+        stan: { num_chains: 1, num_warmup: 0, num_samples: 1, seed: 19 },
+      },
+    );
 
     const start_data = await new Promise((resolve, reject) => {
       timeline[0].func((data) => resolve(data));
@@ -1002,18 +1116,19 @@ test("compileStanModel imports from the documented path", () => {
 
 test("compileStanModel rejects categorical responseProb-only adapters before compiling", async () => {
   await assert.rejects(
-    () => compileStanModel({
-      id: "bad-categorical",
-      stan: STAN_CODE,
-      params: ["k"],
-      designKeys: DESIGN_KEYS,
-      responseSpace: { type: "categorical", n_categories: 3 },
-      prior: { k: { dist: "lognormal", meanlog: -4, sdlog: 2 } },
-      buildData: (trials) => ({ N: trials.length, y: trials.map((t) => t.choice) }),
-      responseProb: () => 0.5,
-      server: "http://compile.test",
-    }),
-    /categorical models must provide responseProbs/
+    () =>
+      compileStanModel({
+        id: "bad-categorical",
+        stan: STAN_CODE,
+        params: ["k"],
+        designKeys: DESIGN_KEYS,
+        responseSpace: { type: "categorical", n_categories: 3 },
+        prior: { k: { dist: "lognormal", meanlog: -4, sdlog: 2 } },
+        buildData: (trials) => ({ N: trials.length, y: trials.map((t) => t.choice) }),
+        responseProb: () => 0.5,
+        server: "http://compile.test",
+      }),
+    /categorical models must provide responseProbs/,
   );
 });
 
@@ -1042,15 +1157,18 @@ function makePackage(overrides = {}) {
 }
 
 test("validateTask flags missing task pieces", () => {
-  assert.equal(validateTask({
-    id: "task",
-    design_grid: DESIGN_GRID,
-    designKeys: DESIGN_KEYS,
-    responseSpace: RESPONSE_SPACE,
-    presentation: TEST_PRESENTATION,
-    choices: ["SS", "LL"],
-    response_labels: ["SS", "LL"],
-  }).valid, true);
+  assert.equal(
+    validateTask({
+      id: "task",
+      design_grid: DESIGN_GRID,
+      designKeys: DESIGN_KEYS,
+      responseSpace: RESPONSE_SPACE,
+      presentation: TEST_PRESENTATION,
+      choices: ["SS", "LL"],
+      response_labels: ["SS", "LL"],
+    }).valid,
+    true,
+  );
 
   const bad = validateTask({ id: "bad", design_grid: DESIGN_GRID });
   assert.equal(bad.valid, false);
@@ -1079,12 +1197,18 @@ test("validateModel flags missing pieces, missing priors, and unsampleable prior
   assert.ok(stale.problems.some((p) => p.level === "error" && /task/.test(p.message)));
 
   // A prior the first-design sampler can't draw is a warning, not an error.
-  const warned = validateModel(makePackage({ prior: { k: { dist: "gamma", alpha: 2, beta: 3 }, tau: { dist: "normal", mean: 0, sd: 1 } } }));
+  const warned = validateModel(
+    makePackage({
+      prior: { k: { dist: "gamma", alpha: 2, beta: 3 }, tau: { dist: "normal", mean: 0, sd: 1 } },
+    }),
+  );
   assert.equal(warned.valid, true);
   assert.ok(warned.problems.some((p) => p.level === "warn" && /can't draw/.test(p.message)));
 
   // A parameter with no prior entry is an error (the engine samples the prior first).
-  const missingPrior = validateModel(makePackage({ prior: { k: { dist: "normal", mean: 0, sd: 1 } } }));
+  const missingPrior = validateModel(
+    makePackage({ prior: { k: { dist: "normal", mean: 0, sd: 1 } } }),
+  );
   assert.equal(missingPrior.valid, false);
   assert.ok(missingPrior.problems.some((p) => p.level === "error" && /tau/.test(p.message)));
 });
@@ -1102,17 +1226,24 @@ test("validateModel warns (not errors) when a model package omits wasmUrl (#57)"
 });
 
 test("validateModel rejects malformed categorical responseProbs", () => {
-  const categorical = (responseProbs) => makePackage({
-    responseSpace: { type: "categorical", n_categories: 3 },
-    responseProb: undefined,
-    responseProbs,
-  });
+  const categorical = (responseProbs) =>
+    makePackage({
+      responseSpace: { type: "categorical", n_categories: 3 },
+      responseProb: undefined,
+      responseProbs,
+    });
   const sampleDesign = { t_ss: 0, t_ll: 1, r_ss: 100, r_ll: 200 };
 
-  assert.equal(validateModel(categorical(() => [0.5, 0.25, 0.25]), {
-    sampleDesign,
-    sampleDraw: { k: 0.01, tau: 1 },
-  }).valid, true);
+  assert.equal(
+    validateModel(
+      categorical(() => [0.5, 0.25, 0.25]),
+      {
+        sampleDesign,
+        sampleDraw: { k: 0.01, tau: 1 },
+      },
+    ).valid,
+    true,
+  );
 
   for (const probs of [
     [0.5, 0.5],
@@ -1120,26 +1251,35 @@ test("validateModel rejects malformed categorical responseProbs", () => {
     [0.5, Number.NaN, 0.5],
     [0.5, -0.1, 0.6],
   ]) {
-    const result = validateModel(categorical(() => probs), {
-      sampleDesign,
-      sampleDraw: { k: 0.01, tau: 1 },
-    });
+    const result = validateModel(
+      categorical(() => probs),
+      {
+        sampleDesign,
+        sampleDraw: { k: 0.01, tau: 1 },
+      },
+    );
     assert.equal(result.valid, false, `expected invalid model for ${JSON.stringify(probs)}`);
-    assert.ok(result.problems.some((p) => p.level === "error" && /response likelihood/.test(p.message)));
+    assert.ok(
+      result.problems.some((p) => p.level === "error" && /response likelihood/.test(p.message)),
+    );
   }
 });
 
 test("registerModelPackage rejects invalid packages and design_grid overrides", () => {
   assert.throws(
-    () => registerModelPackage(
-      { id: "invalid-pkg", params: ["k"], prior: { k: { dist: "lognormal", meanlog: 0, sdlog: 1 } }, moduleUrl: "/m/main.js" }
-    ),
-    /invalid model package/
+    () =>
+      registerModelPackage({
+        id: "invalid-pkg",
+        params: ["k"],
+        prior: { k: { dist: "lognormal", meanlog: 0, sdlog: 1 } },
+        moduleUrl: "/m/main.js",
+      }),
+    /invalid model package/,
   );
 
   assert.throws(
     () => registerModelPackage(makePackage({ id: "old-grid-pkg" }), { design_grid: DESIGN_GRID }),
-    /design_grid belongs on a task/
+    /design_grid belongs on a task/,
   );
 });
 
@@ -1192,7 +1332,9 @@ test("registerModelPackage registers a package and wires responseProb(design, dr
     });
     assert.equal(name, "pkg-order");
 
-    const timeline = flattenTimeline(createTimeline({}, { task: "pkg-order-task", model: "pkg-order" }));
+    const timeline = flattenTimeline(
+      createTimeline({}, { task: "pkg-order-task", model: "pkg-order" }),
+    );
     await new Promise((resolve, reject) => {
       timeline[0].func((d) => resolve(d));
       setTimeout(() => reject(new Error("timed out waiting for fake worker")), 100);

@@ -33,7 +33,4 @@ const default_line_length_simulation_config = {
   },
 };
 
-export {
-  default_line_length_config,
-  default_line_length_simulation_config,
-};
+export { default_line_length_config, default_line_length_simulation_config };

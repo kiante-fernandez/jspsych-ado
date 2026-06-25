@@ -24,7 +24,10 @@ const lll = (await import("../../src/models/line_length_discrimination_3ifc/mode
 const exp = (await import("../../demos/byo_model_exponential/model.js")).default;
 
 let failures = 0;
-const fail = (msg) => { console.log("  FAIL: " + msg); failures++; };
+const fail = (msg) => {
+  console.log("  FAIL: " + msg);
+  failures++;
+};
 
 async function loadModel(adapter) {
   const createModule = (await import(adapter.moduleUrl)).default;
@@ -43,7 +46,9 @@ function findGenColumn(paramNames, base) {
     }
   }
   if (matches.length !== 1) {
-    throw new Error(`expected exactly one column for "${base}" (N=1), found ${matches.length}: [${paramNames.join(", ")}]`);
+    throw new Error(
+      `expected exactly one column for "${base}" (N=1), found ${matches.length}: [${paramNames.join(", ")}]`,
+    );
   }
   return matches[0];
 }
@@ -109,7 +114,10 @@ const sample_config = { num_chains: 1, num_warmup: 100, num_samples: 100, seed: 
 console.log("\n[1] JS responseProb == compiled-Stan likelihood, draw-for-draw\n");
 for (const spec of SPECS) {
   const stan = await loadModel(spec.adapter);
-  const buildData = makeStanDataBuilder({ stanData: spec.adapter.stanData, responseSpace: spec.adapter.responseSpace });
+  const buildData = makeStanDataBuilder({
+    stanData: spec.adapter.stanData,
+    responseSpace: spec.adapter.responseSpace,
+  });
   let maxDiff = 0;
   let comparisons = 0;
 
@@ -126,7 +134,9 @@ for (const spec of SPECS) {
 
     for (let s = 0; s < nDraws; s++) {
       const theta = {};
-      spec.adapter.params.forEach((p, k) => { theta[p] = fit.draws[paramIdx[k]][s]; });
+      spec.adapter.params.forEach((p, k) => {
+        theta[p] = fit.draws[paramIdx[k]][s];
+      });
       const js = spec.jsProbs(designOnly, theta);
       for (let k = 0; k < genIdx.length; k++) {
         const stanProb = fit.draws[genIdx[k]][s];
@@ -138,14 +148,22 @@ for (const spec of SPECS) {
   }
 
   const ok = maxDiff <= spec.atol;
-  if (!ok) fail(`${spec.name}: max |JS - Stan| = ${maxDiff.toExponential(3)} exceeds atol ${spec.atol.toExponential(1)}`);
-  console.log(`  ${spec.name.padEnd(18)} max |JS - Stan| = ${maxDiff.toExponential(3)}  (atol ${spec.atol.toExponential(1)}, ${comparisons} comparisons)  ${ok ? "OK" : "FAIL"}`);
+  if (!ok)
+    fail(
+      `${spec.name}: max |JS - Stan| = ${maxDiff.toExponential(3)} exceeds atol ${spec.atol.toExponential(1)}`,
+    );
+  console.log(
+    `  ${spec.name.padEnd(18)} max |JS - Stan| = ${maxDiff.toExponential(3)}  (atol ${spec.atol.toExponential(1)}, ${comparisons} comparisons)  ${ok ? "OK" : "FAIL"}`,
+  );
 }
 
 console.log("\n[2] Fixed-seed determinism: same data + seed -> identical draws\n");
 {
   const stan = await loadModel(hyp);
-  const buildData = makeStanDataBuilder({ stanData: hyp.stanData, responseSpace: hyp.responseSpace });
+  const buildData = makeStanDataBuilder({
+    stanData: hyp.stanData,
+    responseSpace: hyp.responseSpace,
+  });
   const data = buildData([{ t_ss: 0, t_ll: 30, r_ss: 40, r_ll: 80, choice: 1 }]);
   const cfg = { num_chains: 2, num_warmup: 150, num_samples: 150, seed: 777 };
   const a = stan.sample({ data, ...cfg });
@@ -156,9 +174,16 @@ console.log("\n[2] Fixed-seed determinism: same data + seed -> identical draws\n
   for (let s = 0; identical && s < a.draws[ki].length; s++) {
     if (a.draws[ki][s] !== b.draws[ki][s] || a.draws[ti][s] !== b.draws[ti][s]) identical = false;
   }
-  if (!identical) fail("two fits with the same data+seed produced different draws (seed not deterministic)");
-  console.log(`  hyperbolic: ${a.draws[ki].length} draws, two seeded fits ${identical ? "IDENTICAL" : "DIFFERED"}  ${identical ? "OK" : "FAIL"}`);
+  if (!identical)
+    fail("two fits with the same data+seed produced different draws (seed not deterministic)");
+  console.log(
+    `  hyperbolic: ${a.draws[ki].length} draws, two seeded fits ${identical ? "IDENTICAL" : "DIFFERED"}  ${identical ? "OK" : "FAIL"}`,
+  );
 }
 
-console.log(failures === 0 ? "\nPASS: likelihood parity + determinism verified." : `\nFAIL: ${failures} check(s) failed.`);
+console.log(
+  failures === 0
+    ? "\nPASS: likelihood parity + determinism verified."
+    : `\nFAIL: ${failures} check(s) failed.`,
+);
 process.exit(failures === 0 ? 0 : 1);

@@ -9,10 +9,10 @@ import { canvasSliderChoice } from "../../ado/response_trials.js";
 // works in log-log space). The whole task is presentation + response coding; the
 // statistics live entirely in the model.
 
-const CANVAS = 420;                 // square canvas (height === width avoids axis ambiguity)
+const CANVAS = 420; // square canvas (height === width avoids axis ambiguity)
 const CANVAS_SIZE = [CANVAS, CANVAS];
-const MAX_AREA = 1000;              // largest area in the design grid
-const MAX_RADIUS_PX = 175;          // largest on-screen radius (fits the canvas with margin)
+const MAX_AREA = 1000; // largest area in the design grid
+const MAX_RADIUS_PX = 175; // largest on-screen radius (fits the canvas with margin)
 // Pixels per sqrt(area-unit), so area s maps to radius sqrt(s/pi) scaled to fit.
 const PIXELS_PER_UNIT = MAX_RADIUS_PX / Math.sqrt(MAX_AREA / Math.PI);
 
@@ -52,18 +52,21 @@ function describeDesign(design) {
 const presentation = {
   getChoiceTrials(ctx) {
     return [
-      canvasSliderChoice({
-        draw: drawDisk,
-        getDesign: ctx.getDesign,
-        min: SLIDER_MIN,
-        max: SLIDER_MAX,
-        step: 1,
-        slider_start: Math.round((SLIDER_MIN + SLIDER_MAX) / 2),
-        labels: ["smallest", "largest"],
-        prompt: "<p>How large is this shape? Set the slider to your estimate of its size.</p>",
-        require_movement: true,
-        canvas_size: CANVAS_SIZE,
-      }, ctx),
+      canvasSliderChoice(
+        {
+          draw: drawDisk,
+          getDesign: ctx.getDesign,
+          min: SLIDER_MIN,
+          max: SLIDER_MAX,
+          step: 1,
+          slider_start: Math.round((SLIDER_MIN + SLIDER_MAX) / 2),
+          labels: ["smallest", "largest"],
+          prompt: "<p>How large is this shape? Set the slider to your estimate of its size.</p>",
+          require_movement: true,
+          canvas_size: CANVAS_SIZE,
+        },
+        ctx,
+      ),
     ];
   },
   describeDesign,

@@ -10,7 +10,10 @@ import model, {
 import { makeStanDataBuilder } from "../../src/ado/stan_data.js";
 
 // The model declares a stanData map; the framework generates buildData from it.
-const buildData = makeStanDataBuilder({ stanData: model.stanData, responseSpace: model.responseSpace });
+const buildData = makeStanDataBuilder({
+  stanData: model.stanData,
+  responseSpace: model.responseSpace,
+});
 
 test("normalCdf matches known Phi values and is well-behaved", () => {
   assert.ok(Math.abs(normalCdf(0) - 0.5) < 1e-9);
@@ -24,7 +27,9 @@ test("responseProb matches the Weber/ANS likelihood", () => {
   const design = { n_blue: 10, n_yellow: 20 };
   const w = 0.25;
   const { n_large, n_small } = numerosities(design);
-  const expected = normalCdf((n_large - n_small) / (w * Math.sqrt(n_large * n_large + n_small * n_small)));
+  const expected = normalCdf(
+    (n_large - n_small) / (w * Math.sqrt(n_large * n_large + n_small * n_small)),
+  );
   const got = responseProb(design, { w });
   assert.ok(got > 0.5 && got < 1);
   assert.ok(Math.abs(got - expected) < 1e-12, `expected ${expected}, got ${got}`);

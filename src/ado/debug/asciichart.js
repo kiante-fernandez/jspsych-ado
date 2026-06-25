@@ -75,7 +75,7 @@ function plot(series, config = {}) {
   const padding = typeof config.padding === "string" ? config.padding : DEFAULT_PADDING;
   const connector_style = config.connector_style === "junction" ? "junction" : "corner";
   const canvas = Array.from({ length: height + 1 }, () => Array(values.length + 1).fill(" "));
-  const rows = values.map(value => {
+  const rows = values.map((value) => {
     const normalized = spread === 0 ? 0.5 : (value - min) / range;
     return Math.max(0, Math.min(height, Math.round(height - normalized * height)));
   });
@@ -89,10 +89,12 @@ function plot(series, config = {}) {
     canvas[rows[rows.length - 1]][rows.length] = PLOT_POINT;
   }
 
-  return canvas.map((row, index) => {
-    const value = max - (range * index) / height;
-    return `${format(value, index, padding)} | ${row.join("")}`;
-  }).join("\n");
+  return canvas
+    .map((row, index) => {
+      const value = max - (range * index) / height;
+      return `${format(value, index, padding)} | ${row.join("")}`;
+    })
+    .join("\n");
 }
 
 export { plot };

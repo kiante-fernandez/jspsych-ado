@@ -19,7 +19,10 @@
   border-radius: 10px;
   position: relative;
   vertical-align: middle;
-  transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    transform 0.12s;
 }
 .dd-option-card:hover {
   border-color: #4f46e5;
@@ -56,6 +59,10 @@
   letter-spacing: 0.05em;
 }
 @media (prefers-reduced-motion: reduce) {
-  .dd-option-card { transition: none; }
-  .dd-option-card:hover { transform: none; }
+  .dd-option-card {
+    transition: none;
+  }
+  .dd-option-card:hover {
+    transform: none;
+  }
 }

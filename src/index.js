@@ -27,9 +27,9 @@ const DEFAULT_STAN = { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 1
 const DEFAULT_N_TRIALS = 42;
 const DEFAULT_TOKEN = "1234";
 
-const MODEL_REGISTRY = new Map();  // name -> entry
-const TASK_REGISTRY = new Map();   // name -> task spec
-const _compileCache = new Map();   // `${server}\n${stanCode}` -> moduleUrl (per page session)
+const MODEL_REGISTRY = new Map(); // name -> entry
+const TASK_REGISTRY = new Map(); // name -> task spec
+const _compileCache = new Map(); // `${server}\n${stanCode}` -> moduleUrl (per page session)
 
 // ---------------------------------------------------------------------------
 // registerTask
@@ -60,8 +60,7 @@ function registerTask(name, spec) {
   const errors = problems.filter((p) => p.level === "error");
   if (errors.length) {
     throw new Error(
-      `registerTask("${name}"): invalid task:\n  - ` +
-      errors.map((e) => e.message).join("\n  - ")
+      `registerTask("${name}"): invalid task:\n  - ` + errors.map((e) => e.message).join("\n  - "),
     );
   }
   for (const w of problems.filter((p) => p.level === "warn")) {
@@ -116,9 +115,18 @@ function registerModel(name, spec) {
   if (!spec || typeof spec !== "object") {
     throw new Error(`registerModel("${name}"): spec must be an object.`);
   }
-  for (const k of ["design_grid", "presentation", "choices", "response_labels", "responseToOutcome", "task"]) {
+  for (const k of [
+    "design_grid",
+    "presentation",
+    "choices",
+    "response_labels",
+    "responseToOutcome",
+    "task",
+  ]) {
     if (spec[k] != null) {
-      throw new Error(`registerModel("${name}"): ${k} belongs on a task; register it with registerTask(...).`);
+      throw new Error(
+        `registerModel("${name}"): ${k} belongs on a task; register it with registerTask(...).`,
+      );
     }
   }
   if (spec.linkProb != null) {
@@ -127,33 +135,41 @@ function registerModel(name, spec) {
   const sources = ["stanCode", "stanUrl", "moduleUrl"].filter((k) => spec[k] != null);
   if (sources.length !== 1) {
     throw new Error(
-      `registerModel("${name}"): provide exactly one of stanCode | stanUrl | moduleUrl (got ${sources.length}).`
+      `registerModel("${name}"): provide exactly one of stanCode | stanUrl | moduleUrl (got ${sources.length}).`,
     );
   }
   for (const k of ["params", "designKeys", "responseSpace"]) {
-    if (spec[k] == null) throw new Error(`registerModel("${name}"): missing required field "${k}".`);
+    if (spec[k] == null)
+      throw new Error(`registerModel("${name}"): missing required field "${k}".`);
   }
   if (spec.stanData == null && spec.toStanData == null && spec.buildData == null) {
     throw new Error(
-      `registerModel("${name}"): provide a stanData map, or buildData([{...design,choice}]), or toStanData([{design,response}]).`
+      `registerModel("${name}"): provide a stanData map, or buildData([{...design,choice}]), or toStanData([{design,response}]).`,
     );
   }
   if (spec.stanData != null) {
     const stan_data_problems = validateStanDataSpec(spec.stanData);
     if (stan_data_problems.length) {
-      throw new Error(`registerModel("${name}"): invalid stanData:\n  - ` + stan_data_problems.join("\n  - "));
+      throw new Error(
+        `registerModel("${name}"): invalid stanData:\n  - ` + stan_data_problems.join("\n  - "),
+      );
     }
   }
   if (!Array.isArray(spec.params) || spec.params.length === 0) {
     throw new Error(`registerModel("${name}"): params must be a non-empty array.`);
   }
   if (!spec.params.every((p) => typeof p === "string" || (p && typeof p.name === "string"))) {
-    throw new Error(`registerModel("${name}"): params entries must be strings or objects with a name.`);
+    throw new Error(
+      `registerModel("${name}"): params entries must be strings or objects with a name.`,
+    );
   }
   if (!Array.isArray(spec.designKeys) || spec.designKeys.length === 0) {
     throw new Error(`registerModel("${name}"): designKeys must be a non-empty array.`);
   }
-  const response_space_error = validateResponseSpace(spec.responseSpace, `registerModel("${name}")`);
+  const response_space_error = validateResponseSpace(
+    spec.responseSpace,
+    `registerModel("${name}")`,
+  );
   if (response_space_error) {
     throw new Error(response_space_error);
   }
@@ -164,10 +180,14 @@ function registerModel(name, spec) {
     }
   } else {
     if (spec.responseSpace.type === "categorical" && typeof spec.responseProbs !== "function") {
-      throw new Error(`registerModel("${name}"): categorical models must provide responseProbs(design, draw).`);
+      throw new Error(
+        `registerModel("${name}"): categorical models must provide responseProbs(design, draw).`,
+      );
     }
     if (typeof spec.responseProb !== "function" && typeof spec.responseProbs !== "function") {
-      throw new Error(`registerModel("${name}"): provide responseProb(design, draw) or responseProbs(design, draw).`);
+      throw new Error(
+        `registerModel("${name}"): provide responseProb(design, draw) or responseProbs(design, draw).`,
+      );
     }
   }
   if (MODEL_REGISTRY.has(name)) {
@@ -183,7 +203,7 @@ function registerModel(name, spec) {
   if (!prior && spec.moduleUrl) {
     throw new Error(
       `registerModel("${name}"): no prior available. Pass an explicit \`prior\` when ` +
-      `registering with \`moduleUrl\`, because no Stan source is available to parse.`
+        `registering with \`moduleUrl\`, because no Stan source is available to parse.`,
     );
   }
   if (prior) {
@@ -222,7 +242,7 @@ async function prepareModels({ compileServer, authToken = DEFAULT_TOKEN } = {}) 
     const { spec } = entry;
     if (!compileServer) {
       throw new Error(
-        `prepareModels: model "${entry.name}" needs compilation, but no compileServer was provided.`
+        `prepareModels: model "${entry.name}" needs compilation, but no compileServer was provided.`,
       );
     }
 
@@ -230,7 +250,9 @@ async function prepareModels({ compileServer, authToken = DEFAULT_TOKEN } = {}) 
     if (!stanCode && spec.stanUrl) {
       const res = await fetch(spec.stanUrl);
       if (!res.ok) {
-        throw new Error(`prepareModels: could not fetch stanUrl for "${entry.name}" (${res.status}).`);
+        throw new Error(
+          `prepareModels: could not fetch stanUrl for "${entry.name}" (${res.status}).`,
+        );
       }
       stanCode = await res.text();
     }
@@ -287,8 +309,8 @@ function createTimeline(jsPsych, config = {}, run_context = {}) {
   if (!entry.moduleUrl) {
     throw new Error(
       `createTimeline: model "${config.model}" isn't compiled yet. ` +
-      `Call \`await jsPsychADO.prepareModels({ compileServer })\` first, ` +
-      `or register it with a precompiled \`moduleUrl\`.`
+        `Call \`await jsPsychADO.prepareModels({ compileServer })\` first, ` +
+        `or register it with a precompiled \`moduleUrl\`.`,
     );
   }
 
@@ -368,8 +390,9 @@ function buildAdapter(entry) {
   const adaptedBuildData = buildData
     ? buildData
     : toStanData
-    ? (trials) => toStanData(trials.map(({ choice, ...design }) => ({ design, response: choice })))
-    : makeStanDataBuilder({ stanData, responseSpace: spec.responseSpace });
+      ? (trials) =>
+          toStanData(trials.map(({ choice, ...design }) => ({ design, response: choice })))
+      : makeStanDataBuilder({ stanData, responseSpace: spec.responseSpace });
 
   return {
     id: name,
@@ -381,12 +404,14 @@ function buildAdapter(entry) {
     responseSpace: spec.responseSpace,
     buildData: adaptedBuildData,
     responseProb,
-    responseProbs: responseProbs || (typeof responseProb === "function"
-      ? (design, draw) => {
-          const p = responseProb(design, draw);
-          return [1 - p, p];
-        }
-      : null),
+    responseProbs:
+      responseProbs ||
+      (typeof responseProb === "function"
+        ? (design, draw) => {
+            const p = responseProb(design, draw);
+            return [1 - p, p];
+          }
+        : null),
     // Continuous-response adapter fields (undefined for discrete models). The
     // engine's createDesignScorer reads these when responseSpace.type === "continuous".
     responseDensity: spec.responseDensity,
@@ -408,7 +433,9 @@ function labelsToConfig(labels) {
 
 function requirePriorCoverage(prior, paramNames, context) {
   if (!prior || typeof prior !== "object") {
-    throw new Error(`${context}: prior must be an object mapping each parameter to a {dist, ...} spec.`);
+    throw new Error(
+      `${context}: prior must be an object mapping each parameter to a {dist, ...} spec.`,
+    );
   }
   for (const param of paramNames) {
     if (!prior[param] || typeof prior[param] !== "object") {
@@ -437,7 +464,7 @@ function registerModelPackage(model, overrides = {}) {
   if (Object.prototype.hasOwnProperty.call(overrides, "design_grid")) {
     throw new Error(
       `registerModelPackage("${name ?? "<model>"}"): design_grid belongs on a task; ` +
-      `register it with registerTask(...).`
+        `register it with registerTask(...).`,
     );
   }
   const { valid, problems } = validateModel(model);
@@ -445,7 +472,7 @@ function registerModelPackage(model, overrides = {}) {
   if (errors.length) {
     throw new Error(
       `registerModelPackage("${name ?? "<model>"}"): invalid model package:\n  - ` +
-      errors.map((e) => e.message).join("\n  - ")
+        errors.map((e) => e.message).join("\n  - "),
     );
   }
   for (const w of problems.filter((p) => p.level === "warn")) {

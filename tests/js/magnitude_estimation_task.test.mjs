@@ -11,7 +11,10 @@ test("magnitude_estimation task validates (continuous, no response_labels needed
 });
 
 test("design_grid enumerates to the magnitude axis", () => {
-  assert.deepEqual(enumerateDesigns(design_grid).map((d) => d.s), [10, 25, 50, 100, 250, 500, 1000]);
+  assert.deepEqual(
+    enumerateDesigns(design_grid).map((d) => d.s),
+    [10, 25, 50, 100, 250, 500, 1000],
+  );
 });
 
 test("responseToOutcome maps the raw slider estimate into the modeled log-response", () => {
@@ -43,6 +46,6 @@ test("getChoiceTrials yields exactly one response-collecting slider trial that r
 
 test("the task/model pair validates together (matching design keys + continuous space)", () => {
   assert.doesNotThrow(() =>
-    validateTaskModelPair(task, model, "magnitude_estimation", "magnitude_estimation")
+    validateTaskModelPair(task, model, "magnitude_estimation", "magnitude_estimation"),
   );
 });

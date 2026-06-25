@@ -46,20 +46,25 @@ function make3IFCDesigns({ standard_lengths, deltas, target_indices }) {
 function makeLineLengthStimulus(design) {
   let rows = "";
   for (let i = 0; i < LINE_KEYS.length; i++) {
-    rows += (
-      "<div class=\"ll-line-row\">" +
-        "<div class=\"ll-line-label\">" + response_labels[i] + "</div>" +
-        "<div class=\"ll-line-stage\">" +
-          "<div class=\"ll-line\" style=\"width: " + getLineLength(design, i) + "px;\"></div>" +
-        "</div>" +
-      "</div>"
-    );
+    rows +=
+      '<div class="ll-line-row">' +
+      '<div class="ll-line-label">' +
+      response_labels[i] +
+      "</div>" +
+      '<div class="ll-line-stage">' +
+      '<div class="ll-line" style="width: ' +
+      getLineLength(design, i) +
+      'px;"></div>' +
+      "</div>" +
+      "</div>";
   }
 
   return (
-    "<div class=\"ll-stimulus-wrap\">" +
-      "<div class=\"ll-line-list\">" + rows + "</div>" +
-      "<p class=\"ll-prompt\">Which line is longest?</p>" +
+    '<div class="ll-stimulus-wrap">' +
+    '<div class="ll-line-list">' +
+    rows +
+    "</div>" +
+    '<p class="ll-prompt">Which line is longest?</p>' +
     "</div>"
   );
 }
@@ -89,7 +94,8 @@ const presentation = {
   makeStimulus: makeLineLengthStimulus,
   button_html: makeChoiceButtonHtml,
   keymap: { a: 0, b: 1, c: 2 },
-  prompt: "<p style=\"margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;\">Press <strong>A</strong>, <strong>B</strong>, or <strong>C</strong></p>",
+  prompt:
+    '<p style="margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;">Press <strong>A</strong>, <strong>B</strong>, or <strong>C</strong></p>',
   describeDesign: describeDesign,
 };
 

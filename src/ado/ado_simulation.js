@@ -5,10 +5,7 @@
 // (simulateCategoricalChoice), continuous models via the adapter's responseSampler
 // (simulateContinuousResponse). Each demo wires the matching simulator for its model.
 
-import {
-  getResponseProbsFunction,
-  validateResponseProbs,
-} from "./mi_engine.js";
+import { getResponseProbsFunction, validateResponseProbs } from "./mi_engine.js";
 
 /**
  * @typedef {Object} DelayDiscountingDesign
@@ -40,8 +37,8 @@ function createSeededRng(seed) {
     state += 2147483646;
   }
 
-  return function() {
-    state = state * 16807 % 2147483647;
+  return function () {
+    state = (state * 16807) % 2147483647;
     return (state - 1) / 2147483646;
   };
 }
@@ -64,7 +61,10 @@ function responseLabelSlug(label, index) {
   if (label == null) {
     return String(index);
   }
-  const slug = String(label).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  const slug = String(label)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
   return slug || String(index);
 }
 
@@ -120,7 +120,7 @@ function simulateCategoricalChoice(design, simulation_config, rng, model, opts =
 function simulateContinuousResponse(design, simulation_config, rng, model) {
   if (typeof model.responseSampler !== "function") {
     throw new Error(
-      "simulateContinuousResponse: a continuous model must provide responseSampler(design, params, rng)."
+      "simulateContinuousResponse: a continuous model must provide responseSampler(design, params, rng).",
     );
   }
   const params = simulation_config.params;

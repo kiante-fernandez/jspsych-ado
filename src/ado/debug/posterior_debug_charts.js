@@ -36,7 +36,7 @@ function makeScale(param, posterior_display) {
   if (display.histogram_scale === "log10") {
     return {
       axis_label: label,
-      transform: value => value > 0 ? Math.log10(value) : NaN,
+      transform: (value) => (value > 0 ? Math.log10(value) : NaN),
       format_range: (min, max) =>
         `${label} ${formatEstimate(min)} to ${formatEstimate(max)} (${display.label || param} ${formatEstimate(10 ** min)} to ${formatEstimate(10 ** max)})`,
     };
@@ -44,7 +44,7 @@ function makeScale(param, posterior_display) {
 
   return {
     axis_label: label,
-    transform: value => value,
+    transform: (value) => value,
     format_range: (min, max) => `${label} ${formatEstimate(min)} to ${formatEstimate(max)}`,
   };
 }
@@ -124,7 +124,7 @@ function formatPosteriorDrawChart(draws, param, posterior_display = null, option
   const chart = asciichart.plot(histogram.counts, {
     height: options.height || DEFAULT_HEIGHT,
     min: 0,
-    format: value => String(Math.round(value)).padStart(5),
+    format: (value) => String(Math.round(value)).padStart(5),
   });
 
   return [
@@ -137,17 +137,14 @@ function formatPosteriorDrawChart(draws, param, posterior_display = null, option
 function formatPosteriorDrawCharts(draws, params = null, posterior_display = null, options = {}) {
   const chart_params = Array.isArray(params) ? params : inferPosteriorParams(draws);
   const charts = chart_params
-    .map(param => formatPosteriorDrawChart(draws, param, posterior_display, options))
+    .map((param) => formatPosteriorDrawChart(draws, param, posterior_display, options))
     .filter(Boolean);
 
   if (charts.length === 0) {
     return "";
   }
 
-  return [
-    "Posterior draw histograms (asciichart):",
-    ...charts,
-  ].join("\n\n");
+  return ["Posterior draw histograms (asciichart):", ...charts].join("\n\n");
 }
 
 export {

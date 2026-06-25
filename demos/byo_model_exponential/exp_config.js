@@ -35,7 +35,4 @@ const default_exp_simulation_config = {
   },
 };
 
-export {
-  default_exp_config,
-  default_exp_simulation_config,
-};
+export { default_exp_config, default_exp_simulation_config };

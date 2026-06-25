@@ -27,7 +27,11 @@ function getResponseCount(responseSpace) {
   if (responseSpace.type === "binary") {
     return 2;
   }
-  if (responseSpace.type === "categorical" && Number.isInteger(responseSpace.n_categories) && responseSpace.n_categories >= 2) {
+  if (
+    responseSpace.type === "categorical" &&
+    Number.isInteger(responseSpace.n_categories) &&
+    responseSpace.n_categories >= 2
+  ) {
     return responseSpace.n_categories;
   }
   return null;
@@ -48,7 +52,7 @@ function continuousModelProblems(model) {
   }
   if (typeof model.responseMoments !== "function" && model.responseSupport == null) {
     problems.push(
-      "continuous models need responseMoments(design, draw) => {mean, sd} or an explicit responseSupport for the integration support."
+      "continuous models need responseMoments(design, draw) => {mean, sd} or an explicit responseSupport for the integration support.",
     );
   }
   return problems;
@@ -89,7 +93,10 @@ function validateResponseSpace(responseSpace, context) {
     return null;
   }
   if (responseSpace.type === "continuous") {
-    if (responseSpace.intervals != null && (!Number.isInteger(responseSpace.intervals) || responseSpace.intervals < 2)) {
+    if (
+      responseSpace.intervals != null &&
+      (!Number.isInteger(responseSpace.intervals) || responseSpace.intervals < 2)
+    ) {
       return `${context}: continuous responseSpace intervals must be an integer >= 2.`;
     }
     return null;
@@ -142,9 +149,14 @@ function validateTaskModelPair(task, model, taskName, modelName) {
   const model_type = model.responseSpace && model.responseSpace.type;
   if (task_type !== model_type) {
     problems.push(`responseSpace mismatch: task has "${task_type}", model has "${model_type}"`);
-  } else if (!isContinuous(model.responseSpace) && getResponseCount(task.responseSpace) !== getResponseCount(model.responseSpace)) {
+  } else if (
+    !isContinuous(model.responseSpace) &&
+    getResponseCount(task.responseSpace) !== getResponseCount(model.responseSpace)
+  ) {
     // Category-count matching only applies to discrete responses; continuous has none.
-    problems.push(`responseSpace category count mismatch: task has ${getResponseCount(task.responseSpace)}, model has ${getResponseCount(model.responseSpace)}`);
+    problems.push(
+      `responseSpace category count mismatch: task has ${getResponseCount(task.responseSpace)}, model has ${getResponseCount(model.responseSpace)}`,
+    );
   }
 
   let sample_design = null;
@@ -159,8 +171,8 @@ function validateTaskModelPair(task, model, taskName, modelName) {
       designs.forEach((design, index) => {
         for (const key of required_keys) {
           if (!(key in design) && !seen_missing.has(key)) {
-              problems.push(`task design_grid row ${index} is missing design key "${key}"`);
-              seen_missing.add(key);
+            problems.push(`task design_grid row ${index} is missing design key "${key}"`);
+            seen_missing.add(key);
           }
         }
       });
@@ -180,10 +192,15 @@ function validateTaskModelPair(task, model, taskName, modelName) {
         }
       } else {
         const responseProbs = getResponseProbsFunction(model);
-        const probs = validateResponseProbs(responseProbs(sample_design, sample_draw), "response likelihood probe");
+        const probs = validateResponseProbs(
+          responseProbs(sample_design, sample_draw),
+          "response likelihood probe",
+        );
         const response_count = getResponseCount(model.responseSpace);
         if (probs.length !== response_count) {
-          problems.push(`response likelihood returned ${probs.length} probabilities; expected ${response_count}`);
+          problems.push(
+            `response likelihood returned ${probs.length} probabilities; expected ${response_count}`,
+          );
         }
       }
     } catch (e) {
@@ -207,8 +224,7 @@ function validateTaskModelPair(task, model, taskName, modelName) {
 
   if (problems.length) {
     throw new Error(
-      `model "${modelName}" is incompatible with task "${taskName}": ` +
-      problems.join("; ")
+      `model "${modelName}" is incompatible with task "${taskName}": ` + problems.join("; "),
     );
   }
 }
@@ -225,7 +241,10 @@ function validateTask(task) {
   const warn = (message) => problems.push({ level: "warn", message });
 
   if (!task || typeof task !== "object") {
-    return { valid: false, problems: [{ level: "error", message: "validateTask: task must be an object." }] };
+    return {
+      valid: false,
+      problems: [{ level: "error", message: "validateTask: task must be an object." }],
+    };
   }
   if (typeof task.id !== "string" || !task.id) err("`id` must be a non-empty string.");
   if (task.design_grid == null) err("`design_grid` is required.");
@@ -242,7 +261,11 @@ function validateTask(task) {
   }
 
   const presentation = task.presentation;
-  if (!presentation || (typeof presentation.getChoiceTrials !== "function" && typeof presentation.makeStimulus !== "function")) {
+  if (
+    !presentation ||
+    (typeof presentation.getChoiceTrials !== "function" &&
+      typeof presentation.makeStimulus !== "function")
+  ) {
     err("`presentation` must provide getChoiceTrials(ctx) or makeStimulus(design).");
   }
   // Continuous responses have no discrete labels; response_labels only applies to
@@ -294,7 +317,15 @@ function validateModel(model, opts = {}) {
   const warn = (message) => problems.push({ level: "warn", message });
 
   if (!model || typeof model !== "object") {
-    return { valid: false, problems: [{ level: "error", message: "validateModel: model must be an object (the model package default export)." }] };
+    return {
+      valid: false,
+      problems: [
+        {
+          level: "error",
+          message: "validateModel: model must be an object (the model package default export).",
+        },
+      ],
+    };
   }
 
   if (typeof model.id !== "string" || !model.id) err("`id` must be a non-empty string.");
@@ -304,14 +335,18 @@ function validateModel(model, opts = {}) {
     err("`params` must be a non-empty array of parameter-name strings.");
   }
   if (typeof model.moduleUrl !== "string" || !model.moduleUrl) {
-    err("`moduleUrl` must be the compiled module URL (e.g. new URL(\"./main.js\", import.meta.url).href).");
+    err(
+      '`moduleUrl` must be the compiled module URL (e.g. new URL("./main.js", import.meta.url).href).',
+    );
   }
   // Not required (static-served deployments work without it), but a bundler
   // (Vite/webpack) hashes main.wasm, so without wasmUrl the model 404s its wasm
   // at runtime in a bundled build (#57).
   if (typeof model.wasmUrl !== "string" || !model.wasmUrl) {
-    warn("`wasmUrl` is not set (e.g. new URL(\"./main.wasm\", import.meta.url).href). " +
-      "Static-served deployments still work, but bundlers (Vite/webpack) hash main.wasm, so the model would 404 its wasm at runtime (#57).");
+    warn(
+      '`wasmUrl` is not set (e.g. new URL("./main.wasm", import.meta.url).href). ' +
+        "Static-served deployments still work, but bundlers (Vite/webpack) hash main.wasm, so the model would 404 its wasm at runtime (#57).",
+    );
   }
   if (!Array.isArray(model.designKeys) || model.designKeys.length === 0) {
     err("`designKeys` must be a non-empty array.");
@@ -337,13 +372,25 @@ function validateModel(model, opts = {}) {
     if (typeof model.responseProbs !== "function") {
       err("categorical models must provide `responseProbs(design, draw)`.");
     }
-  } else if (typeof model.responseProb !== "function" && typeof model.responseProbs !== "function") {
+  } else if (
+    typeof model.responseProb !== "function" &&
+    typeof model.responseProbs !== "function"
+  ) {
     err("`responseProb(design, draw)` or `responseProbs(design, draw)` must be a function.");
   }
   if (typeof model.choiceProbLL === "function") {
-    err("`choiceProbLL` has been replaced by `responseProb` for binary models or `responseProbs` for categorical models.");
+    err(
+      "`choiceProbLL` has been replaced by `responseProb` for binary models or `responseProbs` for categorical models.",
+    );
   }
-  for (const k of ["design_grid", "presentation", "choices", "response_labels", "responseToOutcome", "task"]) {
+  for (const k of [
+    "design_grid",
+    "presentation",
+    "choices",
+    "response_labels",
+    "responseToOutcome",
+    "task",
+  ]) {
     if (model[k] != null) {
       err(`\`${k}\` belongs on a task package, not a model package.`);
     }
@@ -354,18 +401,28 @@ function validateModel(model, opts = {}) {
     for (const p of params) {
       const spec = model.prior[p];
       if (!spec || typeof spec !== "object") {
-        err(`prior for "${p}" is missing; the engine samples the prior to choose the first design.`);
+        err(
+          `prior for "${p}" is missing; the engine samples the prior to choose the first design.`,
+        );
       } else if (!SAMPLEABLE_PRIOR_DISTS.has(spec.dist)) {
-        warn(`prior for "${p}" uses dist "${spec.dist}", which the first-design sampler can't draw ` +
-          `(supports ${[...SAMPLEABLE_PRIOR_DISTS].join(", ")}). The first design would fail.`);
+        warn(
+          `prior for "${p}" uses dist "${spec.dist}", which the first-design sampler can't draw ` +
+            `(supports ${[...SAMPLEABLE_PRIOR_DISTS].join(", ")}). The first design would fail.`,
+        );
       }
     }
   } else if (params) {
-    err("`prior` must be an object mapping each parameter to a {dist, ...} spec matching the .stan priors.");
+    err(
+      "`prior` must be an object mapping each parameter to a {dist, ...} spec matching the .stan priors.",
+    );
   }
 
   // Optional runtime probe.
-  if (opts.sampleDesign && isContinuous(model.responseSpace) && typeof model.responseDensity === "function") {
+  if (
+    opts.sampleDesign &&
+    isContinuous(model.responseSpace) &&
+    typeof model.responseDensity === "function"
+  ) {
     try {
       const probe_error = probeContinuousDensity(model, opts.sampleDesign, opts.sampleDraw || {});
       if (probe_error) {
@@ -374,13 +431,21 @@ function validateModel(model, opts = {}) {
     } catch (e) {
       err(`response density threw on the sample design: ${String((e && e.message) || e)}.`);
     }
-  } else if (opts.sampleDesign && (typeof model.responseProb === "function" || typeof model.responseProbs === "function")) {
+  } else if (
+    opts.sampleDesign &&
+    (typeof model.responseProb === "function" || typeof model.responseProbs === "function")
+  ) {
     try {
       const responseProbs = getResponseProbsFunction(model);
-      const probs = validateResponseProbs(responseProbs(opts.sampleDesign, opts.sampleDraw || {}), "validateModel");
+      const probs = validateResponseProbs(
+        responseProbs(opts.sampleDesign, opts.sampleDraw || {}),
+        "validateModel",
+      );
       const response_count = getResponseCount(model.responseSpace);
       if (response_count != null && probs.length !== response_count) {
-        err(`response likelihood returned ${probs.length} probabilities; expected ${response_count}.`);
+        err(
+          `response likelihood returned ${probs.length} probabilities; expected ${response_count}.`,
+        );
       }
     } catch (e) {
       err(`response likelihood threw on the sample design: ${String((e && e.message) || e)}.`);

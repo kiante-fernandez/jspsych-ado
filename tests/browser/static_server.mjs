@@ -30,11 +30,19 @@ export function startStaticServer(root, port = 0) {
       let urlPath = decodeURIComponent(new URL(req.url, "http://x").pathname);
       if (urlPath.endsWith("/")) urlPath += "index.html";
       const filePath = normalize(join(root, urlPath));
-      if (!filePath.startsWith(root)) { res.writeHead(403).end("forbidden"); return; }
+      if (!filePath.startsWith(root)) {
+        res.writeHead(403).end("forbidden");
+        return;
+      }
       const info = await stat(filePath);
-      if (info.isDirectory()) { res.writeHead(302, { Location: urlPath + "/" }).end(); return; }
+      if (info.isDirectory()) {
+        res.writeHead(302, { Location: urlPath + "/" }).end();
+        return;
+      }
       const body = await readFile(filePath);
-      res.writeHead(200, { "Content-Type": TYPES[extname(filePath)] || "application/octet-stream" });
+      res.writeHead(200, {
+        "Content-Type": TYPES[extname(filePath)] || "application/octet-stream",
+      });
       res.end(body);
     } catch {
       res.writeHead(404, { "Content-Type": "text/plain" }).end("404");

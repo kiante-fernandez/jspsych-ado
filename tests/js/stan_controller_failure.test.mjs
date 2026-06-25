@@ -15,7 +15,11 @@ function makeModel() {
     prior: { x: { dist: "normal", mean: 0, sd: 1 } },
     moduleUrl: "/fake.js",
     wasmUrl: "/fake.wasm",
-    buildData: (trials) => ({ N: trials.length, x: trials.map(() => 0), y: trials.map((t) => t.choice) }),
+    buildData: (trials) => ({
+      N: trials.length,
+      x: trials.map(() => 0),
+      y: trials.map((t) => t.choice),
+    }),
     responseProb: () => 0.5,
   };
 }
@@ -37,29 +41,43 @@ function installScriptedWorker(handler) {
     }
     terminate() {}
   };
-  return () => { globalThis.Worker = original; };
+  return () => {
+    globalThis.Worker = original;
+  };
 }
 
 const baseArgs = (model) => ({ model, grid_design: { d: [0, 1] }, n_trials: 2 });
 
 test("construction rejects num_chains < 1", () => {
   assert.throws(
-    () => createStanAdoController({ ...baseArgs(makeModel()), stan: { num_chains: 0, num_warmup: 0, num_samples: 1 } }),
-    /num_chains>=1/
+    () =>
+      createStanAdoController({
+        ...baseArgs(makeModel()),
+        stan: { num_chains: 0, num_warmup: 0, num_samples: 1 },
+      }),
+    /num_chains>=1/,
   );
 });
 
 test("construction rejects num_warmup < 0", () => {
   assert.throws(
-    () => createStanAdoController({ ...baseArgs(makeModel()), stan: { num_chains: 1, num_warmup: -1, num_samples: 1 } }),
-    /num_warmup>=0/
+    () =>
+      createStanAdoController({
+        ...baseArgs(makeModel()),
+        stan: { num_chains: 1, num_warmup: -1, num_samples: 1 },
+      }),
+    /num_warmup>=0/,
   );
 });
 
 test("construction rejects num_samples < 1", () => {
   assert.throws(
-    () => createStanAdoController({ ...baseArgs(makeModel()), stan: { num_chains: 1, num_warmup: 0, num_samples: 0 } }),
-    /num_samples>=1/
+    () =>
+      createStanAdoController({
+        ...baseArgs(makeModel()),
+        stan: { num_chains: 1, num_warmup: 0, num_samples: 0 },
+      }),
+    /num_samples>=1/,
   );
 });
 
@@ -96,7 +114,7 @@ test("empty draw columns reject update() with 'no posterior draws'", async () =>
     await controller.start();
     await assert.rejects(
       controller.update({ ado_design: { d: 0 }, choice: 0 }),
-      /Stan returned no posterior draws/
+      /Stan returned no posterior draws/,
     );
   } finally {
     restore();

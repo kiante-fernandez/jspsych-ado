@@ -32,7 +32,9 @@ function validateStanDataSpec(stanData) {
     return ["`stanData` must be an object mapping Stan data-block variable names to sources."];
   }
   if ("N" in stanData) {
-    problems.push("`stanData` must not declare `N`; it is injected automatically from trials.length.");
+    problems.push(
+      "`stanData` must not declare `N`; it is injected automatically from trials.length.",
+    );
   }
   for (const [stanVar, src] of Object.entries(stanData)) {
     if (typeof src === "string") {
@@ -42,7 +44,9 @@ function validateStanDataSpec(stanData) {
         problems.push(`stanData["${stanVar}"] object form must have a string \`from\`.`);
       }
     } else {
-      problems.push(`stanData["${stanVar}"] must be a trial-key string, "response", or { from, index1? }.`);
+      problems.push(
+        `stanData["${stanVar}"] must be a trial-key string, "response", or { from, index1? }.`,
+      );
     }
   }
   return problems;

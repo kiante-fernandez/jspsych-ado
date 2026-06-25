@@ -9,7 +9,7 @@ Worker/WASM + bundler smokes) and only publishes if they pass and the tag matche
 ## One-time setup
 
 - An `NPM_TOKEN` repository secret must exist (an npm **Automation** access token):
-  *Settings → Secrets and variables → Actions → New repository secret*.
+  _Settings → Secrets and variables → Actions → New repository secret_.
 
 ## Cut a release
 

@@ -91,7 +91,15 @@ const exponentialModel = {
     tau: { dist: "lognormal", meanlog: 0, sdlog: 1 },
   },
   posterior_display: {
-    k: { label: "k", y_min: 0, y_max: 0.2, lower_bound: 0, min_y_span: 0.05, histogram_scale: "log10", histogram_label: "log10(k)" },
+    k: {
+      label: "k",
+      y_min: 0,
+      y_max: 0.2,
+      lower_bound: 0,
+      min_y_span: 0.05,
+      histogram_scale: "log10",
+      histogram_label: "log10(k)",
+    },
     tau: { label: "τ", y_min: 0, y_max: 5, lower_bound: 0, min_y_span: 0.5 },
   },
   moduleUrl: new URL("./main.js", import.meta.url).href,
@@ -105,11 +113,4 @@ const exponentialModel = {
 };
 
 export default exponentialModel;
-export {
-  responseProb,
-  getExponentialValue,
-  logistic,
-  stanData,
-  responseProbs,
-  subjectiveValues,
-};
+export { responseProb, getExponentialValue, logistic, stanData, responseProbs, subjectiveValues };

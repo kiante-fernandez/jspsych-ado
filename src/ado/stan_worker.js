@@ -12,7 +12,7 @@ let modelPromise = null;
 
 // The controller issues one request at a time and matches replies by type, so no
 // message ids are needed.
-self.onmessage = async function(event) {
+self.onmessage = async function (event) {
   const message = event.data;
 
   try {
@@ -32,8 +32,12 @@ self.onmessage = async function(event) {
       const overrides = message.wasmUrl
         ? { locateFile: (path) => (path.endsWith(".wasm") ? message.wasmUrl : path) }
         : {};
-      modelPromise = import(/* @vite-ignore */ /* webpackIgnore: true */ message.moduleUrl).then(module =>
-        StanModel.load((options) => module.default({ ...options, ...overrides }), () => {})
+      modelPromise = import(/* @vite-ignore */ /* webpackIgnore: true */ message.moduleUrl).then(
+        (module) =>
+          StanModel.load(
+            (options) => module.default({ ...options, ...overrides }),
+            () => {},
+          ),
       );
       await modelPromise;
       self.postMessage({ type: "ready" });

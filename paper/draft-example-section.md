@@ -9,8 +9,8 @@ LL. ADO presents the offer expected to be most informative about the discount
 rate `k` and the choice-consistency parameter `τ`, so both are recovered in
 fewer trials than a fixed offer schedule.
 
-An experiment is a thin consumer of the library: it registers a *task* (a design
-grid plus a stimulus renderer) and a *model* (a Stan likelihood plus a matching
+An experiment is a thin consumer of the library: it registers a _task_ (a design
+grid plus a stimulus renderer) and a _model_ (a Stan likelihood plus a matching
 JavaScript link function), then asks the façade for an adaptive timeline.
 
 ```js
@@ -19,21 +19,21 @@ import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
 import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
 import { default_dd_config } from "./experiments/delay_discounting/dd_config.js";
 
-const jsPsych = initJsPsych();                 // jsPsych v8, initialised as usual
+const jsPsych = initJsPsych(); // jsPsych v8, initialised as usual
 
 jsPsychADO.registerTask(delayDiscountingTask.id, delayDiscountingTask);
 jsPsychADO.registerModelPackage(hyperbolicModel, {
-  stan:     default_dd_config.stan,            // sampler settings
-  n_trials: default_dd_config.n_trials,        // number of adaptive trials
+  stan: default_dd_config.stan, // sampler settings
+  n_trials: default_dd_config.n_trials, // number of adaptive trials
 });
 
 const ado = jsPsychADO.createTimeline(jsPsych, {
-  task:  delayDiscountingTask.id,
+  task: delayDiscountingTask.id,
   model: hyperbolicModel.id,
-  design_strategy: "ado",                      // "random" = same-grid baseline
+  design_strategy: "ado", // "random" = same-grid baseline
 });
 
-jsPsych.run([ /* instructions, */ ...ado /* , debrief */ ]);
+jsPsych.run([/* instructions, */ ...ado /* , debrief */]);
 ```
 
 The two registered pieces are all a researcher writes for a new experiment. A
@@ -56,9 +56,8 @@ const delayDiscountingTask = {
 // Model package: the JS link mirrors the Stan likelihood exactly.
 // hyperbolic.stan:  y ~ bernoulli_logit(tau * (v_ll - v_ss));
 function responseProb(design, { k, tau }) {
-  const V = (r, t) => r / (1 + k * t);              // V = R / (1 + k·t)
-  return logistic(tau * (V(design.r_ll, design.t_ll)
-                       - V(design.r_ss, design.t_ss)));
+  const V = (r, t) => r / (1 + k * t); // V = R / (1 + k·t)
+  return logistic(tau * (V(design.r_ll, design.t_ll) - V(design.r_ss, design.t_ss)));
 }
 ```
 

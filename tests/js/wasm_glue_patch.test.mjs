@@ -23,11 +23,11 @@ for (const { name, dir, file } of models) {
     const src = await readFile(file, "utf8");
     assert.ok(
       src.includes(PATCHED),
-      `${name}/main.js is missing the locateFile patch — run \`node scripts/patch-wasm-glue.mjs\` after (re)compiling.`
+      `${name}/main.js is missing the locateFile patch — run \`node scripts/patch-wasm-glue.mjs\` after (re)compiling.`,
     );
     assert.ok(
       !src.includes(UNPATCHED),
-      `${name}/main.js still has the unpatched locateFile form — run \`node scripts/patch-wasm-glue.mjs\`.`
+      `${name}/main.js still has the unpatched locateFile form — run \`node scripts/patch-wasm-glue.mjs\`.`,
     );
   });
 
@@ -35,11 +35,11 @@ for (const { name, dir, file } of models) {
     const model = (await import(pathToFileURL(join(dir, "model.js")).href)).default;
     assert.ok(
       model && typeof model === "object",
-      `${name}/model.js must have a default export (the model package object).`
+      `${name}/model.js must have a default export (the model package object).`,
     );
     assert.ok(
       typeof model.wasmUrl === "string" && model.wasmUrl.endsWith("main.wasm"),
-      `${name}/model.js must expose \`wasmUrl: new URL("./main.wasm", import.meta.url).href\` so bundlers emit the wasm.`
+      `${name}/model.js must expose \`wasmUrl: new URL("./main.wasm", import.meta.url).href\` so bundlers emit the wasm.`,
     );
   });
 }
