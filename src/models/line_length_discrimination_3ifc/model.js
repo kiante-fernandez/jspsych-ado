@@ -1,6 +1,16 @@
+// Model adapter for the 3IFC line-length discrimination task (categorical, 3 responses).
+// JS mirror of line_length_discrimination_3ifc.stan: a multinomial-logit (softmax) over the
+// three intervals, where each interval's evidence is its length advantage over the standard
+// scaled by `sensitivity`, plus per-position biases (bias_b, bias_c; A is the reference at
+// 0). responseProbs is the SINGLE SOURCE OF TRUTH for the likelihood — shared by the MI
+// engine and the simulator, and it must match the .stan model. LINE_LENGTH_SCALE (px per
+// evidence unit) normalizes pixel-length differences so `sensitivity` is on a sane scale.
+// Paired with the line_length_discrimination task package.
+
 const LINE_LENGTH_SCALE = 20;
 const LINE_KEYS = ["line_length_a", "line_length_b", "line_length_c"];
 
+/** Numerically-stable softmax (subtract the max before exp) -> a probability vector. */
 function softmax(values) {
   const max_value = Math.max(...values);
   const exp_values = values.map((value) => Math.exp(value - max_value));
@@ -8,6 +18,11 @@ function softmax(values) {
   return exp_values.map((value) => value / total);
 }
 
+/**
+ * Pixel length of interval `index` (0=A, 1=B, 2=C): the explicit line_length_<a|b|c> key if
+ * present, else derived as standard_length plus delta for the target interval. Mirrors the
+ * task's getLineLength so the likelihood sees the same lengths the participant did.
+ */
 function getLineLength(design, index) {
   const key = LINE_KEYS[index];
   if (typeof design[key] === "number") {

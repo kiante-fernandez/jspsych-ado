@@ -1,3 +1,9 @@
+// The live, in-browser adaptive controller: the only implementation of the start/update
+// controller contract that does real inference. It accumulates trials, samples the Stan
+// posterior off the main thread (via the Web Worker client), summarizes the draws, and
+// picks the MI-optimal next design (or a random one under the recovery baseline). The
+// timeline and the mock controller share its contract; nothing here is task-specific.
+
 import {
   createDesignScorer,
   enumerateDesigns,

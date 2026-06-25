@@ -90,6 +90,11 @@ function probeContinuousDensity(model, design, draw) {
   return null;
 }
 
+/**
+ * Validate a responseSpace shape. Returns an error string (prefixed with `context`) or null
+ * if valid. Accepts {type:"binary"}, {type:"categorical", n_categories>=2}, and
+ * {type:"continuous"} (optional integer intervals>=2).
+ */
 function validateResponseSpace(responseSpace, context) {
   if (!responseSpace || typeof responseSpace.type !== "string") {
     return `${context}: responseSpace.type must be a string.`;
@@ -147,6 +152,19 @@ function findUndefined(value, path = "data") {
   return null;
 }
 
+/**
+ * Validate that a registered task and model are compatible, THROWING if not (this is the
+ * gate createTimeline calls before building). Checks: the model's designKeys are all present
+ * in the task; the responseSpaces match (type + category count for discrete); a prior-draw
+ * likelihood probe returns the right number of probabilities (or a finite density for
+ * continuous); and a buildData probe returns a Stan data object with no undefined fields.
+ *
+ * @param {Object} task - Registered task spec.
+ * @param {Object} model - Built model adapter.
+ * @param {string} taskName - Task name (for the error message).
+ * @param {string} modelName - Model name (for the error message).
+ * @throws {Error} If the pair is incompatible (message lists every problem found).
+ */
 function validateTaskModelPair(task, model, taskName, modelName) {
   const problems = [];
   const task_keys = new Set(task.designKeys || []);

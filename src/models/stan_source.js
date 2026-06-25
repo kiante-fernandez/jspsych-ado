@@ -7,7 +7,16 @@
 // reach either function. Error messages name the façade caller (registerModel /
 // prepareModels) since that is where these run from.
 
-// POST a Stan source string to the compile server and return the main.js URL.
+/**
+ * POST a Stan source string to a stan-playground compile server and return the compiled
+ * main.js URL (the worker dynamic-imports it). Throws with an actionable message on a
+ * network/CORS failure or a non-OK / model_id-less response.
+ *
+ * @param {string} stanCode - Full .stan source.
+ * @param {string} server - Compile server base URL.
+ * @param {string} authToken - Bearer token for the compile endpoint.
+ * @returns {Promise<string>} The `${server}/download/${model_id}/main.js` URL.
+ */
 async function compileToModuleUrl(stanCode, server, authToken) {
   const base = server.replace(/\/+$/, "");
 
@@ -37,7 +46,16 @@ async function compileToModuleUrl(stanCode, server, authToken) {
   return `${base}/download/${model_id}/main.js`;
 }
 
-// Derive the engine's JS prior {param:{dist,...}} from the Stan source.
+/**
+ * Derive the engine's JS prior from a .stan source by reading each parameter's sampling
+ * statement. Supports normal, lognormal, and normal + <lower=0> (-> half-normal); throws
+ * on a missing/unsupported/non-numeric prior so the model fails fast at registration.
+ *
+ * @param {Array<string|{name: string, lower?: number}>} paramSpecs - Parameters to parse.
+ * @param {string} stanCode - Full .stan source.
+ * @returns {Object} prior map: { [param]: { dist, ... } } (lognormal{meanlog,sdlog} |
+ *   normal{mean,sd} | halfnormal{sd} ).
+ */
 function parseStanPriors(stanCode, paramSpecs) {
   const prior = {};
 

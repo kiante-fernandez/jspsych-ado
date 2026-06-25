@@ -2,8 +2,13 @@
 // contract-identical: both emit the same null-metric shape for non-MI designs and walk
 // the same testlet/stopping budget.
 
-// Per-design "no mutual information available" metrics, for designs chosen without an
-// MI scan (the mock controller, and the Stan controller's random-design baseline).
+/**
+ * Per-design "no mutual information available" metrics, for designs chosen without an MI
+ * scan (the mock controller, and the Stan controller's random-design baseline).
+ *
+ * @param {number} count - Number of designs in the testlet.
+ * @returns {Array<{mutual_info: null}>} An array of length `count`.
+ */
 function nullDesignMetrics(count) {
   const metrics = [];
   for (let i = 0; i < count; i++) {

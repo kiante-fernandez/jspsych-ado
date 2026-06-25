@@ -28,6 +28,15 @@ function resolvePlugin(plugins, key) {
   return typeof globalThis !== "undefined" ? globalThis[PLUGIN_GLOBALS[key]] : undefined;
 }
 
+/**
+ * Resolve a jsPsych plugin class or throw a clear, actionable error. Used to fail fast
+ * (with bundler vs static-page guidance) instead of a cryptic "type is undefined" deep in
+ * jsPsych when a required plugin wasn't injected or loaded.
+ *
+ * @param {?Object} plugins - Injected plugin classes (from createTimeline opts), or null.
+ * @param {string} key - A PLUGIN_GLOBALS key (e.g. "htmlButtonResponse").
+ * @returns {Function} The resolved jsPsych plugin class.
+ */
 function requirePlugin(plugins, key) {
   const plugin = resolvePlugin(plugins, key);
   if (!plugin) {
@@ -62,6 +71,14 @@ function makeChoiceSimulationOptions(run_context, design) {
   };
 }
 
+/**
+ * Copy the pending simulated participant's sim_* audit fields onto the finished trial row
+ * (the second half of the simulation hook: makeChoiceSimulationOptions stashed them on
+ * run_context). Only copies sim_* keys that aren't already set, then clears the slot.
+ *
+ * @param {Object} data - The finished jsPsych data row, mutated in place.
+ * @param {Object} run_context - Holds pending_simulation_data from the choice's simulation.
+ */
 function copySimulationAuditFields(data, run_context) {
   const simulation_data = run_context.pending_simulation_data;
   if (!simulation_data) {
