@@ -104,7 +104,7 @@ server and no Python).
   fallback for static pages.
 - Per-task CSS, committed compiled models, and the vendored tinystan sampler.
 
-[Unreleased]: https://github.com/githubpsyche/jspsych-ado/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/githubpsyche/jspsych-ado/compare/v0.1.1...v0.2.0
-[0.1.1]: https://github.com/githubpsyche/jspsych-ado/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/githubpsyche/jspsych-ado/releases/tag/v0.1.0
+[Unreleased]: https://github.com/kiante-fernandez/jspsych-ado/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kiante-fernandez/jspsych-ado/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/kiante-fernandez/jspsych-ado/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/kiante-fernandez/jspsych-ado/releases/tag/v0.1.0

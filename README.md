@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/githubpsyche/jspsych-ado/main/jspsych-ado.png" alt="jspsych-ado — the adaptive loop: model → design → stimulus → response → update" width="180">
+  <img src="https://raw.githubusercontent.com/kiante-fernandez/jspsych-ado/main/jspsych-ado.png" alt="jspsych-ado — the adaptive loop: model → design → stimulus → response → update" width="180">
 </p>
 
 <h1 align="center">jspsych-ado</h1>
@@ -10,10 +10,10 @@
   <a href="https://www.npmjs.com/package/jspsych-ado">
     <img src="https://img.shields.io/npm/v/jspsych-ado.svg" alt="npm version">
   </a>
-  <a href="https://github.com/githubpsyche/jspsych-ado/actions/workflows/ci.yml">
-    <img src="https://github.com/githubpsyche/jspsych-ado/actions/workflows/ci.yml/badge.svg" alt="CI">
+  <a href="https://github.com/kiante-fernandez/jspsych-ado/actions/workflows/ci.yml">
+    <img src="https://github.com/kiante-fernandez/jspsych-ado/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
-  <a href="https://github.com/githubpsyche/jspsych-ado/blob/main/LICENSE">
+  <a href="https://github.com/kiante-fernandez/jspsych-ado/blob/main/LICENSE">
     <img src="https://img.shields.io/npm/l/jspsych-ado.svg" alt="MIT license">
   </a>
 </p>
@@ -168,7 +168,7 @@ Omit `stopping` (or `eig_fraction`) for a fixed-length run of `n_trials`. Each r
 records `ado_should_stop` and `ado_stop_reason` (`"eig_fraction"` or `"max_trials"`);
 the EIG that drove the decision is the grid-max MI in `ado_max_mutual_info`. A
 complementary precision-target rule is tracked in
-[#101](https://github.com/githubpsyche/jspsych-ado/issues/101).
+[#101](https://github.com/kiante-fernandez/jspsych-ado/issues/101).
 
 ### Debug traces
 

@@ -8,7 +8,7 @@ All types of contributions are welcome: from reporting bugs and improving docume
 
 ### Reporting Bugs
 
-Before creating a bug report, please check the [Issues](https://github.com/githubpsyche/jspsych-ado/issues) tab to see if the problem has already been reported.
+Before creating a bug report, please check the [Issues](https://github.com/kiante-fernandez/jspsych-ado/issues) tab to see if the problem has already been reported.
 
 When filing an issue, please include:
 

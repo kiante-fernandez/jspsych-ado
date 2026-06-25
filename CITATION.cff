@@ -22,7 +22,7 @@ authors:
   - given-names: Kianté
     family-names: Fernandez
     orcid: "https://orcid.org/0000-0002-8493-880X"
-repository-code: "https://github.com/githubpsyche/jspsych-ado"
+repository-code: "https://github.com/kiante-fernandez/jspsych-ado"
 license: MIT
 version: 0.2.0
 keywords:

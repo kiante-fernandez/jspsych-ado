@@ -61,7 +61,7 @@ representative at an online or offline event.
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement by opening a
 confidential issue on the project's
-[issue tracker](https://github.com/githubpsyche/jspsych-ado/issues) or by
+[issue tracker](https://github.com/kiante-fernandez/jspsych-ado/issues) or by
 contacting a project maintainer directly. All complaints will be reviewed and
 investigated promptly and fairly.
 

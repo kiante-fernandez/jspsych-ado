@@ -13,13 +13,13 @@
     "bayesian",
     "psychophysics"
   ],
-  "homepage": "https://github.com/githubpsyche/jspsych-ado#readme",
+  "homepage": "https://github.com/kiante-fernandez/jspsych-ado#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/githubpsyche/jspsych-ado.git"
+    "url": "git+https://github.com/kiante-fernandez/jspsych-ado.git"
   },
   "bugs": {
-    "url": "https://github.com/githubpsyche/jspsych-ado/issues"
+    "url": "https://github.com/kiante-fernandez/jspsych-ado/issues"
   },
   "main": "./src/index.js",
   "exports": {
