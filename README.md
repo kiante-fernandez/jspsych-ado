@@ -32,18 +32,21 @@ and no Python**: everything runs client-side, so an experiment deploys as static
 
 You bring a **task** (design grid + presentation) and a **model** (Stan likelihood + a
 small JS adapter); `jsPsychADO` checks that they are compatible and turns them into an
-adaptive jsPsych timeline. Or start from one of the bundled task/model packages, ready
-to run out of the box.
+adaptive jsPsych timeline. Responses can be **binary, finite-categorical, or continuous** —
+the engine enumerates outcomes for discrete responses and integrates the predictive density
+for continuous ones. Or start from one of the bundled task/model packages, ready to run out
+of the box.
 
 ## Status
 
 🚧 **Early release — published on npm as [`jspsych-ado`](https://www.npmjs.com/package/jspsych-ado)**
 (`npm install jspsych-ado`; current version in the badge above). The in-browser engine
-and three bundled examples — binary delay discounting, 3IFC categorical line-length, and
-Halberda-style dot comparison — work and are covered by CI (unit tests + real headless
-Worker/WASM smokes + a bundler build smoke). The committed WASM is bundler-safe and the
-package builds under Vite and webpack 5 (see [Using with a bundler](#using-with-a-bundler)).
-Still pre-1.0: the task/model/controller extension APIs may change before 1.0.
+and four bundled examples — binary delay discounting, Halberda-style dot comparison, 3IFC
+categorical line-length, and continuous magnitude estimation (Stevens' power law) — work
+and are covered by CI (unit tests + real headless Worker/WASM smokes + a bundler build
+smoke). The committed WASM is bundler-safe and the package builds under Vite and webpack 5
+(see [Using with a bundler](#using-with-a-bundler)). Still pre-1.0: the
+task/model/controller extension APIs may change before 1.0.
 
 ## Quick start
 
@@ -57,7 +60,7 @@ demos/halberda_dot_comparison/index.html?controller=stan&strategy=ado&debug=1
 demos/magnitude_estimation/index.html?controller=stan&strategy=ado&debug=1
 ```
 
-See **[`demos/README.md`](demos/README.md)** for a guided tour: the three demos
+See **[`demos/README.md`](demos/README.md)** for a guided tour: the four demos
 above are "drop-in" examples (packaged task + packaged model), and two more show how
 to **bring your own task** (`demos/byo_task_money_choice/`) or **bring your own model**
 (`demos/byo_model_exponential/`). It also explains the **`tasks/` (packaged, shipped)
@@ -277,7 +280,7 @@ fully self-contained / offline build, install jsPsych from npm and bundle it (se
 
 Browser/Web-Worker only — the WASM is built with emscripten `-sENVIRONMENT=web,worker`.
 Targets the jsPsych 7-era plugin API (`jspsych` is a `peerDependency`, `>=7`); the
-in-repo demos pin jsPsych 7.3.4 + plugins from a CDN.
+in-repo demos pin jsPsych 7.3.4 + plugins from a CDN. Development and CI use Node `>=20`.
 
 ## Citation
 
