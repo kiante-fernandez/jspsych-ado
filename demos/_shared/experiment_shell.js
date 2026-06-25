@@ -1,6 +1,6 @@
-import { jsPsychADO } from "../index.js";
-import { createAdoTimeline } from "./ado_timeline.js";
-import { createMockAdoController } from "../controllers/mock_ado_controller.js";
+import { jsPsychADO } from "../../src/index.js";
+import { createAdoTimeline } from "../../src/ado/ado_timeline.js";
+import { createMockAdoController } from "../../src/controllers/mock_ado_controller.js";
 
 const VALID_CONTROLLERS = ["mock", "stan"];
 const VALID_STRATEGIES = ["ado", "random"];

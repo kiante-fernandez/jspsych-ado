@@ -11,7 +11,7 @@ model, and uses the shared experiment shell to build the adaptive timeline:
 import {
   createExperimentAdoTimeline,
   registerAdoExperiment,
-} from "./src/ado/experiment_shell.js";
+} from "./demos/_shared/experiment_shell.js";
 import hyperbolicModel from "./src/models/hyperbolic/model.js";
 import delayDiscountingTask from "./src/tasks/delay_discounting/task.js";
 

@@ -64,7 +64,7 @@ The library is organized around a single coupling point — the **controller con
 ### Two ways to build the timeline
 
 - **Library consumers** call `jsPsychADO.createTimeline(jsPsych, { task, model, ... })` — the documented public API.
-- **The demo pages** call `createExperimentAdoTimeline(...)` from `src/ado/experiment_shell.js`, which wraps `createTimeline` and adds URL-driven controller/strategy switching and simulation. That shell is demo scaffolding — your own experiment should call `createTimeline` directly.
+- **The demo pages** call `createExperimentAdoTimeline(...)` from `demos/_shared/experiment_shell.js`, which wraps `createTimeline` and adds URL-driven controller/strategy switching and simulation. That shell is demo scaffolding — your own experiment should call `createTimeline` directly.
 
 ---
 

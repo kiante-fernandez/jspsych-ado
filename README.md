@@ -196,8 +196,8 @@ controller is the entire abstraction; the timeline never sees Stan or WASM.
 - **`src/ado/mi_engine.js`** — model-agnostic mutual-information design selection.
 - **`src/ado/stan_worker.js`** — one generic Web Worker that runs NUTS off the main thread.
 - **`src/ado/ado_timeline.js`** — the generic, stimulus-agnostic timeline.
-- **`src/ado/experiment_shell.js`** — shared experiment-page run-mode and simulation wiring.
 - **`src/controllers/`** — the in-browser Stan controller and the mock controller.
+- **`demos/_shared/experiment_shell.js`** — demo-only experiment-page run-mode and simulation wiring (not part of the published package).
 - **`src/index.js`** — the `jsPsychADO` façade.
 
 ## Repository layout

@@ -1,4 +1,4 @@
-import { getRunSelection as getSharedRunSelection } from "../../src/ado/experiment_shell.js";
+import { getRunSelection as getSharedRunSelection } from "../_shared/experiment_shell.js";
 
 /**
  * Resolve delay-discounting URLs, retaining `ado=` as a legacy alias.

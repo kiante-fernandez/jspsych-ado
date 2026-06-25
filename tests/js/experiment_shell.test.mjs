@@ -7,7 +7,7 @@ import {
   makeEndSimulationData,
   makeInstructionSimulationData,
   resolveSimulationConfig,
-} from "../../src/ado/experiment_shell.js";
+} from "../../demos/_shared/experiment_shell.js";
 
 const DEFAULT_SIMULATION_CONFIG = {
   seed: 123,
