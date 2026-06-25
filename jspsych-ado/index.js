@@ -974,14 +974,16 @@ export {
   registerModelPackage,
   validateTask,
   validateModel,
-  validateTaskModelPair,
   prepareModels,
   createTimeline,
-  parseStanPriors,
-  labelsToConfig,
-  buildAdapter,
   arange,
   linspace,
   makeStanDataBuilder,
+  // Advanced / internal — exported for power users and the test suite, NOT part of the
+  // stable jsPsychADO façade; may change without a major version bump while pre-1.0.
+  validateTaskModelPair,
+  parseStanPriors,
+  buildAdapter,
+  labelsToConfig,
 };
 export default jsPsychADO;

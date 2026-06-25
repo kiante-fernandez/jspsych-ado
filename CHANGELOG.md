@@ -9,6 +9,13 @@ task/model/controller extension APIs.
 
 ## [Unreleased]
 
+### Changed
+- Narrowed the package `exports` to the supported public surface: the façade (`.`),
+  `./models/*`, `./tasks/*`, and `./package.json`. The `./ado/*`, `./controllers/*`,
+  and `./core/tinystan/*` subpaths are no longer importable — they were internal
+  engine, controller, and vendored-runtime files, never a supported public API
+  (resolves #86). Internal relative imports inside the package are unaffected.
+
 ## [0.2.0] - 2026-06-18
 
 ### Added

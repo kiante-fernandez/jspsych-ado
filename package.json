@@ -24,11 +24,8 @@
   "main": "./jspsych-ado/index.js",
   "exports": {
     ".": "./jspsych-ado/index.js",
-    "./ado/*": "./jspsych-ado/ado/*",
-    "./controllers/*": "./jspsych-ado/controllers/*",
     "./models/*": "./jspsych-ado/models/*",
     "./tasks/*": "./jspsych-ado/tasks/*",
-    "./core/tinystan/*": "./core/tinystan/*",
     "./package.json": "./package.json"
   },
   "sideEffects": [
