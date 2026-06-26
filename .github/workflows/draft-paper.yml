@@ -14,8 +14,9 @@ on:
       - ".github/workflows/draft-paper.yml"
   workflow_dispatch:
 
+# Least privilege by default; only the paper job needs write (to push the regenerated paper.md).
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: paper-${{ github.ref }}
@@ -24,6 +25,8 @@ concurrency:
 jobs:
   paper:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the regenerated paper.md back to the branch
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
