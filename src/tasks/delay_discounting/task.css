@@ -1,0 +1,68 @@
+/* Delay-discounting task styles. The task's makeStimulus/button_html emit these
+ * class names; a consumer must load this stylesheet for the option cards to render
+ * as designed. With a bundler: import "jspsych-ado/tasks/delay_discounting/task.css".
+ * On a static page: <link rel="stylesheet" href=".../tasks/delay_discounting/task.css">. */
+.dd-option-card {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 220px;
+  min-height: 140px;
+  padding: 1.75rem 1.25rem;
+  background: #ffffff;
+  border: 2px solid #d1d5db;
+  border-radius: 10px;
+  position: relative;
+  vertical-align: middle;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    transform 0.12s;
+}
+.dd-option-card:hover {
+  border-color: #4f46e5;
+  box-shadow: 0 6px 20px -6px rgba(0, 0, 0, 0.22);
+  transform: translateY(-2px);
+}
+.dd-option-card:focus-visible {
+  outline: 3px solid #818cf8;
+  outline-offset: 2px;
+}
+.dd-option-card[disabled] {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+.dd-amount {
+  font-family: ui-monospace, "Courier New", monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #111827;
+}
+.dd-when {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+.dd-key-hint {
+  position: absolute;
+  top: 6px;
+  right: 9px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #9ca3af;
+  letter-spacing: 0.05em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dd-option-card {
+    transition: none;
+  }
+  .dd-option-card:hover {
+    transform: none;
+  }
+}

@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "jspsych-ado: In-browser adaptive design optimization for jsPsych experiments"
+abstract: "A reusable library that runs Adaptive Design Optimization (ADO) entirely in the browser for jsPsych experiments: after each response a Stan model compiled to WebAssembly infers the posterior over model parameters and the next stimulus is chosen by maximizing expected information gain. No server and no Python."
+type: software
+authors:
+  - given-names: Xiaohong
+    family-names: Cai
+    orcid: "https://orcid.org/0000-0002-8210-8386"
+  - given-names: Jordan
+    family-names: Gunn
+    orcid: "https://orcid.org/0009-0005-1024-6113"
+  - given-names: Brendan
+    family-names: Lam
+    orcid: "https://orcid.org/0000-0001-9309-8497"
+  - given-names: Ludan
+    family-names: Yuan
+    orcid: "https://orcid.org/0009-0006-3578-8020"
+  - given-names: Ying
+    family-names: Zeng
+    orcid: "https://orcid.org/0009-0008-3743-372X"
+  - given-names: Kianté
+    family-names: Fernandez
+    orcid: "https://orcid.org/0000-0002-8493-880X"
+repository-code: "https://github.com/kiante-fernandez/jspsych-ado"
+license: MIT
+version: 0.2.0
+keywords:
+  - jsPsych
+  - adaptive design optimization
+  - Stan
+  - WebAssembly
+  - Bayesian inference
+  - psychophysics

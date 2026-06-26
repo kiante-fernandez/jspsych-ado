@@ -19,3 +19,6 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+
+# Local Claude Code working notes — intentionally untracked (LaTeX aux is ignored in paper/.gitignore).
+CLAUDE.md

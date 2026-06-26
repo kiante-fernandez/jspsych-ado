@@ -8,15 +8,23 @@ on:
     branches: [main]
   pull_request:
 
+# Least-privilege default for all jobs; none of them write to the repo.
+permissions:
+  contents: read
+
 jobs:
   unit:
-    name: Unit tests + Stan recovery smoke
+    name: Unit tests + Stan recovery smoke (node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Exercise the engines floor (>=20) and the current LTS-ish latest.
+        node: ["20.x", "22.x"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22'
+          node-version: ${{ matrix.node }}
       - name: Unit tests (MI engine, model adapter, facade)
         run: node --test tests/js/*.test.mjs
       - name: Stan recovery smoke - hyperbolic (real WASM via fetch shim)
@@ -31,18 +39,36 @@ jobs:
         run: node tests/js/line_length_3ifc_recovery.smoke.mjs
       - name: Recovery smoke - exponential discounting (real WASM, demo model)
         run: node tests/js/exponential_recovery.smoke.mjs
+      - name: Recovery smoke - magnitude estimation (continuous, real WASM, #114)
+        run: node tests/js/magnitude_estimation_recovery.smoke.mjs
       - name: Likelihood parity smoke (JS responseProb == compiled Stan, all models)
         run: node tests/js/likelihood_parity.smoke.mjs
+
+  static:
+    name: Format + type checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "npm"
+      - name: Install dev deps (prettier + typescript)
+        run: npm ci
+      - name: Check formatting (prettier --check .)
+        run: npm run format:check
+      - name: Type-check public declarations (tsc --noEmit)
+        run: npm run typecheck
 
   browser:
     name: Headless Worker/WASM smoke
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
       - name: Install dev deps (puppeteer + Chromium)
         run: npm ci
       - name: Headless browser smokes (delay discounting + line length)
@@ -52,11 +78,11 @@ jobs:
     name: Bundler smoke (npm pack -> Vite build -> headless WASM)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
       - name: Install dev deps (puppeteer + Chromium)
         run: npm ci
       # Packs the library, installs the tarball into tests/bundler/fixture, runs a

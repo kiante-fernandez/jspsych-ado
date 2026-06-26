@@ -56,11 +56,14 @@ demos/byo_model_exponential/index.html?controller=stan&strategy=ado&debug=1
 
 ```js
 import delayDiscountingTask from ".../tasks/delay_discounting/task.js"; // packaged task
-import exponentialModel from "./model.js";                              // your model, in this folder
+import exponentialModel from "./model.js"; // your model, in this folder
 
 jsPsychADO.registerTask(delayDiscountingTask.id, delayDiscountingTask);
 jsPsychADO.registerModelPackage(exponentialModel, { stan, n_trials: 42 });
-const ado = jsPsychADO.createTimeline(jsPsych, { task: delayDiscountingTask.id, model: exponentialModel.id });
+const ado = jsPsychADO.createTimeline(jsPsych, {
+  task: delayDiscountingTask.id,
+  model: exponentialModel.id,
+});
 ```
 
 (For runnability this page goes through the shared demo "experiment shell" — URL

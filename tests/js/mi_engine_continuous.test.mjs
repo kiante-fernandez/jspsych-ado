@@ -8,8 +8,8 @@ import {
   mutualInfoContinuous,
   realizedInformationGainContinuous,
   samplePriorDraws,
-} from "../../jspsych-ado/ado/mi_engine.js";
-import { createSeededRng } from "../../jspsych-ado/ado/ado_simulation.js";
+} from "../../src/ado/mi_engine.js";
+import { createSeededRng } from "../../src/ado/ado_simulation.js";
 
 // Continuous EIG by 1-D quadrature. The correctness anchor is the linear-Gaussian
 // model y ~ Normal(theta * x, sigma) with a Gaussian prior theta ~ Normal(m, v),
@@ -40,7 +40,7 @@ test("mutualInfoContinuous: quadrature of a single Gaussian recovers its differe
   });
   assert.ok(
     Math.abs(marginal - gaussianEntropy(sigma)) < 1e-3,
-    `marginal entropy ${marginal} vs ${gaussianEntropy(sigma)}`
+    `marginal entropy ${marginal} vs ${gaussianEntropy(sigma)}`,
   );
 });
 
@@ -64,7 +64,7 @@ test("mutualInfoContinuous: linear-Gaussian EIG matches the analytic 0.5 ln(1 + 
   const draws = samplePriorDraws(
     { theta: { dist: "normal", mean: priorMean, sd: Math.sqrt(priorVar) } },
     12000,
-    createSeededRng(20240619)
+    createSeededRng(20240619),
   );
   const density = (d, draw, y) => normalPdf(y, draw.theta * d.x, sigma);
   const conditionalEntropy = () => gaussianEntropy(sigma);
@@ -73,7 +73,11 @@ test("mutualInfoContinuous: linear-Gaussian EIG matches the analytic 0.5 ln(1 + 
     const predMean = priorMean * x;
     const predSd = Math.sqrt(x * x * priorVar + sigma * sigma);
     const support = [predMean - 8 * predSd, predMean + 8 * predSd];
-    const eig = mutualInfoContinuous({ x }, draws, density, { support, intervals: 400, conditionalEntropy });
+    const eig = mutualInfoContinuous({ x }, draws, density, {
+      support,
+      intervals: 400,
+      conditionalEntropy,
+    });
     const analytic = 0.5 * Math.log(1 + (x * x * priorVar) / (sigma * sigma));
     assert.ok(Math.abs(eig - analytic) < 0.03, `x=${x}: EIG ${eig} vs analytic ${analytic}`);
   }
@@ -85,7 +89,7 @@ test("mutualInfoContinuous: EIG increases with a more informative (larger |x|) d
   const draws = samplePriorDraws(
     { theta: { dist: "normal", mean: 0, sd: Math.sqrt(priorVar) } },
     6000,
-    createSeededRng(7)
+    createSeededRng(7),
   );
   const density = (d, draw, y) => normalPdf(y, draw.theta * d.x, sigma);
   const conditionalEntropy = () => gaussianEntropy(sigma);
@@ -103,25 +107,32 @@ test("mutualInfoContinuous: EIG increases with a more informative (larger |x|) d
 test("mutualInfoContinuous: requires a finite support", () => {
   assert.throws(
     () => mutualInfoContinuous({ x: 1 }, [{ theta: 0 }], () => 1, {}),
-    /finite integration support/
+    /finite integration support/,
   );
 });
 
 test("mutualInfoContinuous: rejects a negative or non-finite density", () => {
   assert.throws(
     () => mutualInfoContinuous({ x: 1 }, [{ theta: 0 }], () => -1, { support: [-1, 1] }),
-    /finite and nonnegative/
+    /finite and nonnegative/,
   );
 });
 
 test("mutualInfoContinuous: empty draws give 0", () => {
-  assert.equal(mutualInfoContinuous({ x: 1 }, [], () => 1, { support: [-1, 1] }), 0);
+  assert.equal(
+    mutualInfoContinuous({ x: 1 }, [], () => 1, { support: [-1, 1] }),
+    0,
+  );
 });
 
 test("mutualInfoContinuous: densityFactory fast path equals the plain densityFn path", () => {
   const sigma = 1.0;
   const priorVar = 4.0;
-  const draws = samplePriorDraws({ theta: { dist: "normal", mean: 0, sd: Math.sqrt(priorVar) } }, 3000, createSeededRng(99));
+  const draws = samplePriorDraws(
+    { theta: { dist: "normal", mean: 0, sd: Math.sqrt(priorVar) } },
+    3000,
+    createSeededRng(99),
+  );
   const density = (d, draw, y) => normalPdf(y, draw.theta * d.x, sigma);
   // Hoisted-constants evaluator: same density, mean + normalizer computed once per draw.
   const densityFactory = (d, draw) => {
@@ -136,8 +147,17 @@ test("mutualInfoContinuous: densityFactory fast path equals the plain densityFn 
   const x = 1.5;
   const predSd = Math.sqrt(x * x * priorVar + sigma * sigma);
   const support = [-8 * predSd, 8 * predSd];
-  const plain = mutualInfoContinuous({ x }, draws, density, { support, intervals: 400, conditionalEntropy });
-  const fast = mutualInfoContinuous({ x }, draws, density, { support, intervals: 400, conditionalEntropy, densityFactory });
+  const plain = mutualInfoContinuous({ x }, draws, density, {
+    support,
+    intervals: 400,
+    conditionalEntropy,
+  });
+  const fast = mutualInfoContinuous({ x }, draws, density, {
+    support,
+    intervals: 400,
+    conditionalEntropy,
+    densityFactory,
+  });
   assert.ok(Math.abs(plain - fast) < 1e-9, `factory MI ${fast} vs plain ${plain}`);
 });
 
@@ -155,7 +175,11 @@ function linearGaussianModel() {
 
 test("createDesignScorer: continuous scorer wires auto-support + density through to mutualInfoContinuous", () => {
   const model = linearGaussianModel();
-  const draws = samplePriorDraws({ theta: { dist: "normal", mean: 0, sd: 2 } }, 4000, createSeededRng(11));
+  const draws = samplePriorDraws(
+    { theta: { dist: "normal", mean: 0, sd: 2 } },
+    4000,
+    createSeededRng(11),
+  );
   const scorer = createDesignScorer(model);
   const design = { x: 1.5 };
 
@@ -166,12 +190,19 @@ test("createDesignScorer: continuous scorer wires auto-support + density through
     support,
     conditionalEntropy: model.conditionalEntropy,
   });
-  assert.ok(Math.abs(scorer.mutualInfo(design, draws) - direct) < 1e-9, "scorer MI must match the direct call");
+  assert.ok(
+    Math.abs(scorer.mutualInfo(design, draws) - direct) < 1e-9,
+    "scorer MI must match the direct call",
+  );
 });
 
 test("createDesignScorer: continuous selection picks the most informative design", () => {
   const model = linearGaussianModel();
-  const draws = samplePriorDraws({ theta: { dist: "normal", mean: 0, sd: 2 } }, 4000, createSeededRng(3));
+  const draws = samplePriorDraws(
+    { theta: { dist: "normal", mean: 0, sd: 2 } },
+    4000,
+    createSeededRng(3),
+  );
   const scorer = createDesignScorer(model);
   const picks = scorer.selectOptimalDesigns([{ x: 0.2 }, { x: 1 }, { x: 3 }], draws, 1);
   assert.equal(picks.length, 1);
@@ -181,7 +212,11 @@ test("createDesignScorer: continuous selection picks the most informative design
 
 test("createDesignScorer: continuous realized gain is positive for an observed response", () => {
   const model = linearGaussianModel();
-  const draws = samplePriorDraws({ theta: { dist: "normal", mean: 0, sd: 2 } }, 2000, createSeededRng(5));
+  const draws = samplePriorDraws(
+    { theta: { dist: "normal", mean: 0, sd: 2 } },
+    2000,
+    createSeededRng(5),
+  );
   const scorer = createDesignScorer(model);
   const gain = scorer.realizedInformationGain({ x: 2 }, draws, 3.4);
   assert.ok(Number.isFinite(gain) && gain > 0, `expected a positive finite gain, got ${gain}`);
@@ -193,7 +228,11 @@ test("createDesignScorer: discrete models still route to the discrete path uncha
     responseSpace: { type: "binary" },
     responseProb: (d, draw) => logistic(draw.beta * d.x),
   };
-  const draws = samplePriorDraws({ beta: { dist: "normal", mean: 0, sd: 1 } }, 1500, createSeededRng(9));
+  const draws = samplePriorDraws(
+    { beta: { dist: "normal", mean: 0, sd: 1 } },
+    1500,
+    createSeededRng(9),
+  );
   const scorer = createDesignScorer(model);
   const design = { x: 1.2 };
   const direct = mutualInfo(design, draws, (d, draw) => model.responseProb(d, draw));
@@ -201,21 +240,31 @@ test("createDesignScorer: discrete models still route to the discrete path uncha
 });
 
 test("createDesignScorer: continuous model without responseDensity throws", () => {
-  assert.throws(() => createDesignScorer({ responseSpace: { type: "continuous" } }), /responseDensity/);
+  assert.throws(
+    () => createDesignScorer({ responseSpace: { type: "continuous" } }),
+    /responseDensity/,
+  );
 });
 
 test("createDesignScorer: continuous model without support or moments throws", () => {
   assert.throws(
     () => createDesignScorer({ responseSpace: { type: "continuous" }, responseDensity: () => 1 }),
-    /responseSupport.*responseMoments|automatic support/s
+    /responseSupport.*responseMoments|automatic support/s,
   );
 });
 
 test("createDesignScorer: continuous testlet batching (count > 1) is rejected", () => {
   const model = linearGaussianModel();
-  const draws = samplePriorDraws({ theta: { dist: "normal", mean: 0, sd: 1 } }, 100, createSeededRng(1));
+  const draws = samplePriorDraws(
+    { theta: { dist: "normal", mean: 0, sd: 1 } },
+    100,
+    createSeededRng(1),
+  );
   const scorer = createDesignScorer(model);
-  assert.throws(() => scorer.selectOptimalDesigns([{ x: 1 }, { x: 2 }], draws, 2), /testlet batching/);
+  assert.throws(
+    () => scorer.selectOptimalDesigns([{ x: 1 }, { x: 2 }], draws, 2),
+    /testlet batching/,
+  );
 });
 
 test("makeContinuousSupportResolver: explicit [lo, hi] and function forms are honored", () => {
@@ -228,6 +277,6 @@ test("makeContinuousSupportResolver: explicit [lo, hi] and function forms are ho
 test("realizedInformationGainContinuous: rejects a non-finite response", () => {
   assert.throws(
     () => realizedInformationGainContinuous({ x: 1 }, [{ theta: 0 }], NaN, () => 1),
-    /finite number/
+    /finite number/,
   );
 });

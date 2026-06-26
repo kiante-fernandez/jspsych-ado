@@ -3,7 +3,7 @@
  *
  * Task-owned pieces such as the numerosity-pair design list, canvas
  * presentation, key mapping, and correct/incorrect response coding live in
- * jspsych-ado/tasks/halberda_dot_comparison/task.js. This file holds controller
+ * src/tasks/halberda_dot_comparison/task.js. This file holds controller
  * and run settings for the experiment page.
  */
 const default_halberda_config = {
@@ -33,7 +33,4 @@ const default_halberda_simulation_config = {
   },
 };
 
-export {
-  default_halberda_config,
-  default_halberda_simulation_config,
-};
+export { default_halberda_config, default_halberda_simulation_config };

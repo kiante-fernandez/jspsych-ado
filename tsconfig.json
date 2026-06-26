@@ -1,0 +1,13 @@
+{
+  "//": "Type-checks the hand-written public declarations only (`npm run typecheck`). The library itself is plain ESM JavaScript with no TypeScript build step.",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": []
+  },
+  "files": ["src/index.d.ts", "tests/types/api.test-d.ts"]
+}

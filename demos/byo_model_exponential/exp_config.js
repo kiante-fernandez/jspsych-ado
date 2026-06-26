@@ -5,7 +5,7 @@
  * but fits the exponential-discounting model instead of the hyperbolic one. The
  * only conceptual change is the model — see this folder's README for how that model
  * was authored. Task-owned pieces (grid, presentation, response coding) come from
- * jspsych-ado/tasks/delay_discounting/.
+ * src/tasks/delay_discounting/.
  */
 const default_exp_config = {
   n_trials: 42,
@@ -35,7 +35,4 @@ const default_exp_simulation_config = {
   },
 };
 
-export {
-  default_exp_config,
-  default_exp_simulation_config,
-};
+export { default_exp_config, default_exp_simulation_config };

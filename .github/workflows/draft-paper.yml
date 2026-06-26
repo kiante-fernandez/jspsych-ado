@@ -10,8 +10,8 @@ name: Build paper (LaTeX -> PDF + Markdown)
 on:
   push:
     paths:
-      - 'paper/**'
-      - '.github/workflows/draft-paper.yml'
+      - "paper/**"
+      - ".github/workflows/draft-paper.yml"
   workflow_dispatch:
 
 permissions:
@@ -26,10 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Compile paper.tex -> PDF
-        uses: xu-cheng/latex-action@v3
+        uses: xu-cheng/latex-action@e2f99d4b3685b0da93f97e1b86ad8fab81105098 # v3
         with:
           working_directory: paper
           root_file: paper.tex
@@ -53,7 +53,7 @@ jobs:
           fi
 
       - name: Upload PDF
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: paper
           path: paper/paper.pdf

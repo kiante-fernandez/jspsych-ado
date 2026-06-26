@@ -5,12 +5,15 @@ import {
   buildHistogram,
   inferPosteriorParams,
   formatPosteriorDrawCharts,
-} from "../../jspsych-ado/ado/debug/posterior_debug_charts.js";
+} from "../../src/ado/debug/posterior_debug_charts.js";
 
 test("buildHistogram preserves the number of finite values", () => {
   const histogram = buildHistogram([1, 2, 2, 4, Number.NaN], 4);
   assert.equal(histogram.n, 4);
-  assert.equal(histogram.counts.reduce((sum, count) => sum + count, 0), 4);
+  assert.equal(
+    histogram.counts.reduce((sum, count) => sum + count, 0),
+    4,
+  );
   assert.equal(histogram.min, 1);
   assert.equal(histogram.max, 4);
 });
@@ -37,7 +40,10 @@ test("formatPosteriorDrawCharts uses model display metadata for histogram scales
     tau: { label: "τ" },
   };
 
-  const output = formatPosteriorDrawCharts(draws, ["k", "tau", "alpha"], posterior_display, { bins: 4, height: 3 });
+  const output = formatPosteriorDrawCharts(draws, ["k", "tau", "alpha"], posterior_display, {
+    bins: 4,
+    height: 3,
+  });
 
   assert.match(output, /Posterior draw histograms \(asciichart\):/);
   assert.match(output, /k \(log10\(k\); n=5\)/);
@@ -50,10 +56,15 @@ test("formatPosteriorDrawCharts uses model display metadata for histogram scales
 });
 
 test("formatPosteriorDrawCharts infers parameter names when no list is provided", () => {
-  const output = formatPosteriorDrawCharts([
-    { drift: 0.1, threshold: 1.0 },
-    { drift: 0.2, threshold: 1.2 },
-  ], null, null, { bins: 4, height: 3 });
+  const output = formatPosteriorDrawCharts(
+    [
+      { drift: 0.1, threshold: 1.0 },
+      { drift: 0.2, threshold: 1.2 },
+    ],
+    null,
+    null,
+    { bins: 4, height: 3 },
+  );
 
   assert.match(output, /drift \(drift; n=2\)/);
   assert.match(output, /threshold \(threshold; n=2\)/);

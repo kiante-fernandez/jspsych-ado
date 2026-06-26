@@ -6,11 +6,14 @@ import model, {
   responseProbs,
   getHyperbolicValue,
   logistic,
-} from "../../jspsych-ado/models/hyperbolic/model.js";
-import { makeStanDataBuilder } from "../../jspsych-ado/ado/stan_data.js";
+} from "../../src/models/hyperbolic/model.js";
+import { makeStanDataBuilder } from "../../src/ado/stan_data.js";
 
 // The model declares a stanData map; the framework generates buildData from it.
-const buildData = makeStanDataBuilder({ stanData: model.stanData, responseSpace: model.responseSpace });
+const buildData = makeStanDataBuilder({
+  stanData: model.stanData,
+  responseSpace: model.responseSpace,
+});
 
 test("logistic basics", () => {
   assert.ok(Math.abs(logistic(0) - 0.5) < 1e-12);
@@ -46,9 +49,12 @@ test("changing k: more discounting (larger k) lowers P(LL) when LL is the delaye
   // tau small enough that the logistic doesn't saturate, so the monotonic drop in
   // P(LL) as k grows across several orders of magnitude is actually visible.
   const ks = [0.0001, 0.001, 0.01, 0.1, 1];
-  const probs = ks.map(k => responseProb(design, { k, tau: 0.005 }));
+  const probs = ks.map((k) => responseProb(design, { k, tau: 0.005 }));
   for (let i = 1; i < probs.length; i++) {
-    assert.ok(probs[i] < probs[i - 1], `P(LL) should fall as k grows: k=${ks[i]} gave ${probs[i]} >= ${probs[i - 1]}`);
+    assert.ok(
+      probs[i] < probs[i - 1],
+      `P(LL) should fall as k grows: k=${ks[i]} gave ${probs[i]} >= ${probs[i - 1]}`,
+    );
   }
 });
 
@@ -59,13 +65,19 @@ test("changing tau: higher tau makes choices more deterministic (P(LL) -> 0/1)",
   const ll_pref = { t_ss: 0, t_ll: 52, r_ss: 500, r_ll: 800 };
   const ll_low = responseProb(ll_pref, { k: 0.005, tau: 0.002 });
   const ll_high = responseProb(ll_pref, { k: 0.005, tau: 0.01 });
-  assert.ok(ll_high > ll_low && ll_low > 0.5, `LL-preferred: tau up should raise P(LL): ${ll_low} -> ${ll_high}`);
+  assert.ok(
+    ll_high > ll_low && ll_low > 0.5,
+    `LL-preferred: tau up should raise P(LL): ${ll_low} -> ${ll_high}`,
+  );
 
   // SS preferred (v_ss > v_ll): raising tau pushes P(LL) further below 0.5.
   const ss_pref = { t_ss: 0, t_ll: 52, r_ss: 700, r_ll: 800 };
   const ss_low = responseProb(ss_pref, { k: 0.02, tau: 0.002 });
   const ss_high = responseProb(ss_pref, { k: 0.02, tau: 0.01 });
-  assert.ok(ss_high < ss_low && ss_low < 0.5, `SS-preferred: tau up should lower P(LL): ${ss_low} -> ${ss_high}`);
+  assert.ok(
+    ss_high < ss_low && ss_low < 0.5,
+    `SS-preferred: tau up should lower P(LL): ${ss_low} -> ${ss_high}`,
+  );
 });
 
 test("changing tau: tau -> 0 makes choices random (P(LL) -> 0.5)", () => {

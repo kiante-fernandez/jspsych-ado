@@ -4,15 +4,18 @@ import assert from "node:assert/strict";
 import {
   default as model,
   responseProbs,
-} from "../../jspsych-ado/models/line_length_discrimination_3ifc/model.js";
+} from "../../src/models/line_length_discrimination_3ifc/model.js";
 import {
   default as task,
   make3IFCDesign,
-} from "../../jspsych-ado/tasks/line_length_discrimination/task.js";
-import { makeStanDataBuilder } from "../../jspsych-ado/ado/stan_data.js";
+} from "../../src/tasks/line_length_discrimination/task.js";
+import { makeStanDataBuilder } from "../../src/ado/stan_data.js";
 
 // The model declares a stanData map; the framework generates buildData from it.
-const buildData = makeStanDataBuilder({ stanData: model.stanData, responseSpace: model.responseSpace });
+const buildData = makeStanDataBuilder({
+  stanData: model.stanData,
+  responseSpace: model.responseSpace,
+});
 
 const params = {
   sensitivity: 2.2,
@@ -48,7 +51,10 @@ test("responseProbs favors the target line and strengthens with larger delta", (
 
   assert.ok(target_a_small[0] > target_a_small[1], "target A should be preferred over B");
   assert.ok(target_a_small[0] > target_a_small[2], "target A should be preferred over C");
-  assert.ok(target_a_large[0] > target_a_small[0], "larger delta should increase target choice probability");
+  assert.ok(
+    target_a_large[0] > target_a_small[0],
+    "larger delta should increase target choice probability",
+  );
   assert.ok(target_b[1] > target_b[0], "target B should be preferred over A");
   assert.ok(target_c[2] > target_c[0], "target C should be preferred over A");
 });

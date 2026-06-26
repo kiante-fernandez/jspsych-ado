@@ -7,7 +7,7 @@
         <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
         <script src="https://unpkg.com/@jspsych/plugin-call-function@1.1.3"></script>
         <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.4"></script>
-        <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+        <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
         <style>
           /* Styling for the from-scratch task's plain buttons (defined by THIS task,
              not the package — contrast with the packaged delay-discounting cards). */
@@ -52,10 +52,10 @@
         // ↓↓↓ the task you wrote (vs the packaged tasks/delay_discounting/) ↓↓↓
         import moneyChoiceTask from "./demos/byo_task_money_choice/task.js";
         // ↑↑↑                                                              ↑↑↑
-        import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js"; // packaged model, reused
+        import hyperbolicModel from "./src/models/hyperbolic/model.js"; // packaged model, reused
 
-        import { makeDebriefStimulus, removeAdoDebugPanels } from "./jspsych-ado/ado/ado_timeline.js";
-        import { createSeededRng, simulateDelayDiscountingChoice } from "./jspsych-ado/ado/ado_simulation.js";
+        import { makeDebriefStimulus, removeAdoDebugPanels } from "./src/ado/debug/posterior_convergence_charts.js";
+        import { createSeededRng, simulateCategoricalChoice } from "./src/ado/ado_simulation.js";
         import {
             addAdoDataProperties,
             createExperimentAdoTimeline,
@@ -65,7 +65,7 @@
             makeInstructionSimulationData,
             registerAdoExperiment,
             resolveSimulationConfig,
-        } from "./jspsych-ado/ado/experiment_shell.js";
+        } from "./demos/_shared/experiment_shell.js";
         import { default_mc_config, default_mc_simulation_config } from "./demos/byo_task_money_choice/mc_config.js";
 
         const task = moneyChoiceTask;
@@ -76,7 +76,7 @@
         const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
         const session_id = "local-" + Date.now();
 
-        const run_settings = getExperimentRunSettings(url_params, { allow_legacy_ado: true });
+        const run_settings = getExperimentRunSettings(url_params);
         const simulation_config = resolveSimulationConfig(
             default_mc_simulation_config,
             run_config,
@@ -89,7 +89,7 @@
             model: model,
             session_id: session_id,
             simulate_choice: function(design) {
-                return simulateDelayDiscountingChoice(design, simulation_config, simulation_rng, model);
+                return simulateCategoricalChoice(design, simulation_config, simulation_rng, model);
             },
         });
 

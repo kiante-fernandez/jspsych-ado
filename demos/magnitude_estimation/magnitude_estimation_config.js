@@ -3,7 +3,7 @@
  *
  * Task-owned pieces (the magnitude design grid, the canvas-slider presentation, and
  * the response coding that logs the slider estimate) live in
- * jspsych-ado/tasks/magnitude_estimation/task.js. This file holds controller and run
+ * src/tasks/magnitude_estimation/task.js. This file holds controller and run
  * settings for the experiment page.
  */
 const default_magnitude_estimation_config = {
@@ -36,7 +36,4 @@ const default_magnitude_estimation_simulation_config = {
   },
 };
 
-export {
-  default_magnitude_estimation_config,
-  default_magnitude_estimation_simulation_config,
-};
+export { default_magnitude_estimation_config, default_magnitude_estimation_simulation_config };

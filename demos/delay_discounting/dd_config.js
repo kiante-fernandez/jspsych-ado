@@ -2,7 +2,7 @@
  * Delay-discounting run configuration.
  *
  * Task-owned pieces such as grid_design, presentation, choices, response labels,
- * and response coding live in jspsych-ado/tasks/delay_discounting/task.js. This
+ * and response coding live in src/tasks/delay_discounting/task.js. This
  * file holds controller/run settings for the experiment page.
  */
 const default_dd_config = {
@@ -35,10 +35,7 @@ const default_dd_simulation_config = {
     instructions: 300,
     choice: 500,
     end: 300,
-  }
+  },
 };
 
-export {
-  default_dd_config,
-  default_dd_simulation_config,
-};
+export { default_dd_config, default_dd_simulation_config };

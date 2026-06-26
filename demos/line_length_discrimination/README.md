@@ -23,7 +23,7 @@ in their task/model packages.
 
 ## Model contract
 
-`jspsych-ado/models/line_length_discrimination_3ifc/model.js` defines the
+`src/models/line_length_discrimination_3ifc/model.js` defines the
 categorical likelihood shape used by the ADO engine:
 
 ```js
@@ -35,9 +35,9 @@ based on its line-length difference from the standard, plus simple response
 position biases for B and C. Larger `delta` values make the target line more
 likely to be chosen.
 
-The Stan model in `jspsych-ado/models/line_length_discrimination_3ifc/` matches
+The Stan model in `src/models/line_length_discrimination_3ifc/` matches
 this JS likelihood. The task presentation and design grid live separately in
-`jspsych-ado/tasks/line_length_discrimination/task.js`.
+`src/tasks/line_length_discrimination/task.js`.
 
 Response coding:
 

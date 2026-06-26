@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import task, { responseToOutcome, design_grid } from "../../jspsych-ado/tasks/magnitude_estimation/task.js";
-import model from "../../jspsych-ado/models/magnitude_estimation/model.js";
-import { validateTask, validateTaskModelPair } from "../../jspsych-ado/index.js";
-import { enumerateDesigns } from "../../jspsych-ado/ado/mi_engine.js";
+import task, { responseToOutcome, design_grid } from "../../src/tasks/magnitude_estimation/task.js";
+import model from "../../src/models/magnitude_estimation/model.js";
+import { validateTask, validateTaskModelPair } from "../../src/index.js";
+import { enumerateDesigns } from "../../src/ado/mi_engine.js";
 
 test("magnitude_estimation task validates (continuous, no response_labels needed)", () => {
   const { valid, problems } = validateTask(task);
@@ -11,7 +11,10 @@ test("magnitude_estimation task validates (continuous, no response_labels needed
 });
 
 test("design_grid enumerates to the magnitude axis", () => {
-  assert.deepEqual(enumerateDesigns(design_grid).map((d) => d.s), [10, 25, 50, 100, 250, 500, 1000]);
+  assert.deepEqual(
+    enumerateDesigns(design_grid).map((d) => d.s),
+    [10, 25, 50, 100, 250, 500, 1000],
+  );
 });
 
 test("responseToOutcome maps the raw slider estimate into the modeled log-response", () => {
@@ -43,6 +46,6 @@ test("getChoiceTrials yields exactly one response-collecting slider trial that r
 
 test("the task/model pair validates together (matching design keys + continuous space)", () => {
   assert.doesNotThrow(() =>
-    validateTaskModelPair(task, model, "magnitude_estimation", "magnitude_estimation")
+    validateTaskModelPair(task, model, "magnitude_estimation", "magnitude_estimation"),
   );
 });

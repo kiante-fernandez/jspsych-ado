@@ -13,22 +13,23 @@
     "bayesian",
     "psychophysics"
   ],
-  "homepage": "https://github.com/githubpsyche/jspsych-ado#readme",
+  "homepage": "https://github.com/kiante-fernandez/jspsych-ado#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/githubpsyche/jspsych-ado.git"
+    "url": "git+https://github.com/kiante-fernandez/jspsych-ado.git"
   },
   "bugs": {
-    "url": "https://github.com/githubpsyche/jspsych-ado/issues"
+    "url": "https://github.com/kiante-fernandez/jspsych-ado/issues"
   },
-  "main": "./jspsych-ado/index.js",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
-    ".": "./jspsych-ado/index.js",
-    "./ado/*": "./jspsych-ado/ado/*",
-    "./controllers/*": "./jspsych-ado/controllers/*",
-    "./models/*": "./jspsych-ado/models/*",
-    "./tasks/*": "./jspsych-ado/tasks/*",
-    "./core/tinystan/*": "./core/tinystan/*",
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./models/*": "./src/models/*",
+    "./tasks/*": "./src/tasks/*",
     "./package.json": "./package.json"
   },
   "sideEffects": [
@@ -36,7 +37,7 @@
     "**/main.js"
   ],
   "files": [
-    "jspsych-ado",
+    "src",
     "core/tinystan",
     "README.md",
     "CHANGELOG.md",
@@ -48,18 +49,22 @@
     "test:browser": "node tests/browser/dd_smoke.mjs && node tests/browser/line_length_discrimination_smoke.mjs && node tests/browser/magnitude_estimation_smoke.mjs && node tests/browser/byo_model_exponential_smoke.mjs && node tests/browser/byo_task_money_choice_smoke.mjs",
     "patch:wasm": "node scripts/patch-wasm-glue.mjs",
     "test:bundler": "node tests/bundler/run.mjs",
-    "prepublishOnly": "npm test"
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm test && npm run typecheck",
+    "prepare": "husky"
   },
   "author": "The jspsych-ado contributors",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "peerDependencies": {
-    "jspsych": ">=7",
-    "@jspsych/plugin-html-button-response": ">=1",
     "@jspsych/plugin-call-function": ">=1",
     "@jspsych/plugin-canvas-keyboard-response": ">=1",
-    "@jspsych/plugin-canvas-slider-response": ">=1"
+    "@jspsych/plugin-canvas-slider-response": ">=1",
+    "@jspsych/plugin-html-button-response": ">=1",
+    "jspsych": ">=7"
   },
   "peerDependenciesMeta": {
     "@jspsych/plugin-html-button-response": {
@@ -76,6 +81,16 @@
     }
   },
   "devDependencies": {
-    "puppeteer": "^24.15.0"
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.4",
+    "puppeteer": "^24.15.0",
+    "typescript": "^5.7.2"
+  },
+  "prettier": {
+    "printWidth": 100
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,json,md,css}": "prettier --write"
   }
 }

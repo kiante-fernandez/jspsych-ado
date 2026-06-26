@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { createMockAdoController } from "../../jspsych-ado/controllers/mock_ado_controller.js";
+import { createMockAdoController } from "../../src/controllers/mock_ado_controller.js";
 
 test("mock controller does not emit Stan-only quantitative debug metrics", async () => {
   const controller = createMockAdoController({

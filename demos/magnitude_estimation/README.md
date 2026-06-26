@@ -11,7 +11,7 @@ likelihood lives in the model package.
 
 ## Model contract
 
-`jspsych-ado/models/magnitude_estimation/model.js` is a continuous-response model:
+`src/models/magnitude_estimation/model.js` is a continuous-response model:
 instead of a probability vector it supplies a response **density**. In log-log space
 the likelihood is Gaussian,
 

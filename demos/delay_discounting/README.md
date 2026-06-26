@@ -3,7 +3,7 @@
 An ADOpy-style delay discounting experiment whose adaptive inference runs entirely
 in the browser with a Stan model compiled to WebAssembly.
 
-This experiment is a thin consumer of the general [`jspsych-ado/`](../../jspsych-ado)
+This experiment is a thin consumer of the general [`src/`](../../src)
 package. `index.html` registers a delay-discounting task, registers the hyperbolic
 model, and uses the shared experiment shell to build the adaptive timeline:
 
@@ -11,9 +11,9 @@ model, and uses the shared experiment shell to build the adaptive timeline:
 import {
   createExperimentAdoTimeline,
   registerAdoExperiment,
-} from "./jspsych-ado/ado/experiment_shell.js";
-import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
-import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
+} from "./demos/_shared/experiment_shell.js";
+import hyperbolicModel from "./src/models/hyperbolic/model.js";
+import delayDiscountingTask from "./src/tasks/delay_discounting/task.js";
 
 registerAdoExperiment({ task: delayDiscountingTask, model: hyperbolicModel, config });
 
@@ -27,7 +27,7 @@ const timeline = createExperimentAdoTimeline(jsPsych, {
 
 What lives where:
 
-- **All adaptive machinery is in `jspsych-ado/`** — the MI engine, the in-browser
+- **All adaptive machinery is in `src/`** — the MI engine, the in-browser
   Stan controller + Web Worker, the generic timeline, and the facade.
 - **The delay-discounting task package** owns the design grid, SS/LL option cards,
   S/L keymap, response labels, and task id.

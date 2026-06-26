@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import task from "../../jspsych-ado/tasks/delay_discounting/task.js";
-import { enumerateDesigns } from "../../jspsych-ado/ado/mi_engine.js";
+import task from "../../src/tasks/delay_discounting/task.js";
+import { enumerateDesigns } from "../../src/ado/mi_engine.js";
 
 test("delay-discounting task exposes the presentation and response contract", () => {
   assert.equal(task.id, "delay_discounting");

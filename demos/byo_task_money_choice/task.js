@@ -12,7 +12,7 @@
 //   2. presentation  — how a design is shown and answered
 //   3. response coding — choices / response_labels (+ responseToOutcome if needed)
 
-import { arange } from "../../jspsych-ado/ado/grid.js"; // reuse the shipped grid helper
+import { arange } from "../../src/ado/grid.js"; // reuse the shipped grid helper
 
 function weeks(t) {
   if (t === 0) return "today";
@@ -54,7 +54,8 @@ const moneyChoiceTask = {
     makeStimulus,
     button_html: buttonHtml,
     keymap: { a: 0, b: 1 }, // A = sooner, B = later
-    prompt: '<p style="margin-top:1rem;font-size:0.8rem;color:#9ca3af;">Press <strong>A</strong> for the sooner option · <strong>B</strong> for the later option</p>',
+    prompt:
+      '<p style="margin-top:1rem;font-size:0.8rem;color:#9ca3af;">Press <strong>A</strong> for the sooner option · <strong>B</strong> for the later option</p>',
   },
   choices: ["SS", "LL"],
   response_labels: { 0: "SS", 1: "LL" }, // 0 = smaller-sooner, 1 = larger-later

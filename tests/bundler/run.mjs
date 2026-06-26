@@ -24,7 +24,11 @@ const FIXTURE = join(HERE, "fixture");
 const DIST = join(FIXTURE, "dist");
 
 const run = (cmd, args, cwd) =>
-  execFileSync(cmd, args, { cwd, stdio: "inherit", env: { ...process.env, npm_config_fund: "false", npm_config_audit: "false" } });
+  execFileSync(cmd, args, {
+    cwd,
+    stdio: "inherit",
+    env: { ...process.env, npm_config_fund: "false", npm_config_audit: "false" },
+  });
 
 function fail(msg) {
   console.error("\nFAIL: " + msg);
@@ -75,16 +79,26 @@ try {
 
   if (!ok) {
     if (result.spike && result.spike.error) console.error("page error:\n" + result.spike.error);
-    if (result.failedWasm.length) console.error("failed wasm requests:\n" + result.failedWasm.join("\n"));
+    if (result.failedWasm.length)
+      console.error("failed wasm requests:\n" + result.failedWasm.join("\n"));
     fail("bundled consumer did not load the hashed wasm + produce a posterior");
   }
-  console.log("\nPASS: packed library builds under Vite and loads its hashed WASM through the public API");
+  console.log(
+    "\nPASS: packed library builds under Vite and loads its hashed WASM through the public API",
+  );
 } finally {
   await rm(tarball, { force: true });
 }
 
 async function headlessRun(dist) {
-  const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".wasm": "application/wasm", ".json": "application/json", ".css": "text/css" };
+  const TYPES = {
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".mjs": "text/javascript",
+    ".wasm": "application/wasm",
+    ".json": "application/json",
+    ".css": "text/css",
+  };
   const server = http.createServer(async (req, res) => {
     let path = decodeURIComponent(req.url.split("?")[0]);
     if (path === "/") path = "/index.html";
@@ -100,17 +114,27 @@ async function headlessRun(dist) {
   await new Promise((r) => server.listen(0, r));
   const port = server.address().port;
 
-  const { default: puppeteer } = await import(join(ROOT, "node_modules/puppeteer/lib/esm/puppeteer/puppeteer.js"));
+  const { default: puppeteer } = await import(
+    join(ROOT, "node_modules/puppeteer/lib/esm/puppeteer/puppeteer.js")
+  );
   const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
   const page = await browser.newPage();
   const failedWasm = [];
-  page.on("requestfailed", (r) => { if (r.url().includes(".wasm")) failedWasm.push(r.url() + " :: " + (r.failure()?.errorText || "")); });
-  page.on("response", (r) => { if (r.status() >= 400 && r.url().includes(".wasm")) failedWasm.push(r.status() + " " + r.url()); });
+  page.on("requestfailed", (r) => {
+    if (r.url().includes(".wasm"))
+      failedWasm.push(r.url() + " :: " + (r.failure()?.errorText || ""));
+  });
+  page.on("response", (r) => {
+    if (r.status() >= 400 && r.url().includes(".wasm")) failedWasm.push(r.status() + " " + r.url());
+  });
 
   let spike, urls;
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "load" });
-    await page.waitForFunction("window.__spike && (window.__spike.done === true || window.__spike.error)", { timeout: 60000 });
+    await page.waitForFunction(
+      "window.__spike && (window.__spike.done === true || window.__spike.error)",
+      { timeout: 60000 },
+    );
   } catch (e) {
     spike = await page.evaluate(() => window.__spike).catch(() => ({ error: String(e) }));
   }

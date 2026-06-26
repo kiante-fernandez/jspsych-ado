@@ -7,7 +7,7 @@
         <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
         <script src="https://unpkg.com/@jspsych/plugin-call-function@1.1.3"></script>
         <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.4"></script>
-        <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+        <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
         <style>
           .dd-option-card {
             all: unset;
@@ -80,11 +80,11 @@
         //                            own experiment.
         // The interface here goes through the demo "experiment shell" (URL-param
         // controller switching + simulation). The bare 3-call form is in the root
-        // README and demos/README.md. Everything ADO lives in ../../jspsych-ado/.
-        import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
-        import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
-        import { makeDebriefStimulus, removeAdoDebugPanels } from "./jspsych-ado/ado/ado_timeline.js";
-        import { createSeededRng, simulateDelayDiscountingChoice } from "./jspsych-ado/ado/ado_simulation.js";
+        // README and demos/README.md. Everything ADO lives in ../../src/.
+        import hyperbolicModel from "./src/models/hyperbolic/model.js";
+        import delayDiscountingTask from "./src/tasks/delay_discounting/task.js";
+        import { makeDebriefStimulus, removeAdoDebugPanels } from "./src/ado/debug/posterior_convergence_charts.js";
+        import { createSeededRng, simulateCategoricalChoice } from "./src/ado/ado_simulation.js";
         import {
             addAdoDataProperties,
             createExperimentAdoTimeline,
@@ -94,7 +94,7 @@
             makeInstructionSimulationData,
             registerAdoExperiment,
             resolveSimulationConfig,
-        } from "./jspsych-ado/ado/experiment_shell.js";
+        } from "./demos/_shared/experiment_shell.js";
         import { default_dd_config, default_dd_simulation_config } from "./demos/delay_discounting/dd_config.js";
 
         // ─────────────────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@
         const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
         const session_id = "local-" + Date.now();
 
-        const run_settings = getExperimentRunSettings(url_params, { allow_legacy_ado: true });
+        const run_settings = getExperimentRunSettings(url_params);
         const simulation_config = resolveSimulationConfig(
             default_dd_simulation_config,
             run_config,
@@ -119,7 +119,9 @@
             model: hyperbolicModel,
             session_id: session_id,
             simulate_choice: function(design) {
-                return simulateDelayDiscountingChoice(design, simulation_config, simulation_rng, hyperbolicModel);
+                return simulateCategoricalChoice(design, simulation_config, simulation_rng, hyperbolicModel, {
+                    response_labels: { 0: "SS", 1: "LL" },
+                });
             },
         });
 

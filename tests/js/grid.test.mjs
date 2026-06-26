@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { arange, linspace } from "../../jspsych-ado/ado/grid.js";
-import { arange as arangeFacade, linspace as linspaceFacade } from "../../jspsych-ado/index.js";
+import { arange, linspace } from "../../src/ado/grid.js";
+import { arange as arangeFacade, linspace as linspaceFacade } from "../../src/index.js";
 
 // arange: half-open [start, stop) — the np.arange semantics that the old
 // delay_discounting range() used (`value < stop`).

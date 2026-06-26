@@ -4,7 +4,7 @@ This experiment is a jsPsych reproduction of the core non-verbal number acuity
 task from:
 
 Halberda, J., Mazzocco, M. M. M., & Feigenson, L. (2008). Individual differences
-in non-verbal number acuity correlate with maths achievement. *Nature, 455*,
+in non-verbal number acuity correlate with maths achievement. _Nature, 455_,
 665-668.
 
 Participants briefly see intermixed blue and yellow dots and answer which color
@@ -18,9 +18,9 @@ The runnable experiment now follows the same thin-consumer structure as
 ```text
 demos/halberda_dot_comparison/index.html
 demos/halberda_dot_comparison/halberda_config.js
-jspsych-ado/tasks/halberda_dot_comparison/task.js
-jspsych-ado/models/weber_dots/model.js
-jspsych-ado/models/weber_dots/weber_dot_comparison.stan
+src/tasks/halberda_dot_comparison/task.js
+src/models/weber_dots/model.js
+src/models/weber_dots/weber_dots.stan
 ```
 
 The task package owns:
@@ -72,9 +72,3 @@ Useful URL parameters:
 ?simulate=visual
 ?debug=1
 ```
-
-## Legacy File
-
-`experiment.js` is the older fixed-trial standalone version. The current
-adaptive experiment is built from `index.html`, `halberda_config.js`, the task
-package, and the Weber model package.

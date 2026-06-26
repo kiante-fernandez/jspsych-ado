@@ -8,10 +8,10 @@ import model, {
   conditionalEntropy,
   responseSampler,
   buildData,
-} from "../../jspsych-ado/models/magnitude_estimation/model.js";
-import { validateModel } from "../../jspsych-ado/index.js";
-import { createDesignScorer, samplePriorDraws } from "../../jspsych-ado/ado/mi_engine.js";
-import { createSeededRng } from "../../jspsych-ado/ado/ado_simulation.js";
+} from "../../src/models/magnitude_estimation/model.js";
+import { validateModel } from "../../src/index.js";
+import { createDesignScorer, samplePriorDraws } from "../../src/ado/mi_engine.js";
+import { createSeededRng } from "../../src/ado/ado_simulation.js";
 
 test("magnitude_estimation validates as a continuous model package", () => {
   const { valid, problems } = validateModel(model);
@@ -64,17 +64,27 @@ test("conditionalEntropy is the closed-form Gaussian differential entropy of sig
   const expected = 0.5 * Math.log(2 * Math.PI * Math.E * sigma * sigma);
   assert.ok(Math.abs(conditionalEntropy({ s: 10 }, { loga: 0, b: 1, sigma }) - expected) < 1e-12);
   // It is homoscedastic: independent of the design magnitude.
-  assert.equal(conditionalEntropy({ s: 10 }, { loga: 0, b: 1, sigma }), conditionalEntropy({ s: 1000 }, { loga: 0, b: 1, sigma }));
+  assert.equal(
+    conditionalEntropy({ s: 10 }, { loga: 0, b: 1, sigma }),
+    conditionalEntropy({ s: 1000 }, { loga: 0, b: 1, sigma }),
+  );
 });
 
 test("responseSampler is deterministic at sigma=0 (returns the predicted log-mean)", () => {
   const design = { s: 80 };
   const params = { loga: -1, b: 0.8, sigma: 0 };
-  assert.ok(Math.abs(responseSampler(design, params, createSeededRng(1)) - predictedLogMean(design, params)) < 1e-12);
+  assert.ok(
+    Math.abs(
+      responseSampler(design, params, createSeededRng(1)) - predictedLogMean(design, params),
+    ) < 1e-12,
+  );
 });
 
 test("buildData logs s into log_s and passes the (already-log) response as log_y", () => {
-  const data = buildData([{ s: 100, choice: 2.3 }, { s: 10, choice: 0.5 }]);
+  const data = buildData([
+    { s: 100, choice: 2.3 },
+    { s: 10, choice: 0.5 },
+  ]);
   assert.equal(data.N, 2);
   assert.deepEqual(data.log_s, [Math.log(100), Math.log(10)]);
   assert.deepEqual(data.log_y, [2.3, 0.5]);
@@ -97,11 +107,14 @@ test("createDesignScorer: continuous MI rises monotonically with magnitude under
   const scorer = createDesignScorer(model);
   const grid = [10, 25, 50, 100, 250, 500, 1000];
   const mis = grid.map((s) => scorer.mutualInfo({ s }, draws));
-  assert.ok(mis.every((v) => v > 0), "all MI positive");
+  assert.ok(
+    mis.every((v) => v > 0),
+    "all MI positive",
+  );
   for (let i = 1; i < mis.length; i++) {
     assert.ok(
       mis[i] > mis[i - 1],
-      `MI should increase with s: ${grid[i - 1]}->${mis[i - 1].toFixed(3)} vs ${grid[i]}->${mis[i].toFixed(3)}`
+      `MI should increase with s: ${grid[i - 1]}->${mis[i - 1].toFixed(3)} vs ${grid[i]}->${mis[i].toFixed(3)}`,
     );
   }
 });

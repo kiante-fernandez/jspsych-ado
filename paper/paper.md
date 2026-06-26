@@ -4,7 +4,7 @@
 # from paper.tex; keep the two author lists in sync.)
 # Author order: co-authors alphabetical by surname; Kianté Fernandez last & corresponding.
 # Names resolved from ORCID records. TODO: per-author affiliations.
-title: 'jspsych-ado: In-browser adaptive design optimization for jsPsych experiments'
+title: "jspsych-ado: In-browser adaptive design optimization for jsPsych experiments"
 tags:
   - JavaScript
   - jsPsych

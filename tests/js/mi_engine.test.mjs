@@ -13,8 +13,8 @@ import {
   summarizeDraws,
   samplePriorDraws,
   validateResponseProbs,
-} from "../../jspsych-ado/ado/mi_engine.js";
-import { createSeededRng } from "../../jspsych-ado/ado/ado_simulation.js";
+} from "../../src/ado/mi_engine.js";
+import { createSeededRng } from "../../src/ado/ado_simulation.js";
 
 const LN2 = Math.log(2);
 
@@ -90,7 +90,10 @@ test("realizedInformationGain supports categorical response probabilities", () =
 test("realizedInformationGain rejects response indices outside the model response space", () => {
   const draws = [{ s: 0 }, { s: 1 }];
   const responseProb = (_design, draw) => (draw.s === 1 ? 1 : 0);
-  assert.throws(() => realizedInformationGain({}, draws, 2, responseProb), /outside the response probability vector length/);
+  assert.throws(
+    () => realizedInformationGain({}, draws, 2, responseProb),
+    /outside the response probability vector length/,
+  );
 });
 
 test("enumerateDesigns produces the full cartesian product", () => {
@@ -107,10 +110,16 @@ test("enumerateDesigns produces the full cartesian product", () => {
 test("enumerateDesigns passes a curated array of designs through unchanged", () => {
   // The array escape hatch lets a model supply hand-picked designs (e.g. dots
   // numerosity pairs) that are not a clean grid; the engine returns them as-is.
-  const curated = [{ n1: 10, n2: 12 }, { n1: 10, n2: 20 }];
+  const curated = [
+    { n1: 10, n2: 12 },
+    { n1: 10, n2: 20 },
+  ];
   const designs = enumerateDesigns(curated);
   assert.equal(designs, curated);
-  assert.deepEqual(designs, [{ n1: 10, n2: 12 }, { n1: 10, n2: 20 }]);
+  assert.deepEqual(designs, [
+    { n1: 10, n2: 12 },
+    { n1: 10, n2: 20 },
+  ]);
 });
 
 test("selectOptimalDesign returns a valid grid member and prefers the discriminating design", () => {
@@ -148,7 +157,10 @@ test("selectOptimalDesigns returns distinct designs and avoids a redundant secon
     return 0.99;
   };
   const picks = selectOptimalDesigns(designs, draws, responseProb, 2, { rng: createSeededRng(3) });
-  assert.deepEqual(picks.map((p) => p.design.d), [0, 2]);
+  assert.deepEqual(
+    picks.map((p) => p.design.d),
+    [0, 2],
+  );
 });
 
 test("selectOptimalDesigns supports categorical fantasy updates", () => {
@@ -165,7 +177,10 @@ test("selectOptimalDesigns supports categorical fantasy updates", () => {
     return draw.b === 0 ? [1, 0, 0] : [0, 0, 1];
   };
   const picks = selectOptimalDesigns(designs, draws, responseProbs, 2, { rng: createSeededRng(4) });
-  assert.deepEqual(picks.map((p) => p.design.d), [0, 2]);
+  assert.deepEqual(
+    picks.map((p) => p.design.d),
+    [0, 2],
+  );
 });
 
 test("selectOptimalDesigns requires an rng when count > 1 and caps at the grid size", () => {

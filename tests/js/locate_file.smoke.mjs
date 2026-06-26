@@ -32,11 +32,22 @@ globalThis.fetch = async (url, opts) => {
       ok: true,
       status: 200,
       url: s,
-      arrayBuffer: async () => WASM_BYTES.buffer.slice(WASM_BYTES.byteOffset, WASM_BYTES.byteOffset + WASM_BYTES.byteLength),
+      arrayBuffer: async () =>
+        WASM_BYTES.buffer.slice(
+          WASM_BYTES.byteOffset,
+          WASM_BYTES.byteOffset + WASM_BYTES.byteLength,
+        ),
     };
   }
   if (s.startsWith("file:")) {
-    return { ok: false, status: 404, url: s, arrayBuffer: async () => { throw new Error("404"); } };
+    return {
+      ok: false,
+      status: 404,
+      url: s,
+      arrayBuffer: async () => {
+        throw new Error("404");
+      },
+    };
   }
   return realFetch(url, opts);
 };
@@ -58,8 +69,9 @@ for (const { name, dir } of await listModelMains()) {
   let loadedWith = false;
   try {
     const m = await StanModel.load(
-      (options) => createModule({ ...options, locateFile: (p) => (p.endsWith(".wasm") ? HASHED_URL : p) }),
-      () => {}
+      (options) =>
+        createModule({ ...options, locateFile: (p) => (p.endsWith(".wasm") ? HASHED_URL : p) }),
+      () => {},
     );
     loadedWith = !!m && typeof m.stanVersion === "function";
   } catch (e) {
@@ -75,18 +87,27 @@ for (const { name, dir } of await listModelMains()) {
   // (2) WITHOUT override -> default findWasmBinary fetches the sibling, which 404s.
   let loadedWithout = false;
   try {
-    const m = await StanModel.load((options) => createModule({ ...options }), () => {});
+    const m = await StanModel.load(
+      (options) => createModule({ ...options }),
+      () => {},
+    );
     loadedWithout = !!m && typeof m.stanVersion === "function";
   } catch {
     // expected
   }
   if (!loadedWithout) {
-    console.log(`  [${name}] PASS: load failed without the override (sibling wasm 404s under a bundler)`);
+    console.log(
+      `  [${name}] PASS: load failed without the override (sibling wasm 404s under a bundler)`,
+    );
   } else {
     console.log(`  [${name}] FAIL: load unexpectedly succeeded without a locateFile override`);
     failures++;
   }
 }
 
-console.log(failures === 0 ? "\nPASS: emscripten honors Module.locateFile for every model" : `\nFAIL: ${failures} check(s) failed`);
+console.log(
+  failures === 0
+    ? "\nPASS: emscripten honors Module.locateFile for every model"
+    : `\nFAIL: ${failures} check(s) failed`,
+);
 process.exit(failures === 0 ? 0 : 1);
