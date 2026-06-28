@@ -63,21 +63,29 @@ test("construction rejects num_samples < 1", () => {
   );
 });
 
-test("worker onerror rejects start() with a clear load-failure message", async () => {
+test("worker onerror rejects the first update with a clear load-failure message", async () => {
   const restore = installScriptedWorker((_message, port) => port.error("module not found"));
   try {
     const controller = createStanAdoController(baseArgs(makeModel()));
-    await assert.rejects(controller.start(), /Stan worker failed to load: module not found/);
+    controller.start();
+    await assert.rejects(
+      controller.update({ ado_design: { d: 0 }, choice: 0 }),
+      /Stan worker failed to load: module not found/
+    );
   } finally {
     restore();
   }
 });
 
-test("worker onmessageerror rejects with a deserialization message", async () => {
+test("worker onmessageerror rejects the first update with a deserialization message", async () => {
   const restore = installScriptedWorker((_message, port) => port.messageerror());
   try {
     const controller = createStanAdoController(baseArgs(makeModel()));
-    await assert.rejects(controller.start(), /message could not be deserialized/);
+    controller.start();
+    await assert.rejects(
+      controller.update({ ado_design: { d: 0 }, choice: 0 }),
+      /message could not be deserialized/
+    );
   } finally {
     restore();
   }
@@ -93,7 +101,7 @@ test("empty draw columns reject update() with 'no posterior draws'", async () =>
   });
   try {
     const controller = createStanAdoController(baseArgs(makeModel()));
-    await controller.start();
+    controller.start();
     await assert.rejects(
       controller.update({ ado_design: { d: 0 }, choice: 0 }),
       /Stan returned no posterior draws/
@@ -115,7 +123,7 @@ test("a second in-flight request is rejected instead of clobbering the first", a
   });
   try {
     const controller = createStanAdoController(baseArgs(makeModel()));
-    await controller.start();
+    controller.start();
     const first = controller.update({ ado_design: { d: 0 }, choice: 0 });
     first.catch(() => {}); // first never settles (worker hangs); avoid an unhandled rejection
     const second = controller.update({ ado_design: { d: 1 }, choice: 1 });

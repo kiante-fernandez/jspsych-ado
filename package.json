@@ -27,7 +27,6 @@
     "./ado/*": "./jspsych-ado/ado/*",
     "./controllers/*": "./jspsych-ado/controllers/*",
     "./models/*": "./jspsych-ado/models/*",
-    "./tasks/*": "./jspsych-ado/tasks/*",
     "./core/tinystan/*": "./core/tinystan/*",
     "./package.json": "./package.json"
   },
@@ -45,7 +44,7 @@
   "scripts": {
     "test": "node --test tests/js/*.test.mjs",
     "test:smoke": "node tests/js/stan_recovery.smoke.mjs",
-    "test:browser": "node tests/browser/dd_smoke.mjs && node tests/browser/line_length_discrimination_smoke.mjs && node tests/browser/byo_model_exponential_smoke.mjs && node tests/browser/byo_task_money_choice_smoke.mjs",
+    "test:browser": "node tests/browser/controller_api_smoke.mjs && node tests/browser/dd_tutorial_smoke.mjs && node tests/browser/dd_smoke.mjs && node tests/browser/line_length_discrimination_smoke.mjs && node tests/browser/halberda_dot_comparison_smoke.mjs && node tests/browser/byo_model_exponential_smoke.mjs && node tests/browser/byo_task_money_choice_smoke.mjs",
     "patch:wasm": "node scripts/patch-wasm-glue.mjs",
     "test:bundler": "node tests/bundler/run.mjs",
     "prepublishOnly": "npm test"
@@ -55,16 +54,12 @@
     "node": ">=18"
   },
   "peerDependencies": {
-    "jspsych": ">=7",
-    "@jspsych/plugin-html-button-response": ">=1",
-    "@jspsych/plugin-call-function": ">=1",
-    "@jspsych/plugin-canvas-keyboard-response": ">=1"
+    "jspsych": ">=8",
+    "@jspsych/plugin-html-button-response": ">=2",
+    "@jspsych/plugin-canvas-keyboard-response": ">=2"
   },
   "peerDependenciesMeta": {
     "@jspsych/plugin-html-button-response": {
-      "optional": true
-    },
-    "@jspsych/plugin-call-function": {
       "optional": true
     },
     "@jspsych/plugin-canvas-keyboard-response": {

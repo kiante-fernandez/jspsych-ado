@@ -35,7 +35,7 @@ const PRIOR_DRAWS = 2000;
  * @param {?number} [options.design_seed] - Optional seed for prior/random design
  *   selection. Defaults to stan.seed so existing runs stay reproducible.
  * @param {number} [options.testlet_size=1] - Choice trials shown between Stan refits.
- * @returns {Object} Controller with async start(context) and update(trial_data).
+ * @returns {Object} Controller with start(context) and async update(trial_data).
  *   Results include next_designs plus aligned next_design_metrics, where
  *   mutual_info is available for MI-selected ADO designs and null for random.
  */
@@ -103,6 +103,7 @@ function createStanAdoController({
 
   let worker = null;
   let current_design_draws = null;
+  let model_ready = null;
   // Requests are strictly sequential (init, then one awaited sample per trial),
   // so a single in-flight slot is enough.
   let pending = null;
@@ -311,13 +312,14 @@ function createStanAdoController({
 
   return {
     /**
-     * Load the WASM model and choose the first design from prior draws.
+     * Start loading the WASM model and choose the first design from prior draws.
      *
-     * @returns {Promise<Object>} Initial ADO state (null posteriors).
+     * @returns {Object} Initial ADO state (null posteriors).
      */
-    start: async function() {
+    start: function() {
       ensureWorker();
-      await send({ type: "init", moduleUrl: model.moduleUrl, wasmUrl: model.wasmUrl });
+      model_ready = send({ type: "init", moduleUrl: model.moduleUrl, wasmUrl: model.wasmUrl });
+      model_ready.catch(() => {});
 
       trials.length = 0;
       stopper.reset();
@@ -368,6 +370,7 @@ function createStanAdoController({
      */
     update: async function(trial_data) {
       const started_at = now();
+      await model_ready;
 
       const rows = Array.isArray(trial_data) ? trial_data : [trial_data];
       const realized_information_gains = computeRealizedInformationGains(rows);
