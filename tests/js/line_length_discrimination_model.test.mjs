@@ -6,9 +6,12 @@ import {
   responseProbs,
 } from "../../jspsych-ado/models/line_length_discrimination_3ifc/model.js";
 import {
-  default as task,
+  choices,
+  design_grid,
   make3IFCDesign,
-} from "../../jspsych-ado/tasks/line_length_discrimination/task.js";
+  makeLineLengthStimulus,
+  response_labels,
+} from "../../demos/line_length_discrimination/task.js";
 import { makeStanDataBuilder } from "../../jspsych-ado/ado/stan_data.js";
 
 // The model declares a stanData map; the framework generates buildData from it.
@@ -93,11 +96,9 @@ test("model package exposes the categorical ADO contract", () => {
   assert.equal(model.responseProb, undefined);
 });
 
-test("task package exposes the 3IFC response space and presentation", () => {
-  assert.equal(task.id, "line_length_discrimination_3ifc");
-  assert.deepEqual(task.responseSpace, { type: "categorical", n_categories: 3 });
-  assert.deepEqual(task.response_labels, { 0: "A", 1: "B", 2: "C" });
-  assert.deepEqual(task.choices, ["A", "B", "C"]);
-  assert.equal(typeof task.presentation.makeStimulus, "function");
-  assert.equal(task.design_grid.length, 36);
+test("line-length demo helper exposes the 3IFC design and trial-authoring pieces", () => {
+  assert.deepEqual(response_labels, { 0: "A", 1: "B", 2: "C" });
+  assert.deepEqual(choices, ["A", "B", "C"]);
+  assert.equal(typeof makeLineLengthStimulus, "function");
+  assert.equal(design_grid.length, 36);
 });

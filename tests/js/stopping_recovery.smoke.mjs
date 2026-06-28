@@ -31,14 +31,14 @@ const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws 
 const { createSeededRng, simulateDelayDiscountingChoice } = await import("../../jspsych-ado/ado/ado_simulation.js");
 const { makeStanDataBuilder } = await import("../../jspsych-ado/ado/stan_data.js");
 const { normalizeStoppingConfig, evaluateStopping, maxPossibleEig } = await import("../../jspsych-ado/ado/stopping.js");
+const { design_grid } = await import("../../demos/delay_discounting/task.js");
 
 const buildData = makeStanDataBuilder({ stanData: hyp.stanData, responseSpace: hyp.responseSpace });
 const createModule = (await import(hyp.moduleUrl)).default;
 const model = await StanModel.load(createModule, () => {});
 console.log("stan version:", model.stanVersion());
 
-const designs = enumerateDesigns((await import("../../demos/delay_discounting/dd_config.js")).default_dd_config.grid_design
-  ?? (await import("../../jspsych-ado/tasks/delay_discounting/task.js")).default.design_grid);
+const designs = enumerateDesigns(design_grid);
 const sample_config = { num_chains: 2, num_warmup: 300, num_samples: 300, seed: 123 };
 const max_possible_eig = maxPossibleEig(hyp.responseSpace); // ln 2
 

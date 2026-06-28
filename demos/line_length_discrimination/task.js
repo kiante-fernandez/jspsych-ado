@@ -1,4 +1,4 @@
-import { linspace } from "../../ado/grid.js";
+import { linspace } from "../../jspsych-ado/index.js";
 
 const LINE_KEYS = ["line_length_a", "line_length_b", "line_length_c"];
 
@@ -8,6 +8,7 @@ const response_labels = {
   2: "C",
 };
 
+// Static button labels also define the response-code order.
 const choices = ["A", "B", "C"];
 
 function getLineLength(design, index) {
@@ -18,6 +19,7 @@ function getLineLength(design, index) {
   return design.standard_length + (Number(design.target_index) === index ? design.delta : 0);
 }
 
+// target_index is zero-indexed in JS; stanData converts it to Stan's 1-indexed category.
 function make3IFCDesign(standard_length, delta, target_index) {
   const design = {
     standard_length: standard_length,
@@ -64,10 +66,11 @@ function makeLineLengthStimulus(design) {
   );
 }
 
-function makeChoiceButtonHtml() {
-  return choices.map(() => '<button class="ll-choice-button">%choice%</button>');
+function makeChoiceButtonHtml(choice) {
+  return '<button class="ll-choice-button">' + choice + '</button>';
 }
 
+// Debug output includes the latent target and realized line lengths.
 function describeDesign(design) {
   return [
     "standard_length: " + design.standard_length + " px",
@@ -85,44 +88,15 @@ const design_grid = make3IFCDesigns({
   target_indices: [0, 1, 2],
 });
 
-const presentation = {
-  makeStimulus: makeLineLengthStimulus,
-  button_html: makeChoiceButtonHtml,
-  keymap: { a: 0, b: 1, c: 2 },
-  prompt: "<p style=\"margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;\">Press <strong>A</strong>, <strong>B</strong>, or <strong>C</strong></p>",
-  describeDesign: describeDesign,
-};
-
-const lineLengthDiscriminationTask = {
-  id: "line_length_discrimination_3ifc",
-  design_grid,
-  designKeys: [
-    "standard_length",
-    "delta",
-    "target_index",
-    "target_label",
-    "line_length_a",
-    "line_length_b",
-    "line_length_c",
-  ],
-  responseSpace: { type: "categorical", n_categories: 3 },
-  presentation,
-  choices: choices,
-  response_labels: response_labels,
-};
-
-export default lineLengthDiscriminationTask;
 export {
   LINE_KEYS,
   choices,
   design_grid,
   describeDesign,
   getLineLength,
-  lineLengthDiscriminationTask,
   make3IFCDesign,
   make3IFCDesigns,
   makeChoiceButtonHtml,
   makeLineLengthStimulus,
-  presentation,
   response_labels,
 };

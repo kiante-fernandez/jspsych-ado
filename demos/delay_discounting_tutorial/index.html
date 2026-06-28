@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Delay Discounting Tutorial</title>
+        <base href="../../">
+        <script src="https://unpkg.com/jspsych@8.2.3"></script>
+        <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+        <script src="https://unpkg.com/@jspsych/plugin-instructions@2.1.0"></script>
+        <link href="https://unpkg.com/jspsych@8.2.3/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+    </head>
+    <body></body>
+    <script type="module">
+        import { jsPsychADO } from "./jspsych-ado/index.js";
+        import model from "./jspsych-ado/models/hyperbolic/model.js";
+
+        const jsPsych = initJsPsych({
+            on_finish: () => jsPsych.data.displayData(),
+        });
+        window.jsPsych = jsPsych;
+
+        const design_grid = {
+            t_ss: [0],
+            t_ll: [1, 4, 12, 52],
+            r_ss: [100, 200, 400, 600],
+            r_ll: [800],
+        };
+
+        const stan = {
+            num_chains: 1,
+            num_warmup: 100,
+            num_samples: 200,
+            seed: 123,
+        };
+
+        const ado = jsPsychADO.createController(jsPsych, {
+            model,
+            design_grid,
+            stan,
+            n_trials: 6,
+        });
+
+        const instructions = {
+            type: jsPsychInstructions,
+            pages: [
+                "<p>This tutorial shows the smallest controller-style ADO pattern.</p>",
+                "<p>Each trial is an ordinary jsPsych button trial. The controller supplies the current design and records the response.</p>",
+            ],
+            show_clickable_nav: true,
+        };
+
+        const trial = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: () =>
+                `${ado.evaluateDesignVariable("r_ss")} now or ${ado.evaluateDesignVariable("r_ll")} later?`,
+            choices: ["Sooner", "Later"],
+            on_finish: (data) => ado.recordResponse(data.response),
+        };
+
+        const end_screen = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: "<h2>Finished</h2><p>The tutorial run is complete.</p>",
+            choices: ["SUBMIT"],
+        };
+
+        const adoTimeline = ado.createTimeline(trial);
+
+        jsPsych.run([instructions, ...adoTimeline, end_screen]);
+    </script>
+</html>

@@ -1,34 +1,39 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import task, {
+import {
   CANVAS_SIZE,
   correctChoiceIndex,
+  design_grid,
+  makeDotComparisonTrials,
   makeDotComparisonDesigns,
   responseToOutcome,
-} from "../../jspsych-ado/tasks/halberda_dot_comparison/task.js";
+  response_labels,
+} from "../../demos/halberda_dot_comparison/task.js";
 import model from "../../jspsych-ado/models/weber_dots/model.js";
-import { validateTask, validateModel } from "../../jspsych-ado/index.js";
+import { validateModel } from "../../jspsych-ado/index.js";
 
-test("Halberda task package exposes an adaptive dot-comparison design list", () => {
-  assert.equal(task.id, "halberda_dot_comparison");
-  assert.ok(task.design_grid.length > 0);
-  assert.deepEqual(task.responseSpace, { type: "binary" });
-  assert.deepEqual(task.response_labels, { 0: "incorrect", 1: "correct" });
-  assert.equal(typeof task.presentation.getChoiceTrials, "function");
+test("Halberda demo helper exposes an adaptive dot-comparison design list", () => {
+  assert.ok(design_grid.length > 0);
+  assert.deepEqual(response_labels, { 0: "incorrect", 1: "correct" });
+  assert.equal(typeof makeDotComparisonTrials, "function");
 });
 
 test("Halberda canvas trials use the full drawing coordinate system", () => {
   globalThis.jsPsychCanvasKeyboardResponse = globalThis.jsPsychCanvasKeyboardResponse || function jsPsychCanvasKeyboardResponse() {};
-  const design = task.design_grid[0];
+  const design = design_grid[0];
+  const ado = {
+    getDesign: () => design,
+    recordResponse: () => {},
+  };
   const ctx = {
+    ado,
     getDesign: () => design,
     getState: () => ({ session_id: "s", trial_index: 0 }),
     run_context: {},
     trial_number: 1,
-    task: task.id,
   };
-  const trials = task.presentation.getChoiceTrials(ctx);
+  const trials = makeDotComparisonTrials(ctx);
   assert.equal(trials.length, 3);
   assert.deepEqual(CANVAS_SIZE, [600, 800]);
   for (const trial of trials) {
@@ -59,11 +64,8 @@ test("raw B/Y responses map to model outcome correct/incorrect", () => {
   assert.equal(responseToOutcome(yellow_more, 1), 1);
 });
 
-test("Halberda task and Weber model validate as a compatible pair", () => {
-  const task_result = validateTask(task);
-  assert.deepEqual(task_result.problems.filter(p => p.level === "error"), []);
-
-  const sample_design = task.design_grid[0];
+test("Weber model validates against a Halberda design row", () => {
+  const sample_design = design_grid[0];
   const model_result = validateModel(model, {
     sampleDesign: sample_design,
     sampleDraw: { w: 0.25 },

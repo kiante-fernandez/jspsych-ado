@@ -1,7 +1,4 @@
-/* Delay-discounting task styles. The task's makeStimulus/button_html emit these
- * class names; a consumer must load this stylesheet for the option cards to render
- * as designed. With a bundler: import "jspsych-ado/tasks/delay_discounting/task.css".
- * On a static page: <link rel="stylesheet" href=".../tasks/delay_discounting/task.css">. */
+/* Local delay-choice styles for the bring-your-own-model demo. */
 .dd-option-card {
   all: unset;
   box-sizing: border-box;

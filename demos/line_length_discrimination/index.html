@@ -3,197 +3,97 @@
     <head>
         <title>3IFC Line-Length Discrimination</title>
         <base href="../../">
-        <script src="https://unpkg.com/jspsych@7.3.4"></script>
-        <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
-        <script src="https://unpkg.com/@jspsych/plugin-call-function@1.1.3"></script>
-        <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.4"></script>
-        <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css"></link>
-        <style>
-          .ll-stimulus-wrap {
-            width: min(720px, calc(100vw - 48px));
-            margin: 0 auto;
-            text-align: center;
-          }
-          .ll-line-list {
-            display: grid;
-            gap: 18px;
-            width: min(560px, calc(100vw - 48px));
-            margin: 0 auto;
-          }
-          .ll-line-row {
-            display: grid;
-            grid-template-columns: 36px 1fr;
-            align-items: center;
-            gap: 12px;
-          }
-          .ll-line-label {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            border: 1px solid #d1d5db;
-            border-radius: 50%;
-            color: #111827;
-            font-weight: 700;
-          }
-          .ll-line-stage {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            max-width: calc(100vw - 48px);
-            height: 82px;
-            margin: 0 auto;
-            border: 1px solid #e5e7eb;
-            background: #ffffff;
-          }
-          .ll-line {
-            height: 12px;
-            background: #111827;
-          }
-          .ll-prompt {
-            margin: 1.75rem 0 1rem;
-            font-size: 1.25rem;
-            color: #111827;
-          }
-          .ll-choice-button {
-            min-width: 120px;
-            min-height: 48px;
-            padding: 0.75rem 1.25rem;
-            border: 2px solid #d1d5db;
-            border-radius: 8px;
-            background: #ffffff;
-            color: #111827;
-            font: inherit;
-            cursor: pointer;
-          }
-          .ll-choice-button:hover {
-            border-color: #2563eb;
-          }
-          .ll-choice-button:focus-visible {
-            outline: 3px solid #93c5fd;
-            outline-offset: 2px;
-          }
-          .ll-choice-button[disabled] {
-            opacity: 0.5;
-            cursor: default;
-          }
-        </style>
+        <script src="https://unpkg.com/jspsych@8.2.3"></script>
+        <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+        <script src="https://unpkg.com/@jspsych/plugin-instructions@2.1.0"></script>
+        <link href="https://unpkg.com/jspsych@8.2.3/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+        <link href="./demos/line_length_discrimination/task.css" rel="stylesheet" type="text/css"></link>
     </head>
     <body></body>
     <script type="module">
-        import { makeDebriefStimulus } from "./jspsych-ado/ado/ado_timeline.js";
-        import { createSeededRng, simulateCategoricalChoice } from "./jspsych-ado/ado/ado_simulation.js";
-        import {
-            addAdoDataProperties,
-            createExperimentAdoTimeline,
-            getExperimentRunSettings,
-            makeAdoRunContext,
-            makeEndSimulationData,
-            makeInstructionSimulationData,
-            registerAdoExperiment,
-            resolveSimulationConfig,
-        } from "./jspsych-ado/ado/experiment_shell.js";
-        import lineLengthTask from "./jspsych-ado/tasks/line_length_discrimination/task.js";
+        import { jsPsychADO } from "./jspsych-ado/index.js";
         import lineLengthModel from "./jspsych-ado/models/line_length_discrimination_3ifc/model.js";
         import {
-            default_line_length_config,
-            default_line_length_simulation_config,
-        } from "./demos/line_length_discrimination/line_length_config.js";
+            choices,
+            design_grid,
+            describeDesign,
+            makeChoiceButtonHtml,
+            makeLineLengthStimulus,
+        } from "./demos/line_length_discrimination/task.js";
 
-        // Drop-in demo (pattern 1 — see demos/README.md): a PACKAGED task + PACKAGED
-        // model. Three layers below: THE ADO INTERFACE (register + build), STANDARD
-        // jsPsych, and DEMO SCAFFOLDING (URL switches + simulation, not needed in your
-        // own experiment).
-        // ── DEMO SCAFFOLDING ──
-        const url_params = new URLSearchParams(window.location.search);
-        const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
-        const session_id = "local-" + Date.now();
-        const run_settings = getExperimentRunSettings(url_params);
-        const simulation_config = resolveSimulationConfig(
-            default_line_length_simulation_config,
-            run_config,
-            run_settings.simulation_mode
-        );
-        const simulation_rng = createSeededRng(simulation_config.seed);
-
-        const run_context = makeAdoRunContext({
-            run_settings: run_settings,
-            model: lineLengthModel,
-            session_id: session_id,
-            simulate_choice: function(design) {
-                return simulateCategoricalChoice(design, simulation_config, simulation_rng, lineLengthModel, {
-                    response_labels: lineLengthTask.response_labels,
-                });
-            },
+        const jsPsych = initJsPsych({
+            on_finish: () => jsPsych.data.displayData(),
         });
-
-        // ── THE ADO INTERFACE (1/2) — register the packaged task + model. ──
-        registerAdoExperiment({
-            task: lineLengthTask,
-            model: lineLengthModel,
-            config: default_line_length_config,
-        });
+        window.jsPsych = jsPsych;
 
         const instructions = {
             type: jsPsychInstructions,
             pages: [
-                '<p>Welcome to the line-length discrimination task.</p><p>You will see three horizontal lines on each trial.</p>',
-                '<p>Two lines are the same length. One line is longer.</p><p>Choose which line is longest: <strong>A</strong>, <strong>B</strong>, or <strong>C</strong>.</p><p>There is no feedback in this prototype.</p>',
-                '<p>Press Next when you are ready to begin.</p>',
+                "<p>Welcome to the line-length discrimination task.</p><p>You will see three horizontal lines on each trial.</p>",
+                "<p>Two lines are the same length. One line is longer. Choose which line is longest: <strong>A</strong>, <strong>B</strong>, or <strong>C</strong>.</p>",
+                "<p>Press Next when you are ready to begin.</p>",
             ],
             show_clickable_nav: true,
-            key_forward: 'm',
-            key_backward: 'z',
-            button_label_previous: 'Previous (<strong>Z</strong>)',
-            button_label_next: 'Next (<strong>M</strong>)',
-            simulation_options: {
-                data: makeInstructionSimulationData(3, simulation_config),
+        };
+
+        const ado = jsPsychADO.createController(jsPsych, {
+            model: lineLengthModel,
+            design_grid,
+            stan: {
+                num_chains: 2,
+                num_warmup: 250,
+                num_samples: 250,
+                seed: 123,
+            },
+            n_trials: 18,
+        });
+
+        const keymap = { a: 0, b: 1, c: 2 };
+        const prompt = "<p style=\"margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;\">Press <strong>A</strong>, <strong>B</strong>, or <strong>C</strong></p>";
+
+        let choice_key_handler = null;
+        function enableChoiceKeys() {
+            const key_to_choice = Object.fromEntries(
+                Object.entries(keymap).map(([key, index]) => [key.toUpperCase(), index])
+            );
+            choice_key_handler = (event) => {
+                const index = key_to_choice[event.key.toUpperCase()];
+                if (index === undefined) return;
+                const button = document.querySelector(`#jspsych-html-button-response-btngroup [data-choice="${index}"]`);
+                if (button) button.click();
+            };
+            document.addEventListener("keydown", choice_key_handler);
+        }
+
+        function disableChoiceKeys() {
+            if (choice_key_handler) {
+                document.removeEventListener("keydown", choice_key_handler);
+                choice_key_handler = null;
+            }
+        }
+
+        const trial = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: () => makeLineLengthStimulus(ado.getDesign()),
+            choices,
+            button_html: makeChoiceButtonHtml,
+            prompt,
+            on_load: enableChoiceKeys,
+            on_finish: (data) => {
+                disableChoiceKeys();
+                ado.recordResponse(data.response);
             },
         };
 
+        const plain_finish_stimulus = "<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>";
         const end_screen = {
             type: jsPsychHtmlButtonResponse,
-            stimulus: '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>',
-            on_start: function(trial) {
-                var bar = document.getElementById("ado-live-posterior-chart");
-                if (bar) { bar.remove(); }
-                trial.stimulus = run_context.debug
-                    ? makeDebriefStimulus(run_context.param_history || {}, run_context.posterior_display)
-                    : '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
-            },
+            stimulus: plain_finish_stimulus,
             choices: ["SUBMIT"],
-            simulation_options: {
-                data: makeEndSimulationData(simulation_config),
-            },
         };
 
-        jsPsych = initJsPsych({
-            on_finish: () => jsPsych.data.displayData()
-        });
-        addAdoDataProperties(jsPsych, {
-            run_settings: run_settings,
-            model: lineLengthModel,
-            simulation_config: simulation_config,
-        });
-
-        // ── THE ADO INTERFACE (2/2) — build the adaptive timeline and run it. ──
-        let timeline = [instructions];
-        timeline = timeline.concat(createExperimentAdoTimeline(jsPsych, {
-            task: lineLengthTask,
-            model: lineLengthModel,
-            config: default_line_length_config,
-            run_context: run_context,
-            session_id: session_id,
-            design_seed: run_config.controller ? run_config.controller.design_seed : null,
-        }));
-        timeline.push(end_screen);
-
-        if (run_settings.simulation_mode) {
-            jsPsych.simulate(timeline, run_settings.simulation_mode);
-        } else {
-            jsPsych.run(timeline);
-        }
+        jsPsych.run([instructions, ...ado.createTimeline(trial, {
+            describeDesign,
+        }), end_screen]);
     </script>
 </html>

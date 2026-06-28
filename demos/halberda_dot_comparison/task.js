@@ -1,14 +1,10 @@
-import {
-  canvasFrame,
-  canvasResponse,
-} from "../../ado/ado_timeline.js";
-
 const CANVAS_W = 800;
 const CANVAS_H = 600;
 const CANVAS_SIZE = [CANVAS_H, CANVAS_W];
 const FIXATION_MS = 250;
 const STIM_MS = 200;
 const RESPONSE_KEYS = ["b", "y"];
+// Raw keys are blue/yellow; the model observes correctness.
 const response_labels = { 0: "incorrect", 1: "correct" };
 
 const RATIOS = [
@@ -169,6 +165,7 @@ function drawResponsePrompt(canvas) {
   drawTextCentered(ctx, "Press B for BLUE     Press Y for YELLOW", 310, "26px Arial");
 }
 
+// Convert raw key choice (0 = blue, 1 = yellow) to the model outcome.
 function responseToOutcome(design, choice_index) {
   const chose_blue = Number(choice_index) === 0;
   const blue_is_correct = design.n_blue > design.n_yellow;
@@ -196,45 +193,46 @@ function withCanvasSize(trial) {
   };
 }
 
+function canvasFrame({ draw, getDesign, duration = null }) {
+  return {
+    type: globalThis.jsPsychCanvasKeyboardResponse,
+    stimulus: (canvas) => draw(canvas, getDesign()),
+    choices: "NO_KEYS",
+    trial_duration: duration,
+    response_ends_trial: false,
+  };
+}
+
+// jsPsych may record keyboard responses as keys or numeric indexes depending on mode.
+function responseIndex(response, choices) {
+  if (typeof response === "number") {
+    return response;
+  }
+  return choices.map(key => String(key).toLowerCase()).indexOf(String(response).toLowerCase());
+}
+
 const design_grid = makeDotComparisonDesigns();
 
-const presentation = {
-  getChoiceTrials(ctx) {
-    const getDesign = ctx.getDesign;
-    // Pass ctx.plugins so injected jsPsych plugin classes reach the canvas factories
-    // under a bundler (falls back to globals for static-served pages). (#57)
-    return [
-      withCanvasSize(canvasFrame({ draw: drawFixation, getDesign, duration: FIXATION_MS }, ctx.plugins)),
-      withCanvasSize(canvasFrame({ draw: drawDots, getDesign, duration: STIM_MS }, ctx.plugins)),
-      withCanvasSize(canvasResponse({ draw: drawResponsePrompt, getDesign, choices: RESPONSE_KEYS }, ctx)),
-    ];
-  },
-  describeDesign,
-};
+// One adaptive choice is a fixation frame, a brief dot frame, then a response frame.
+function makeDotComparisonTrials(ctx) {
+  const ado = ctx.ado;
+  const getDesign = () => ado.getDesign();
+  const response_trial = withCanvasSize({
+    type: globalThis.jsPsychCanvasKeyboardResponse,
+    stimulus: (canvas) => drawResponsePrompt(canvas, getDesign()),
+    choices: RESPONSE_KEYS,
+    on_finish: (data) => {
+      ado.recordResponse(responseToOutcome(getDesign(), responseIndex(data.response, RESPONSE_KEYS)));
+    },
+  });
 
-const halberdaDotComparisonTask = {
-  id: "halberda_dot_comparison",
-  design_grid,
-  designKeys: [
-    "n_blue",
-    "n_yellow",
-    "n_large",
-    "n_small",
-    "ratio",
-    "ratio_value",
-    "ratio_big_small",
-    "more_color",
-    "correct_key",
-    "control_mode",
-  ],
-  responseSpace: { type: "binary" },
-  presentation,
-  choices: RESPONSE_KEYS,
-  response_labels,
-  responseToOutcome,
-};
+  return [
+    withCanvasSize(canvasFrame({ draw: drawFixation, getDesign, duration: FIXATION_MS })),
+    withCanvasSize(canvasFrame({ draw: drawDots, getDesign, duration: STIM_MS })),
+    response_trial,
+  ];
+}
 
-export default halberdaDotComparisonTask;
 export {
   BASE_LARGE_COUNTS,
   CANVAS_H,
@@ -251,9 +249,8 @@ export {
   drawDots,
   drawFixation,
   drawResponsePrompt,
-  halberdaDotComparisonTask,
+  makeDotComparisonTrials,
   makeDotComparisonDesigns,
-  presentation,
   responseToOutcome,
   response_labels,
   withCanvasSize,

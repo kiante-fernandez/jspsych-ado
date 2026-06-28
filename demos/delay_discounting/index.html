@@ -3,204 +3,98 @@
     <head>
         <title>Delay Discounting</title>
         <base href="../../">
-        <script src="https://unpkg.com/jspsych@7.3.4"></script>
-        <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
-        <script src="https://unpkg.com/@jspsych/plugin-call-function@1.1.3"></script>
-        <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.4"></script>
-        <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css"></link>
-        <style>
-          .dd-option-card {
-            all: unset;
-            box-sizing: border-box;
-            cursor: pointer;
-            display: inline-flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            width: 220px;
-            min-height: 140px;
-            padding: 1.75rem 1.25rem;
-            background: #ffffff;
-            border: 2px solid #d1d5db;
-            border-radius: 10px;
-            position: relative;
-            vertical-align: middle;
-            transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
-          }
-          .dd-option-card:hover {
-            border-color: #4f46e5;
-            box-shadow: 0 6px 20px -6px rgba(0, 0, 0, 0.22);
-            transform: translateY(-2px);
-          }
-          .dd-option-card:focus-visible {
-            outline: 3px solid #818cf8;
-            outline-offset: 2px;
-          }
-          .dd-option-card[disabled] {
-            opacity: 0.5;
-            cursor: default;
-            pointer-events: none;
-          }
-          .dd-amount {
-            font-family: ui-monospace, "Courier New", monospace;
-            font-size: 2rem;
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            color: #111827;
-          }
-          .dd-when {
-            font-size: 0.9rem;
-            color: #6b7280;
-          }
-          .dd-key-hint {
-            position: absolute;
-            top: 6px;
-            right: 9px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: #9ca3af;
-            letter-spacing: 0.05em;
-          }
-          @media (prefers-reduced-motion: reduce) {
-            .dd-option-card { transition: none; }
-            .dd-option-card:hover { transform: none; }
-          }
-        </style>
+        <script src="https://unpkg.com/jspsych@8.2.3"></script>
+        <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+        <script src="https://unpkg.com/@jspsych/plugin-instructions@2.1.0"></script>
+        <link href="https://unpkg.com/jspsych@8.2.3/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+        <link href="./demos/delay_discounting/task.css" rel="stylesheet" type="text/css"></link>
     </head>
     <body></body>
     <script type="module">
-        // Delay-discounting demo: a PACKAGED task + a PACKAGED model (pattern 1,
-        // "drop-in" — see demos/README.md). This page has three kinds of code:
-        //   1. THE ADO INTERFACE   — register the task + model, build the timeline
-        //                            (the only jspsych-ado-specific lines; ~3 calls)
-        //   2. STANDARD jsPsych     — instructions, end screen, jsPsych.run
-        //   3. DEMO SCAFFOLDING     — URL switches + simulated participant, so the
-        //                            page is runnable/testable; NOT needed in your
-        //                            own experiment.
-        // The interface here goes through the demo "experiment shell" (URL-param
-        // controller switching + simulation). The bare 3-call form is in the root
-        // README and demos/README.md. Everything ADO lives in ../../jspsych-ado/.
+        import { jsPsychADO } from "./jspsych-ado/index.js";
         import hyperbolicModel from "./jspsych-ado/models/hyperbolic/model.js";
-        import delayDiscountingTask from "./jspsych-ado/tasks/delay_discounting/task.js";
-        import { makeDebriefStimulus, removeAdoDebugPanels } from "./jspsych-ado/ado/ado_timeline.js";
-        import { createSeededRng, simulateDelayDiscountingChoice } from "./jspsych-ado/ado/ado_simulation.js";
         import {
-            addAdoDataProperties,
-            createExperimentAdoTimeline,
-            getExperimentRunSettings,
-            makeAdoRunContext,
-            makeEndSimulationData,
-            makeInstructionSimulationData,
-            registerAdoExperiment,
-            resolveSimulationConfig,
-        } from "./jspsych-ado/ado/experiment_shell.js";
-        import { default_dd_config, default_dd_simulation_config } from "./demos/delay_discounting/dd_config.js";
+            design_grid,
+            describeDesign,
+            makeButtonHtml,
+            makeChoices,
+            response_labels,
+        } from "./demos/delay_discounting/task.js";
 
-        // ─────────────────────────────────────────────────────────────────────
-        // DEMO SCAFFOLDING — URL switches (?controller=, ?strategy=, ?simulate=,
-        // ?debug=) and the simulated participant. This makes the page runnable and
-        // testable; your own experiment would set these directly, not from the URL.
-        // ─────────────────────────────────────────────────────────────────────
-        const url_params = new URLSearchParams(window.location.search);
-        const run_config = window.__JSPSYCH_ADO_RUN_CONFIG__ || {};
-        const session_id = "local-" + Date.now();
-
-        const run_settings = getExperimentRunSettings(url_params, { allow_legacy_ado: true });
-        const simulation_config = resolveSimulationConfig(
-            default_dd_simulation_config,
-            run_config,
-            run_settings.simulation_mode
-        );
-        const simulation_rng = createSeededRng(simulation_config.seed);
-
-        const run_context = makeAdoRunContext({
-            run_settings: run_settings,
-            model: hyperbolicModel,
-            session_id: session_id,
-            simulate_choice: function(design) {
-                return simulateDelayDiscountingChoice(design, simulation_config, simulation_rng, hyperbolicModel);
-            },
+        const jsPsych = initJsPsych({
+            on_finish: () => jsPsych.data.displayData(),
         });
-
-        // ─────────────────────────────────────────────────────────────────────
-        // THE ADO INTERFACE (1/2) — register the packaged task + model. The shell's
-        // registerAdoExperiment is a thin wrapper over jsPsychADO.registerTask +
-        // registerModelPackage (see the bare form in demos/README.md).
-        // ─────────────────────────────────────────────────────────────────────
-        registerAdoExperiment({
-            task: delayDiscountingTask,
-            model: hyperbolicModel,
-            config: default_dd_config,
-        });
-
-        // ─────────────────────────────────────────────────────────────────────
-        // STANDARD jsPsych — ordinary instructions + end screen. Nothing here is
-        // ADO-specific; this is exactly what you'd write for any jsPsych study.
-        // ─────────────────────────────────────────────────────────────────────
-        const plain_finish_stimulus = '<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>';
+        window.jsPsych = jsPsych;
 
         const instructions = {
             type: jsPsychInstructions,
             pages: [
-                '<p>Welcome to the delay discounting task.</p><p>On each trial, choose between a smaller reward available sooner and a larger reward available later.</p>',
-                '<p>The task will adapt after each response. Choose the option you genuinely prefer on each trial.</p>',
-                '<p>Press Next when you are ready to begin.</p>',
+                "<p>Welcome to the delay discounting task.</p><p>On each trial, choose between a smaller reward available sooner and a larger reward available later.</p>",
+                "<p>The task will adapt after each response. Choose the option you genuinely prefer on each trial.</p>",
+                "<p>Press Next when you are ready to begin.</p>",
             ],
             show_clickable_nav: true,
-            key_forward: 'm',
-            key_backward: 'z',
-            button_label_previous: 'Previous (<strong>Z</strong>)',
-            button_label_next: 'Next (<strong>M</strong>)',
-            simulation_options: {
-                data: makeInstructionSimulationData(3, simulation_config),
+        };
+
+        const ado = jsPsychADO.createController(jsPsych, {
+            model: hyperbolicModel,
+            design_grid,
+            stan: {
+                num_chains: 2,
+                num_warmup: 500,
+                num_samples: 500,
+                seed: 123,
+            },
+            n_trials: 42,
+        });
+
+        const keymap = { s: 0, l: 1 };
+        const prompt = "<p style=\"margin-top: 1.25rem; font-size: 0.82rem; color: #9ca3af;\">Press <strong>S</strong> for Smaller-sooner &nbsp;·&nbsp; Press <strong>L</strong> for Larger-later</p>";
+
+        let choice_key_handler = null;
+        function enableChoiceKeys() {
+            const key_to_choice = Object.fromEntries(
+                Object.entries(keymap).map(([key, index]) => [key.toUpperCase(), index])
+            );
+            choice_key_handler = (event) => {
+                const index = key_to_choice[event.key.toUpperCase()];
+                if (index === undefined) return;
+                const button = document.querySelector(`#jspsych-html-button-response-btngroup [data-choice="${index}"]`);
+                if (button) button.click();
+            };
+            document.addEventListener("keydown", choice_key_handler);
+        }
+
+        function disableChoiceKeys() {
+            if (choice_key_handler) {
+                document.removeEventListener("keydown", choice_key_handler);
+                choice_key_handler = null;
+            }
+        }
+
+        const trial = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: "<p style=\"font-size: 1.3rem; margin: 0 0 1.75rem;\">Which would you prefer?</p>",
+            choices: () => makeChoices(ado.getDesign()),
+            button_html: makeButtonHtml,
+            prompt,
+            on_load: enableChoiceKeys,
+            on_finish: (data) => {
+                disableChoiceKeys();
+                ado.recordResponse(data.response);
             },
         };
 
+        const plain_finish_stimulus = "<h2>Finished</h2><p>The experiment is complete. Click SUBMIT to finish.</p>";
         const end_screen = {
             type: jsPsychHtmlButtonResponse,
             stimulus: plain_finish_stimulus,
-            on_start: function(trial) {
-                removeAdoDebugPanels();
-                trial.stimulus = run_context.debug
-                    ? makeDebriefStimulus(run_context.param_history || {}, run_context.posterior_display)
-                    : plain_finish_stimulus;
-            },
             choices: ["SUBMIT"],
-            simulation_options: {
-                data: makeEndSimulationData(simulation_config),
-            },
         };
 
-        jsPsych = initJsPsych({
-            on_finish: () => jsPsych.data.displayData()
-        });
-        addAdoDataProperties(jsPsych, {
-            run_settings: run_settings,
-            model: hyperbolicModel,
-            simulation_config: simulation_config,
-        });
-
-        // ─────────────────────────────────────────────────────────────────────
-        // THE ADO INTERFACE (2/2) — build the adaptive timeline fragment and splice
-        // it between the standard trials. The shell's createExperimentAdoTimeline
-        // wraps jsPsychADO.createTimeline (adding controller switching + simulation).
-        // ─────────────────────────────────────────────────────────────────────
-        let timeline = [instructions];
-        timeline = timeline.concat(createExperimentAdoTimeline(jsPsych, {
-            task: delayDiscountingTask,
-            model: hyperbolicModel,
-            config: default_dd_config,
-            run_context: run_context,
-            session_id: session_id,
-            design_seed: run_config.controller ? run_config.controller.design_seed : null,
-        }));
-        timeline.push(end_screen);
-
-        if (run_settings.simulation_mode) {
-            jsPsych.simulate(timeline, run_settings.simulation_mode);
-        } else {
-            jsPsych.run(timeline);
-        }
+        jsPsych.run([instructions, ...ado.createTimeline(trial, {
+            describeDesign,
+            response_labels,
+        }), end_screen]);
     </script>
 </html>

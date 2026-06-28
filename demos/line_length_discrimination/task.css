@@ -1,7 +1,4 @@
-/* Line-length 3IFC task styles. The task's makeStimulus emits these class names;
- * a consumer must load this stylesheet for the stimulus to render as designed.
- * With a bundler: import "jspsych-ado/tasks/line_length_discrimination_3ifc/task.css".
- * On a static page: <link rel="stylesheet" href=".../task.css">. */
+/* Line-length 3IFC demo styles. The demo helper emits these class names. */
 .ll-stimulus-wrap {
   width: min(720px, calc(100vw - 48px));
   margin: 0 auto;

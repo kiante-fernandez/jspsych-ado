@@ -1,6 +1,6 @@
 // Real Stan WASM recovery smoke for the exponential-discounting model — the
 // "bring your own model" demo's model (a new .stan compiled to WASM, reusing the
-// packaged delay-discounting task). Checks:
+// packaged delay-discounting design grid). Checks:
 //   1. recovery        - k and tau recovered within tolerance at N adaptive trials
 //   2. k ordering      - recovered k rises with the true discount rate
 //   3. precision       - k posterior SD shrinks with more trials
@@ -30,7 +30,7 @@ globalThis.fetch = async (url, opts) => {
 
 const StanModel = (await import("../../core/tinystan/index.mjs")).default;
 const exp = (await import("../../demos/byo_model_exponential/model.js")).default;
-const ddTask = (await import("../../jspsych-ado/tasks/delay_discounting/task.js")).default;
+const { design_grid } = await import("../../demos/byo_model_exponential/task.js");
 const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws } = await import(
   "../../jspsych-ado/ado/mi_engine.js"
 );
@@ -42,9 +42,9 @@ const createModule = (await import(exp.moduleUrl)).default;
 const model = await StanModel.load(createModule, () => {});
 console.log("stan version:", model.stanVersion());
 
-// Reuse the packaged delay-discounting task's design grid (the whole point of the
-// "bring your own model" demo: same task, new likelihood).
-const designs = enumerateDesigns(ddTask.design_grid);
+// Reuse the packaged delay-discounting design grid (the whole point of the
+// "bring your own model" demo: same designs, new likelihood).
+const designs = enumerateDesigns(design_grid);
 const sample_config = { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 };
 
 function runRecovery(trueParams, seed, nTrials) {
