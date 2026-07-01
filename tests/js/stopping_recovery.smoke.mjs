@@ -30,8 +30,7 @@ const model = await StanModel.load(createModule, () => {});
 console.log("stan version:", model.stanVersion());
 
 const designs = enumerateDesigns(
-  (await import("../../demos/delay_discounting/dd_config.js")).default_dd_config.grid_design ??
-    (await import("../../src/tasks/delay_discounting/task.js")).default.design_grid,
+  (await import("../../demos/delay_discounting/task.js")).design_grid,
 );
 const sample_config = { num_chains: 2, num_warmup: 300, num_samples: 300, seed: 123 };
 const max_possible_eig = maxPossibleEig(hyp.responseSpace); // ln 2

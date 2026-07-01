@@ -369,6 +369,53 @@ test("forgotten recordResponse: on_finish rejects AND the experiment aborts visi
   assert.equal(data.ado_event, "error");
 });
 
+test("categorical run: K=3 outcomes flow through the public API; out-of-range rejected", async () => {
+  const categorical_model = makeModel({
+    id: "test_3cat",
+    responseSpace: { type: "categorical", n_categories: 3 },
+    responseProb: undefined,
+    responseProbs: (design, theta) => {
+      const a = Math.exp(theta.k * design.t_ll);
+      const b = Math.exp(theta.tau);
+      const z = a + b + 1;
+      return [a / z, b / z, 1 / z];
+    },
+  });
+  const ado = createController(makeJsPsych(), {
+    model: categorical_model,
+    design_grid: DESIGN_GRID,
+    controller: "mock",
+  });
+  const trial = {
+    type: "html-button-response",
+    stimulus: "s",
+    choices: ["A", "B", "C"],
+    on_finish: (d) => ado.recordResponse(d.response),
+  };
+  const { rows } = await runFragment(
+    ado.createTimeline(trial, { n_trials: 2, debug: false }),
+    () => ({ response: 2 }),
+  );
+  assert.equal(rows[0].choice, 2);
+  assert.equal(rows[0].choice_label, "C"); // inferred from the 3 static choices
+
+  // K=3 bound: response 3 is out of range and must reject with the categorical range.
+  const ado2 = createController(makeJsPsych(), {
+    model: categorical_model,
+    design_grid: DESIGN_GRID,
+    controller: "mock",
+  });
+  const f = ado2.createTimeline(
+    { ...trial, on_finish: (d) => ado2.recordResponse(d.response) },
+    { n_trials: 1, debug: false },
+  );
+  f[0].on_timeline_start();
+  await assert.rejects(
+    () => f[0].timeline[0].timeline[0].on_finish({ response: 3 }),
+    /integer outcome in 0\.\.2/,
+  );
+});
+
 test("user mapping owns raw->outcome: mapped value is the choice, raw response survives", async () => {
   const ado = createController(makeJsPsych(), {
     model: makeModel(),

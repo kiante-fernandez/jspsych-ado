@@ -14,7 +14,7 @@ import "./_wasm_node_shim.mjs";
 
 const StanModel = (await import("../../core/tinystan/index.mjs")).default;
 const exp = (await import("../../demos/byo_model_exponential/model.js")).default;
-const ddTask = (await import("../../src/tasks/delay_discounting/task.js")).default;
+const { design_grid } = await import("../../demos/delay_discounting/task.js");
 const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws } =
   await import("../../src/ado/mi_engine.js");
 const { createSeededRng, simulateCategoricalChoice } =
@@ -28,7 +28,7 @@ console.log("stan version:", model.stanVersion());
 
 // Reuse the packaged delay-discounting task's design grid (the whole point of the
 // "bring your own model" demo: same task, new likelihood).
-const designs = enumerateDesigns(ddTask.design_grid);
+const designs = enumerateDesigns(design_grid);
 const sample_config = { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 };
 
 function runRecovery(trueParams, seed, nTrials) {

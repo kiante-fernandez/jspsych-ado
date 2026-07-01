@@ -23,8 +23,7 @@ const { enumerateDesigns, selectOptimalDesign, summarizeDraws, samplePriorDraws 
   await import("../../src/ado/mi_engine.js");
 const { createSeededRng, simulateCategoricalChoice } =
   await import("../../src/ado/ado_simulation.js");
-const { default_dd_config } = await import("../../demos/delay_discounting/dd_config.js");
-const delayDiscountingTask = (await import("../../src/tasks/delay_discounting/task.js")).default;
+const { design_grid } = await import("../../demos/delay_discounting/task.js");
 
 const { makeStanDataBuilder } = await import("../../src/ado/stan_data.js");
 // The model declares a stanData map; generate its buildData (the framework does this
@@ -35,8 +34,8 @@ const createModule = (await import(hyp.moduleUrl)).default;
 const model = await StanModel.load(createModule, () => {});
 console.log("stan version:", model.stanVersion());
 
-const designs = enumerateDesigns(delayDiscountingTask.design_grid);
-const sample_config = { ...default_dd_config.stan };
+const designs = enumerateDesigns(design_grid);
+const sample_config = { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 };
 
 /**
  * Run the adaptive loop against a simulated participant with the given true
