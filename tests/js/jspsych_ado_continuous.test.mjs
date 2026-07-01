@@ -1,18 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  registerTask,
-  registerModelPackage,
-  validateTask,
-  validateModel,
-  validateTaskModelPair,
-  buildAdapter,
-} from "../../src/index.js";
+import { createController, validateModel, buildModelAdapter } from "../../src/index.js";
+import { validateDesignGridForModel } from "../../src/validation.js";
 import { createDesignScorer, gaussianEntropy } from "../../src/ado/mi_engine.js";
 import { simulateContinuousResponse, createSeededRng } from "../../src/ado/ado_simulation.js";
 
 // End-to-end facade support for a continuous (pseudo-continuous) response: a model
-// supplies a density + moments instead of a probability vector, and a task carries
+// supplies a density + moments instead of a probability vector, and the trials carry
 // no response labels. Uses a linear-Gaussian estimation model y ~ Normal(theta*x, sigma).
 
 const SIGMA = 1.0;
@@ -47,18 +41,9 @@ function continuousModelPackage(overrides = {}) {
   };
 }
 
-function continuousTask(overrides = {}) {
-  return {
-    id: "cont_task",
-    design_grid: { x: [0.5, 1, 2] },
-    designKeys: ["x"],
-    responseSpace: { type: "continuous" },
-    // Presentation is the task's concern; any trial yielding a number works (slider,
-    // numeric input, ...). A getChoiceTrials stub is enough for validation here.
-    presentation: { getChoiceTrials: () => [] },
-    ...overrides,
-  };
-}
+const CONT_GRID = { x: [0.5, 1, 2] };
+
+const jsPsychStub = { abortExperiment() {} };
 
 test("validateModel: a continuous model package validates", () => {
   const { valid, problems } = validateModel(continuousModelPackage());
@@ -79,21 +64,8 @@ test("validateModel: continuous model without moments or support is rejected", (
   assert.ok(problems.some((p) => /responseMoments|responseSupport/.test(p.message)));
 });
 
-test("validateTask: a continuous task needs no response_labels", () => {
-  const { valid, problems } = validateTask(continuousTask());
-  assert.equal(valid, true, JSON.stringify(problems));
-});
-
-test("buildAdapter: forwards continuous fields, and the adapter drives the engine scorer", () => {
-  const spec = continuousModelPackage();
-  const adapter = buildAdapter({
-    spec,
-    name: "cont_est",
-    paramNames: ["theta"],
-    prior: spec.prior,
-    moduleUrl: spec.moduleUrl,
-    wasmUrl: spec.wasmUrl,
-  });
+test("buildModelAdapter: forwards continuous fields, and the adapter drives the engine scorer", () => {
+  const adapter = buildModelAdapter(continuousModelPackage(), "test");
   assert.equal(typeof adapter.responseDensity, "function");
   assert.equal(typeof adapter.responseDensityFactory, "function");
   assert.equal(typeof adapter.responseMoments, "function");
@@ -107,65 +79,88 @@ test("buildAdapter: forwards continuous fields, and the adapter drives the engin
   assert.ok(scorer.mutualInfo({ x: 2 }, draws) > 0);
 });
 
-test("validateTaskModelPair: a matching continuous task/model pair passes", () => {
-  const spec = continuousModelPackage();
-  const adapter = buildAdapter({
-    spec,
-    name: "cont_est",
-    paramNames: ["theta"],
-    prior: spec.prior,
-    moduleUrl: spec.moduleUrl,
-    wasmUrl: spec.wasmUrl,
-  });
-  assert.doesNotThrow(() =>
-    validateTaskModelPair(continuousTask(), adapter, "cont_task", "cont_est"),
+test("validateDesignGridForModel: a matching continuous grid/model pair passes", () => {
+  const adapter = buildModelAdapter(continuousModelPackage(), "test");
+  assert.doesNotThrow(() => validateDesignGridForModel(CONT_GRID, adapter, "cont_est"));
+});
+
+test("validateDesignGridForModel: a responseDensityFactory that disagrees with responseDensity is caught", () => {
+  const adapter = buildModelAdapter(
+    continuousModelPackage({ responseDensityFactory: () => () => 0.123 }),
+    "test",
   );
+  assert.throws(() => validateDesignGridForModel(CONT_GRID, adapter, "cont_est"), /disagrees/);
 });
 
-test("validateTaskModelPair: a responseDensityFactory that disagrees with responseDensity is caught", () => {
-  const spec = continuousModelPackage({ responseDensityFactory: () => () => 0.123 });
-  const adapter = buildAdapter({
-    spec,
-    name: "cont_est",
-    paramNames: ["theta"],
-    prior: spec.prior,
-    moduleUrl: spec.moduleUrl,
-    wasmUrl: spec.wasmUrl,
+test("validateDesignGridForModel: a bad continuous density (negative) is caught by the probe", () => {
+  const adapter = buildModelAdapter(continuousModelPackage({ responseDensity: () => -1 }), "test");
+  assert.throws(() => validateDesignGridForModel(CONT_GRID, adapter, "cont_est"), /density probe/);
+});
+
+test("createController: a continuous model builds a controller handle without error", () => {
+  const ado = createController(jsPsychStub, {
+    model: continuousModelPackage({ id: "cont_est_ctrl" }),
+    design_grid: CONT_GRID,
+    controller: "mock",
   });
-  assert.throws(
-    () => validateTaskModelPair(continuousTask(), adapter, "cont_task", "cont_est"),
-    /disagrees/,
-  );
+  assert.equal(typeof ado.createTimeline, "function");
 });
 
-test("validateTaskModelPair: a bad continuous density (negative) is caught by the probe", () => {
-  const spec = continuousModelPackage({ responseDensity: () => -1 });
-  const adapter = buildAdapter({
-    spec,
-    name: "cont_est",
-    paramNames: ["theta"],
-    prior: spec.prior,
-    moduleUrl: spec.moduleUrl,
-    wasmUrl: spec.wasmUrl,
-  });
-  assert.throws(
-    () => validateTaskModelPair(continuousTask(), adapter, "cont_task", "cont_est"),
-    /density probe/,
-  );
-});
-
-test("registerModelPackage + registerTask: a continuous pair registers without error", () => {
-  registerTask("cont_task_reg", continuousTask({ id: "cont_task_reg" }));
-  const name = registerModelPackage(continuousModelPackage({ id: "cont_est_reg" }));
-  assert.equal(name, "cont_est_reg");
-});
-
-test("registerModelPackage: continuous model missing responseDensity throws", () => {
+test("createController: continuous model missing responseDensity throws", () => {
   assert.throws(
     () =>
-      registerModelPackage(continuousModelPackage({ id: "cont_bad", responseDensity: undefined })),
+      createController(jsPsychStub, {
+        model: continuousModelPackage({ id: "cont_bad", responseDensity: undefined }),
+        design_grid: CONT_GRID,
+      }),
     /responseDensity/,
   );
+});
+
+test("controller API run: a continuous response records a numeric choice with no label", async () => {
+  const ado = createController(jsPsychStub, {
+    model: continuousModelPackage({ id: "cont_run" }),
+    design_grid: CONT_GRID,
+    controller: "mock",
+  });
+  const trial = {
+    type: "canvas-slider-response",
+    stimulus: () => `estimate for x=${ado.evaluateDesignVariable("x")}`,
+    on_finish: (data) => ado.recordResponse(Number(data.response)),
+  };
+  const fragment = ado.createTimeline(trial, { n_trials: 2, debug: false });
+  const root = fragment[0];
+  root.on_timeline_start();
+
+  const rows = [];
+  for (const node of root.timeline) {
+    if (node.conditional_function && !node.conditional_function()) continue;
+    for (const t of node.timeline) {
+      if (typeof t.stimulus === "function") t.stimulus(); // jsPsych 8: params before on_start
+      if (t.on_start) t.on_start(t);
+      const data = { response: 42.5 };
+      await t.on_finish(data);
+      rows.push(data);
+    }
+  }
+
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].choice, 42.5);
+  assert.equal(rows[0].choice_label, null);
+  assert.equal(typeof rows[0].ado_design.x, "number");
+});
+
+test("controller API run: a non-finite continuous response is rejected", async () => {
+  const ado = createController(jsPsychStub, {
+    model: continuousModelPackage({ id: "cont_nan" }),
+    design_grid: CONT_GRID,
+    controller: "mock",
+  });
+  const trial = { type: "x", stimulus: "s", on_finish: (d) => ado.recordResponse(d.response) };
+  const root = ado.createTimeline(trial, { n_trials: 1, debug: false })[0];
+  root.on_timeline_start();
+  const t = root.timeline[0].timeline[0];
+  await assert.rejects(() => t.on_finish({ response: "very long" }), /finite numeric response/);
 });
 
 // --- Simulator ---

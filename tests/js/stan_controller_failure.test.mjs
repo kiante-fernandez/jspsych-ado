@@ -81,21 +81,31 @@ test("construction rejects num_samples < 1", () => {
   );
 });
 
-test("worker onerror rejects start() with a clear load-failure message", async () => {
+test("worker onerror surfaces on the first update() with a clear load-failure message", async () => {
+  // start() is synchronous (it kicks off the load in the background), so a load
+  // failure must reject the FIRST update() instead of hanging the run.
   const restore = installScriptedWorker((_message, port) => port.error("module not found"));
   try {
     const controller = createStanAdoController(baseArgs(makeModel()));
-    await assert.rejects(controller.start(), /Stan worker failed to load: module not found/);
+    controller.start();
+    await assert.rejects(
+      controller.update({ ado_design: { d: 0 }, choice: 0 }),
+      /Stan worker failed to load: module not found/,
+    );
   } finally {
     restore();
   }
 });
 
-test("worker onmessageerror rejects with a deserialization message", async () => {
+test("worker onmessageerror surfaces on the first update() with a deserialization message", async () => {
   const restore = installScriptedWorker((_message, port) => port.messageerror());
   try {
     const controller = createStanAdoController(baseArgs(makeModel()));
-    await assert.rejects(controller.start(), /message could not be deserialized/);
+    controller.start();
+    await assert.rejects(
+      controller.update({ ado_design: { d: 0 }, choice: 0 }),
+      /message could not be deserialized/,
+    );
   } finally {
     restore();
   }

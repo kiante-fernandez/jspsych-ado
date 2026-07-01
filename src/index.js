@@ -652,5 +652,6 @@ export {
   // stable jsPsychADO façade; may change without a major version bump while pre-1.0.
   parseStanPriors,
   labelsToConfig,
+  buildModelAdapter,
 };
 export default jsPsychADO;
