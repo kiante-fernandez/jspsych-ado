@@ -105,16 +105,16 @@ Figure [1](#fig:conceptual){reference-type="ref" reference="fig:conceptual"} su
 ![Conceptual loop implemented by `jspsych-ado`. Candidate designs are scored by expected information gain, the selected design is presented as a jsPsych trial, the participant's response is used to update the posterior, and the updated posterior informs the next design selection.](jspsych-ado-conceptual.png){#fig:conceptual width="0.75\\linewidth"}
 
 Figure [2](#fig:code-block){reference-type="ref" reference="fig:code-block"} shows how this loop is exposed to users.
-An experiment registers a task and a model, then calls `createTimeline` to construct the adaptive jsPsych timeline.
-Tasks own the participant-facing pieces: candidate designs, display logic, response options, and response coding.
+An experiment creates a controller for a model and a grid of candidate designs (`createController`), authors ordinary jsPsych trials that read the current design from the controller (`evaluateDesignVariable`) and report the outcome from the trial's `on_finish` (`recordResponse`), and then wraps those trials into the adaptive timeline (`createTimeline`).
+The participant-facing task is therefore plain jsPsych code: display logic, response options, and response coding live in the experiment, exactly as in a non-adaptive study.
 A model owns the statistical response process.
-A controller connects the registered task and model, checks that their design variables and response spaces are compatible, and chooses designs during the experiment.
+The controller validates the model against the candidate designs, chooses designs during the experiment, and guarantees the scheduling: the posterior update is awaited before the next trial renders.
 This separation lets researchers change the participant-facing task, the statistical model, or the adaptive policy independently.
 
 The model package defines the statistical quantities that the controller needs for inference and design scoring.
 The adaptive loop requires two statistical computations.
 First, after each response, the system must update uncertainty about model parameters; this is Stan's role.
-The registered Stan model is fit to the accumulated trial history, and the controller receives posterior draws from $p(\theta \mid D)$.
+The model's Stan program is fit to the accumulated trial history, and the controller receives posterior draws from $p(\theta \mid D)$.
 Second, the system must predict how a participant would respond to each candidate design under possible parameter values.
 This is the role of the model's JavaScript `responseProb` or `responseProbs` function, which the controller evaluates over the design grid.
 A model package therefore supplies parameter names and priors, Stan code or a compiled WebAssembly artifact, the data mapping from jsPsych trial rows to Stan input, and the JavaScript response-probability function.
@@ -136,7 +136,7 @@ The resulting recovery, parity, and browser-level checks are discussed below as 
 
 # Example: adaptive numerosity discrimination
 
-![Minimal `jspsych-ado` workflow. Users register a task that defines the stimuli and responses, register a model that defines the statistical response process, and create an adaptive jsPsych timeline from the paired task and model.](jspsych-ado-code_block.png){#fig:code-block width="1\\linewidth"}
+![Minimal `jspsych-ado` workflow. Users create a controller for a model and a design grid, author an ordinary jsPsych trial that reads the current design from the controller and records the response, and wrap that trial into an adaptive jsPsych timeline.](jspsych-ado-code_block.png){#fig:code-block width="1\\linewidth"}
 
 We will now explain the details using a numerosity (numeric) discrimination task, following @halberda2008individual, which ships with the package as a ready-to-run task/model pair. In this example there is a single stimulus parameter controling the numerosity ratio of the two dot arrays and denoted by the design $d$ and a single model parameter, the Weber fraction $\theta = w$ (a participant's approximate-number-system acuity). A cumulative-normal (probit) function $\Phi$ is assumed to be the psychometric function, and the task is two-alternative forced choice (the participant judges which color is more numerous), giving a binary response $y$. Using the ADO method, the Weber fraction can be estimated, with the next dot pair $d^{*}$ on each trial
 chosen to maximize the expected information gain about $w$.
