@@ -57,33 +57,7 @@ function makeJsPsych() {
   };
 }
 
-// Drive a returned timeline fragment the way jsPsych 8 does: function-valued
-// parameters are resolved BEFORE on_start (processParameters -> onStart -> plugin ->
-// await onFinish). respond(trial_number, trial, resolved) supplies the plugin data row.
-async function runFragment(fragment, respond) {
-  const root = fragment[0];
-  if (root.on_timeline_start) root.on_timeline_start();
-  const rows = [];
-  const rendered = [];
-  let step = 0;
-  for (const node of root.timeline) {
-    if (node.conditional_function && !node.conditional_function()) continue;
-    for (const t of node.timeline) {
-      const resolved = {};
-      for (const key of ["stimulus", "choices", "data", "simulation_options"]) {
-        resolved[key] = typeof t[key] === "function" ? t[key]() : t[key];
-      }
-      if (t.on_start) t.on_start(t);
-      rendered.push(resolved);
-      const data = respond ? respond(step, t, resolved) : { response: 1 };
-      if (t.on_finish) await t.on_finish(data);
-      rows.push(data);
-      step += 1;
-    }
-  }
-  if (root.on_timeline_finish) root.on_timeline_finish();
-  return { rows, rendered };
-}
+import { runFragment } from "./_timeline_harness.mjs";
 
 // A fake Worker servicing the stan controller's protocol: init -> ack; sample ->
 // posterior draw columns. `gate` (when provided) delays sample responses until

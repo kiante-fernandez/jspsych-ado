@@ -21,7 +21,8 @@
 
 import { createStanAdoController } from "./controllers/stan_ado_controller.js";
 import { createMockAdoController } from "./controllers/mock_ado_controller.js";
-import { createAdoTimeline } from "./ado/ado_timeline.js";
+import { createAdoTimeline, normalizeTestletSize } from "./ado/ado_timeline.js";
+import { enumerateDesigns } from "./ado/mi_engine.js";
 import { arange, linspace } from "./ado/grid.js";
 import { makeStanDataBuilder } from "./ado/stan_data.js";
 import {
@@ -29,7 +30,7 @@ import {
   simulateCategoricalChoice,
   simulateContinuousResponse,
 } from "./ado/ado_simulation.js";
-import { makeChoiceSimulationOptions } from "./ado/simulation_hooks.js";
+import { makeChoiceSimulationOptions, copySimulationAuditFields } from "./ado/simulation_hooks.js";
 import {
   validateModel,
   validateDesignGridForModel,
@@ -104,7 +105,11 @@ function createController(jsPsych, config = {}) {
   }
 
   const adapter = buildModelAdapter(config.model, "createController");
-  validateDesignGridForModel(config.design_grid, adapter, adapter.id);
+  // Enumerate the candidate designs ONCE per handle; validation, and every
+  // controller built by createTimeline, reuse the enumerated array (enumerating
+  // an already-enumerated array is a pass-through).
+  const candidate_designs = enumerateDesigns(config.design_grid);
+  validateDesignGridForModel(candidate_designs, adapter, adapter.id);
 
   // The facade state below belongs to the ACTIVE run (one createTimeline call).
   // Sequential reuse (a practice run then a main run from the same handle) works
@@ -214,7 +219,7 @@ function createController(jsPsych, config = {}) {
       const adaptive_controller =
         controller_mode === "mock"
           ? createMockAdoController({
-              grid_design: config.design_grid,
+              grid_design: candidate_designs,
               params: adapter.params,
               n_trials,
               testlet_size,
@@ -222,7 +227,7 @@ function createController(jsPsych, config = {}) {
             })
           : createStanAdoController({
               model: adapter,
-              grid_design: config.design_grid,
+              grid_design: candidate_designs,
               stan,
               n_trials,
               testlet_size,
@@ -297,15 +302,14 @@ function createController(jsPsych, config = {}) {
           choices: response_trial ? response_trial.choices : undefined,
           describeDesign: timeline_config.describeDesign ?? config.describeDesign,
           getChoiceTrials(ctx) {
-            get_live_design = ctx.getDesign;
-            get_live_state = ctx.getState;
-            const materialized = uses_trial_factory
-              ? trial_or_trials({ ...ctx, ado })
-              : static_trial_info.trials;
-            const { trials, response_trial_index } = normalizeControllerTrials(
-              materialized,
-              timeline_config.response_trial_index,
-            );
+            // The factory path re-normalizes because user code may return anything;
+            // the static path was validated once at createTimeline entry.
+            const { trials, response_trial_index } = uses_trial_factory
+              ? normalizeControllerTrials(
+                  trial_or_trials({ ...ctx, ado }),
+                  timeline_config.response_trial_index,
+                )
+              : static_trial_info;
             return trials.map((trial, index) => {
               const cloned = { ...trial };
               delete cloned.__ado_is_response;
@@ -332,6 +336,7 @@ function createController(jsPsych, config = {}) {
                   );
                 }
                 data.__ado_response = recorded_response;
+                copySimulationAuditFields(data, run_context);
               };
               // Simulation hook (#135 follow-up to the old ?simulate= contract): when a
               // synthetic participant is configured, supply plugin simulation data drawn
@@ -348,8 +353,18 @@ function createController(jsPsych, config = {}) {
         },
         run_context,
         {
-          onTimelineStart: () => {
+          // Bind-once accessor handoff: the timeline delivers its live design/state
+          // readers when it starts, and a lightweight final snapshot when it ends
+          // (post-run getState() keeps working — e.g. a debrief screen — while the
+          // controller, grid, and posterior draws become collectable).
+          onTimelineStart: (accessors) => {
+            get_live_design = accessors.getDesign;
+            get_live_state = accessors.getState;
             active_run = run;
+          },
+          onTimelineFinish: (final_accessors) => {
+            get_live_design = final_accessors.getDesign;
+            get_live_state = final_accessors.getState;
           },
         },
       );
@@ -433,16 +448,6 @@ function normalizeControllerMode(value) {
   }
   if (!CONTROLLER_MODES.has(value)) {
     throw new Error(`createController: controller must be "stan" or "mock", got "${value}".`);
-  }
-  return value;
-}
-
-function normalizeTestletSize(value) {
-  if (value == null) {
-    return 1;
-  }
-  if (!Number.isInteger(value) || value < 1) {
-    throw new Error(`ado.createTimeline: testlet_size must be a positive integer, got ${value}`);
   }
   return value;
 }

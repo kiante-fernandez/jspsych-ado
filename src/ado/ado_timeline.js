@@ -8,7 +8,6 @@ import {
   updateInformationGainPanel,
   finalizeDebugUi,
 } from "./debug/posterior_convergence_charts.js";
-import { copySimulationAuditFields } from "./simulation_hooks.js";
 
 // Generic adaptive-design-optimization (ADO) jsPsych timeline.
 //
@@ -94,6 +93,17 @@ function copySelectionFields(data, ado_state, design_metric) {
 // The generic ADO timeline
 // ---------------------------------------------------------------------------
 
+/** Validate a testlet size (choice trials between refits); null/undefined means 1. */
+function normalizeTestletSize(value) {
+  if (value == null) {
+    return 1;
+  }
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`testlet_size must be a positive integer, got ${value}`);
+  }
+  return value;
+}
+
 /**
  * Create the generic adaptive jsPsych timeline fragment for any ADO controller.
  *
@@ -148,16 +158,6 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
     }
   }
 
-  function normalizeTestletSize(value) {
-    if (value == null) {
-      return 1;
-    }
-    if (!Number.isInteger(value) || value < 1) {
-      throw new Error(`createAdoTimeline: testlet_size must be a positive integer, got ${value}`);
-    }
-    return value;
-  }
-
   function designsFromResult(result) {
     if (result.next_designs && result.next_designs.length) {
       return result.next_designs.slice();
@@ -191,7 +191,7 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
     }
   }
 
-  function copyUpdateFields(data, result, batch_length) {
+  function copyUpdateFields(data, result, batch_length, next_designs, next_design_metrics) {
     data.ado_event = "update";
     data.ado_session_id = result.session_id;
     data.ado_trial_index = result.trial_index;
@@ -200,8 +200,8 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
     data.controller_mode = run_context.controller_mode;
     data.design_strategy = run_context.design_strategy;
     data.ado_next_design = result.next_design;
-    data.ado_next_designs = designsFromResult(result);
-    data.ado_next_design_metrics = metricsFromResult(result, designsFromResult(result).length);
+    data.ado_next_designs = next_designs;
+    data.ado_next_design_metrics = next_design_metrics;
     data.ado_next_selection_time_ms = result.selection_time_ms ?? null;
     data.ado_max_mutual_info = result.max_mutual_info ?? null;
     data.ado_post_mean = result.post_mean;
@@ -310,9 +310,11 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
           logAdoTrial(run_context, batch[batch.length - 1], result, config);
           appendPosteriorHistory(run_context, result);
           appendInformationGainHistory(run_context, batch, result);
+          const next_designs = designsFromResult(result);
+          const next_design_metrics = metricsFromResult(result, next_designs.length);
           for (const row of batch) {
             copyPosteriorFields(row, result);
-            copyUpdateFields(row, result, batch.length);
+            copyUpdateFields(row, result, batch.length, next_designs, next_design_metrics);
           }
           updateLiveCharts(run_context.param_history || {}, ado_state, run_context);
           updateInformationGainPanel(run_context);
@@ -343,7 +345,6 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
         failExperiment(error);
         throw error;
       }
-      copySimulationAuditFields(data, run_context);
       const design = current_design;
       const choice = data.__ado_response;
       delete data.__ado_response;
@@ -395,7 +396,9 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
       timeline: trials,
       // on_timeline_start fires before the first child trial's parameters are
       // resolved, so the first design is in place exactly when it's needed and a
-      // start() failure aborts visibly instead of crashing page setup.
+      // start() failure aborts visibly instead of crashing page setup. The facade
+      // receives the live accessors here (bind-once, instead of a side channel
+      // through every getChoiceTrials call).
       on_timeline_start: () => {
         try {
           initializeAdo();
@@ -404,17 +407,29 @@ function createAdoTimeline(jsPsych, adaptive_controller, config, run_context = {
           throw error;
         }
         if (typeof hooks.onTimelineStart === "function") {
-          hooks.onTimelineStart();
+          hooks.onTimelineStart({
+            getDesign: () => current_design,
+            getState: () => ado_state,
+          });
         }
       },
+      // On finish, hand the facade a lightweight final snapshot (posterior
+      // summaries without the draw arrays) so post-run reads like a debrief's
+      // getState() keep working while the controller/grid/draws become
+      // collectable.
       on_timeline_finish: () => {
         finalizeDebugUi(run_context);
         if (typeof hooks.onTimelineFinish === "function") {
-          hooks.onTimelineFinish();
+          const final_state = ado_state ? { ...ado_state, posterior_draws: null } : null;
+          const final_design = current_design;
+          hooks.onTimelineFinish({
+            getDesign: () => final_design,
+            getState: () => final_state,
+          });
         }
       },
     },
   ];
 }
 
-export { createAdoTimeline };
+export { createAdoTimeline, normalizeTestletSize };

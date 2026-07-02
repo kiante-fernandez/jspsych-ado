@@ -4,6 +4,7 @@ import { createController, validateModel, buildModelAdapter } from "../../src/in
 import { validateDesignGridForModel } from "../../src/validation.js";
 import { createDesignScorer, gaussianEntropy } from "../../src/ado/mi_engine.js";
 import { simulateContinuousResponse, createSeededRng } from "../../src/ado/ado_simulation.js";
+import { runFragment } from "./_timeline_harness.mjs";
 
 // End-to-end facade support for a continuous (pseudo-continuous) response: a model
 // supplies a density + moments instead of a probability vector, and the trials carry
@@ -128,21 +129,12 @@ test("controller API run: a continuous response records a numeric choice with no
     stimulus: () => `estimate for x=${ado.evaluateDesignVariable("x")}`,
     on_finish: (data) => ado.recordResponse(Number(data.response)),
   };
-  const fragment = ado.createTimeline(trial, { n_trials: 2, debug: false });
-  const root = fragment[0];
-  root.on_timeline_start();
-
-  const rows = [];
-  for (const node of root.timeline) {
-    if (node.conditional_function && !node.conditional_function()) continue;
-    for (const t of node.timeline) {
-      if (typeof t.stimulus === "function") t.stimulus(); // jsPsych 8: params before on_start
-      if (t.on_start) t.on_start(t);
-      const data = { response: 42.5 };
-      await t.on_finish(data);
-      rows.push(data);
-    }
-  }
+  const { rows } = await runFragment(
+    ado.createTimeline(trial, { n_trials: 2, debug: false }),
+    () => ({
+      response: 42.5,
+    }),
+  );
 
   assert.equal(rows.length, 2);
   assert.equal(rows[0].choice, 42.5);
