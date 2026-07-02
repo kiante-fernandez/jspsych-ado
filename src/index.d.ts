@@ -184,9 +184,7 @@ export interface AdoController {
    */
   createTimeline(
     trialOrTrials:
-      | JsPsychTrial
-      | JsPsychTrial[]
-      | ((ctx: AdoTrialContext) => JsPsychTrial | JsPsychTrial[]),
+      JsPsychTrial | JsPsychTrial[] | ((ctx: AdoTrialContext) => JsPsychTrial | JsPsychTrial[]),
     options?: CreateTimelineOptions,
   ): any[];
 }
