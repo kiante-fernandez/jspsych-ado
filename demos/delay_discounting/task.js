@@ -1,6 +1,6 @@
 // Local delay-discounting showcase helpers.
 
-import { arange } from "../../src/index.js";
+import { arange } from "jspsych-ado";
 
 const response_labels = { 0: "SS", 1: "LL" };
 

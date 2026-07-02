@@ -36,11 +36,21 @@
             color: #9ca3af;
           }
         </style>
+        <!-- In your own project: npm install jspsych-ado, and these imports work as-is.
+         This map lets the in-repo demo resolve the same bare specifiers locally. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "jspsych-ado": "./src/index.js",
+          "jspsych-ado/": "./src/"
+        }
+      }
+    </script>
     </head>
     <body></body>
     <script type="module">
-        import { jsPsychADO } from "./src/index.js";
-        import hyperbolicModel from "./src/models/hyperbolic/model.js";
+        import { jsPsychADO } from "jspsych-ado";
+        import hyperbolicModel from "jspsych-ado/models/hyperbolic/model.js";
         import {
             buttonHtml,
             describeDesign,

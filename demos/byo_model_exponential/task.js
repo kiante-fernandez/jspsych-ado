@@ -1,6 +1,6 @@
 // Local delay-choice helpers for the bring-your-own-model demo.
 
-import { arange } from "../../src/index.js";
+import { arange } from "jspsych-ado";
 
 const response_labels = { 0: "SS", 1: "LL" };
 

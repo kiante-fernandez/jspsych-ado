@@ -1,4 +1,4 @@
-import { linspace } from "../../src/index.js";
+import { linspace } from "jspsych-ado";
 
 const LINE_KEYS = ["line_length_a", "line_length_b", "line_length_c"];
 

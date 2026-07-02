@@ -55,6 +55,7 @@ open the example:
 
 ```text
 demos/delay_discounting_tutorial/index.html?debug=1
+demos/size_discrimination/index.html?debug=1
 demos/delay_discounting/index.html?debug=1
 demos/line_length_discrimination/index.html?debug=1
 demos/halberda_dot_comparison/index.html?debug=1

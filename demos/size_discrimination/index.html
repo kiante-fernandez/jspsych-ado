@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Adaptive size discrimination</title>
+    <base href="../../" />
+    <script src="https://unpkg.com/jspsych@8.2.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+    <link href="https://unpkg.com/jspsych@8.2.3/css/jspsych.css" rel="stylesheet" type="text/css" />
+    <!-- In your own project: npm install jspsych-ado, and these imports work as-is.
+         This map lets the in-repo demo resolve the same bare specifiers locally. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "jspsych-ado": "./src/index.js",
+          "jspsych-ado/": "./src/"
+        }
+      }
+    </script>
+  </head>
+  <body></body>
+  <script type="module">
+    import { jsPsychADO } from "jspsych-ado";
+    import weber from "jspsych-ado/models/weber_dots/model.js";
+
+    // An adaptive twin of the jsPsych documentation's simple RT task
+    // (https://www.jspsych.org/latest/tutorials/rt-task/): blue vs orange circles,
+    // F/J keys — but here the SIZE DIFFERENCE adapts. The weber_dots model is
+    // generic Weber discrimination over two magnitudes, so it fits circle
+    // diameters just as well as dot counts; ADO converges on the size pairs most
+    // informative about this participant's Weber fraction w.
+
+    const jsPsych = initJsPsych({
+      on_finish: () => jsPsych.data.displayData(),
+    });
+    window.jsPsych = jsPsych;
+
+    // Candidate designs: base diameters (px) crossed with size ratios, each pair
+    // in both orders so neither color is always the larger one.
+    const design_grid = [];
+    for (const base of [50, 70, 90]) {
+      for (const ratio of [1.08, 1.15, 1.25, 1.4, 1.6, 1.8]) {
+        const larger = Math.round(base * ratio);
+        design_grid.push({ n_blue: larger, n_yellow: base });
+        design_grid.push({ n_blue: base, n_yellow: larger });
+      }
+    }
+
+    const ado = jsPsychADO.createController(jsPsych, {
+      model: weber,
+      design_grid,
+      stan: { num_chains: 2, num_warmup: 500, num_samples: 500, seed: 123 },
+      n_trials: 24,
+    });
+
+    const circle = (diameter, color) =>
+      `<div class="sd-circle" style="display:inline-block;vertical-align:middle;margin:0 45px;` +
+      `width:${diameter}px;height:${diameter}px;border-radius:50%;background:${color};"></div>`;
+
+    const welcome = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: "<p>Welcome to the experiment. Press any key to begin.</p>",
+    };
+
+    const instructions = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <p>Two circles will appear on each trial: one <strong style="color:#1d6fd4;">blue</strong>,
+        one <strong style="color:#e08b00;">orange</strong>.</p>
+        <div style="margin:1.5rem 0;">${circle(70, "#1d6fd4")}${circle(90, "#e08b00")}</div>
+        <p>Press <strong>F</strong> if the <strong>blue</strong> circle is bigger.<br>
+        Press <strong>J</strong> if the <strong>orange</strong> circle is bigger.</p>
+        <p>The difficulty adapts to you. Press any key to start.</p>`,
+    };
+
+    const fixation = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: '<div style="font-size:60px;">+</div>',
+      choices: "NO_KEYS",
+      trial_duration: 400,
+    };
+
+    const trial = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: () =>
+        circle(ado.evaluateDesignVariable("n_blue"), "#1d6fd4") +
+        circle(ado.evaluateDesignVariable("n_yellow"), "#e08b00"),
+      choices: ["f", "j"],
+      on_finish: (data) => {
+        // Raw response is the key; the model observes CORRECTNESS (0/1).
+        const design = ado.getDesign();
+        const chose_blue = data.response === "f";
+        const blue_is_bigger = design.n_blue > design.n_yellow;
+        ado.recordResponse(chose_blue === blue_is_bigger ? 1 : 0);
+      },
+    };
+
+    // Each adaptive step is fixation -> choice; the last trial collects the response.
+    const adoTimeline = ado.createTimeline([fixation, trial], {
+      response_labels: ["incorrect", "correct"],
+    });
+
+    const debrief = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: () => {
+        const state = ado.getState();
+        const w = state && state.post_mean ? state.post_mean.w : null;
+        const w_sd = state && state.post_sd ? state.post_sd.w : null;
+        return (
+          "<p>All done!</p>" +
+          (w != null
+            ? `<p>Your estimated Weber fraction: <strong>${w.toFixed(3)}</strong> ` +
+              `(&plusmn; ${w_sd.toFixed(3)}).</p>` +
+              "<p>Smaller means you can tell apart circles that are closer in size.</p>"
+            : "") +
+          "<p>Press any key to see the data.</p>"
+        );
+      },
+    };
+
+    jsPsych.run([welcome, instructions, ...adoTimeline, debrief]);
+  </script>
+</html>

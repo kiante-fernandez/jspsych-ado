@@ -2,7 +2,7 @@
 // It uses the hyperbolic model's delay-discounting design keys with different
 // participant-facing button text.
 
-import { arange } from "../../src/index.js"; // reuse the public grid helper
+import { arange } from "jspsych-ado"; // reuse the public grid helper
 
 function weeks(t) {
   if (t === 0) return "today";

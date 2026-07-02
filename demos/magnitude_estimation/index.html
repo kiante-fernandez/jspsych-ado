@@ -9,11 +9,21 @@
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-instructions@2.1.0"></script>
     <link href="https://unpkg.com/jspsych@8.2.3/css/jspsych.css" rel="stylesheet" type="text/css" />
-  </head>
+      <!-- In your own project: npm install jspsych-ado, and these imports work as-is.
+         This map lets the in-repo demo resolve the same bare specifiers locally. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "jspsych-ado": "./src/index.js",
+          "jspsych-ado/": "./src/"
+        }
+      }
+    </script>
+</head>
   <body></body>
   <script type="module">
-    import { jsPsychADO } from "./src/index.js";
-    import magnitudeModel from "./src/models/magnitude_estimation/model.js";
+    import { jsPsychADO } from "jspsych-ado";
+    import magnitudeModel from "jspsych-ado/models/magnitude_estimation/model.js";
     import {
       CANVAS_SIZE,
       SLIDER_MIN,
